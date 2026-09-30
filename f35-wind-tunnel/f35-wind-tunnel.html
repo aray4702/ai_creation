@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F-35 Digital Wind Tunnel</title>
+<style>
+  :root{
+    --panel-bg: rgba(10,16,24,0.82);
+    --panel-border: rgba(90,180,255,0.25);
+    --accent: #4fd8ff;
+    --accent2: #ff8a3d;
+    --text: #d9ecf7;
+    --text-dim: #7c93a3;
+  }
+  html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#020407;font-family:'Segoe UI',Consolas,monospace;color:var(--text);}
+  canvas{display:block;}
+  #app{position:fixed;inset:0;}
+
+  /* ---------- start overlay ---------- */
+  #startOverlay{
+    position:fixed;inset:0;z-index:50;
+    background:radial-gradient(ellipse at 50% 40%, #0c1824 0%, #020407 75%);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;
+  }
+  #startOverlay h1{
+    font-size:2.4em;letter-spacing:0.12em;margin:0 0 6px 0;
+    color:var(--accent);text-shadow:0 0 18px rgba(79,216,255,0.6);
+    font-weight:600;
+  }
+  #startOverlay p{color:var(--text-dim);max-width:560px;line-height:1.5;margin:6px 0 26px;font-size:0.95em;}
+  #startBtn{
+    padding:14px 40px;font-size:1.05em;letter-spacing:0.08em;
+    background:linear-gradient(180deg,#1b3a4d,#0e2028);
+    border:1px solid var(--accent);color:var(--accent);
+    border-radius:4px;cursor:pointer;text-transform:uppercase;
+    box-shadow:0 0 24px rgba(79,216,255,0.25);
+    transition:all .15s ease;
+  }
+  #startBtn:hover{background:linear-gradient(180deg,#26506a,#123040);box-shadow:0 0 32px rgba(79,216,255,0.5);}
+  #startOverlay .hint{margin-top:22px;font-size:0.75em;color:var(--text-dim);letter-spacing:0.05em;}
+
+  /* ---------- HUD ---------- */
+  .panel{
+    background:var(--panel-bg);
+    border:1px solid var(--panel-border);
+    border-radius:6px;
+    backdrop-filter:blur(4px);
+    box-shadow:0 0 20px rgba(0,0,0,0.4), inset 0 0 20px rgba(79,216,255,0.03);
+  }
+  .panel h2{
+    margin:0;padding:8px 12px;font-size:0.72em;letter-spacing:0.14em;
+    color:var(--accent);border-bottom:1px solid var(--panel-border);
+    text-transform:uppercase;font-weight:600;
+  }
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:10;font-size:14px;}
+  #hud .panel{pointer-events:auto;}
+
+  #leftPanel{position:absolute;left:14px;top:14px;width:210px;}
+  .btnGroup{display:flex;flex-direction:column;gap:6px;padding:10px;}
+  .modeBtn{
+    background:rgba(20,32,42,0.7);border:1px solid rgba(90,180,255,0.18);
+    color:var(--text-dim);padding:8px 10px;border-radius:4px;cursor:pointer;
+    font-size:0.78em;text-align:left;letter-spacing:0.03em;transition:all .12s ease;
+  }
+  .modeBtn:hover{border-color:var(--accent);color:var(--text);}
+  .modeBtn.active{
+    background:linear-gradient(90deg,rgba(79,216,255,0.22),rgba(79,216,255,0.05));
+    border-color:var(--accent);color:#fff;box-shadow:0 0 10px rgba(79,216,255,0.25) inset;
+  }
+  .modeBtn small{display:block;color:var(--text-dim);font-size:0.85em;margin-top:2px;}
+  .sectionGap{height:6px;}
+
+  #vizPanel{position:absolute;left:14px;top:346px;width:210px;}
+
+  #readoutPanel{position:absolute;right:14px;top:14px;width:230px;}
+  .readoutRow{
+    display:flex;justify-content:space-between;align-items:baseline;
+    padding:7px 12px;border-bottom:1px solid rgba(90,180,255,0.08);
+  }
+  .readoutRow:last-child{border-bottom:none;}
+  .readoutRow .label{font-size:0.68em;color:var(--text-dim);letter-spacing:0.08em;text-transform:uppercase;}
+  .readoutRow .value{font-size:1.05em;color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums;}
+  .readoutRow .value.warn{color:var(--accent2);}
+  .readoutRow .unit{font-size:0.6em;color:var(--text-dim);margin-left:3px;}
+
+  #bottomBar{
+    position:absolute;left:50%;bottom:14px;transform:translateX(-50%);
+    display:flex;gap:18px;padding:10px 22px;align-items:center;white-space:nowrap;
+  }
+  #bottomBar .stat{text-align:center;min-width:78px;}
+  #bottomBar .stat .v{font-size:1.25em;color:var(--accent);font-weight:700;font-variant-numeric:tabular-nums;}
+  #bottomBar .stat .l{font-size:0.6em;color:var(--text-dim);letter-spacing:0.1em;text-transform:uppercase;margin-top:2px;}
+  #bottomBar .divider{width:1px;height:34px;background:rgba(90,180,255,0.2);}
+
+  #modeLabel{
+    position:absolute;top:14px;left:50%;transform:translateX(-50%);
+    padding:6px 18px;font-size:0.8em;letter-spacing:0.12em;color:var(--accent);
+    text-transform:uppercase;
+  }
+  #camHint{
+    position:absolute;bottom:78px;left:50%;transform:translateX(-50%);
+    font-size:0.68em;color:var(--text-dim);letter-spacing:0.04em;text-align:center;
+  }
+  #stallWarn{
+    position:absolute;left:50%;top:64px;transform:translateX(-50%);
+    background:rgba(255,60,40,0.15);border:1px solid rgba(255,80,60,0.6);
+    color:#ff6b52;padding:5px 16px;border-radius:3px;font-size:0.75em;
+    letter-spacing:0.1em;text-transform:uppercase;opacity:0;transition:opacity .3s;
+  }
+  #stallWarn.show{opacity:1;animation:pulseWarn 1s infinite;}
+  @keyframes pulseWarn{0%,100%{box-shadow:0 0 6px rgba(255,80,60,0.4);}50%{box-shadow:0 0 18px rgba(255,80,60,0.9);}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="startOverlay">
+  <h1>F-35 DIGITAL WIND TUNNEL</h1>
+  <p>Procedurally modeled F-35 in a real-time aerodynamic visualization rig. Switch flight attitudes, cycle CFD-style rendering modes, and inspect live aerodynamic readouts. Drag to orbit, scroll to zoom, right-drag to pan.</p>
+  <button id="startBtn">▶ Begin Test</button>
+  <div class="hint">Runs entirely in-browser · WebGL / Three.js · no external model files</div>
+</div>
+
+<div id="hud" style="display:none;">
+  <div id="modeLabel">STREAMLINES</div>
+  <div id="stallWarn">⚠ FLOW SEPARATION — STALL WARNING</div>
+
+  <div id="leftPanel" class="panel">
+    <h2>Flight Attitude</h2>
+    <div class="btnGroup" id="attitudeBtns">
+      <div class="modeBtn active" data-attitude="level">Level High-Speed Flight<small>α ≈ 2°, cruise Mach</small></div>
+      <div class="modeBtn" data-attitude="highaoa">High Angle of Attack<small>α ≈ 18°, nose-up</small></div>
+      <div class="modeBtn" data-attitude="stall">Near-Stall Test<small>α ≈ 27°, flow breakdown</small></div>
+    </div>
+  </div>
+
+  <div id="vizPanel" class="panel">
+    <h2>Flow Visualization</h2>
+    <div class="btnGroup" id="vizBtns">
+      <div class="modeBtn active" data-viz="0">Streamlines</div>
+      <div class="modeBtn" data-viz="1">Velocity Contour</div>
+      <div class="modeBtn" data-viz="2">Pressure Contour</div>
+      <div class="modeBtn" data-viz="3">Vortex Visualization</div>
+      <div class="modeBtn" data-viz="4">Particle Flow</div>
+      <div class="modeBtn" data-viz="5">Schlieren Imaging</div>
+    </div>
+  </div>
+
+  <div id="readoutPanel" class="panel">
+    <h2>Aerodynamic Data</h2>
+    <div class="readoutRow"><span class="label">Mach</span><span class="value" id="valMach">0.00</span></div>
+    <div class="readoutRow"><span class="label">Airspeed</span><span class="value" id="valSpeed">0<span class="unit">km/h</span></span></div>
+    <div class="readoutRow"><span class="label">Angle of Attack α</span><span class="value" id="valAoA">0.0<span class="unit">deg</span></span></div>
+    <div class="readoutRow"><span class="label">Lift Coeff. C_L</span><span class="value" id="valCL">0.00</span></div>
+    <div class="readoutRow"><span class="label">Drag Coeff. C_D</span><span class="value" id="valCD">0.00</span></div>
+    <div class="readoutRow"><span class="label">L / D Ratio</span><span class="value" id="valLD">0.0</span></div>
+    <div class="readoutRow"><span class="label">Dynamic Pressure</span><span class="value" id="valQ">0<span class="unit">kPa</span></span></div>
+    <div class="readoutRow"><span class="label">Tunnel Status</span><span class="value" id="valStatus">RUNNING</span></div>
+  </div>
+
+  <div id="camHint">LMB drag: orbit &nbsp;·&nbsp; scroll: zoom &nbsp;·&nbsp; RMB / two-finger drag: pan</div>
+
+  <div id="bottomBar" class="panel">
+    <div class="stat"><div class="v" id="botMach">0.00</div><div class="l">Mach</div></div>
+    <div class="divider"></div>
+    <div class="stat"><div class="v" id="botSpeed">0</div><div class="l">km/h</div></div>
+    <div class="divider"></div>
+    <div class="stat"><div class="v" id="botAoA">0°</div><div class="l">AoA</div></div>
+    <div class="divider"></div>
+    <div class="stat"><div class="v" id="botCL">0.00</div><div class="l">C_L</div></div>
+    <div class="divider"></div>
+    <div class="stat"><div class="v" id="botCD">0.00</div><div class="l">C_D</div></div>
+    <div class="divider"></div>
+    <div class="stat"><div class="v" id="botFPS">60</div><div class="l">FPS</div></div>
+  </div>
+</div>
+
+<script>
+window.addEventListener('error',e=>{document.title='ERROR: '+e.message+' @'+e.lineno;});
+</script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* =========================================================================
+   F-35 DIGITAL WIND TUNNEL
+   All geometry is procedural (no external model/texture files).
+   World axes: X = lateral(right+), Y = vertical(up+), Z = longitudinal (nose = +Z).
+   Freestream flows from +Z (inlet) to -Z (outlet): flowDirWorld = (0,0,-1)
+   ========================================================================= */
+
+const _urlParams = new URLSearchParams(location.search);
+const AUTOTEST = _urlParams.has('autotest');
+const FORCE_ATTITUDE = _urlParams.get('attitude'); // debug/testing override: level|highaoa|stall
+const FORCE_VIZ = _urlParams.get('viz'); // debug/testing override: 0-5
+
+let scene, camera, renderer, controls, clock;
+let aircraft, pivotGroup;
+let aeroMaterial;
+let streamlineLines = [];
+let particleSystem, vortexGroup, schlierenMesh, fanBlades, inletFace;
+const flowDirWorld = new THREE.Vector3(0,0,-1);
+
+/* ---------------- attitude / viz state ---------------- */
+const ATTITUDES = {
+  level:   { aoaDeg: 2,  mach: 0.85, sep: 0.02, label:'LEVEL HIGH-SPEED FLIGHT' },
+  highaoa: { aoaDeg: 18, mach: 0.45, sep: 0.30, label:'HIGH ANGLE OF ATTACK' },
+  stall:   { aoaDeg: 27, mach: 0.22, sep: 0.95, label:'NEAR-STALL TEST' },
+};
+const VIZ_NAMES = ['STREAMLINES','VELOCITY CONTOUR','PRESSURE CONTOUR','VORTEX VISUALIZATION','PARTICLE FLOW','SCHLIEREN IMAGING'];
+
+let state = {
+  attitude: 'level',
+  vizMode: 0,
+  curAoA: 2*Math.PI/180,   // current animated (lerped) AoA radians
+  targetAoA: 2*Math.PI/180,
+  curMach: 0.85,
+  targetMach: 0.85,
+  curSep: 0.02,
+  targetSep: 0.02,
+};
+
+/* ---------------------------------------------------------------------- */
+/* Aircraft silhouette influence field — shared conceptually between JS   */
+/* (streamlines) and GLSL (particles / schlieren) for flow deflection.    */
+/* Coordinates given in aircraft-LOCAL space (already de-rotated by AoA).*/
+/* ---------------------------------------------------------------------- */
+function localInfluence(x,y,z){
+  // fuselage capsule along Z
+  const halfLen = 5.6;
+  const zc = Math.max(-halfLen, Math.min(halfLen, z));
+  const taper = 1.0 - smoothstep(halfLen*0.55, halfLen, Math.abs(zc));
+  const fuseR = 0.18 + 0.62*taper;
+  const dFuse = Math.hypot(x,y) - fuseR;
+  // wing slab
+  let dWing = 1e3;
+  if(z > -2.6 && z < 1.8){
+    const wingHalfSpan = 3.55;
+    const dx = Math.max(Math.abs(x)-wingHalfSpan,0);
+    const dy = Math.abs(y)*2.6;
+    dWing = Math.hypot(dx,dy) - 0.05;
+  }
+  return Math.min(dFuse, dWing);
+}
+function smoothstep(a,b,x){ const t = Math.max(0,Math.min(1,(x-a)/(b-a))); return t*t*(3-2*t); }
+
+/* ==================== INIT ==================== */
+
+function init(){
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x03060a);
+  scene.fog = new THREE.FogExp2(0x03060a, 0.028);
+
+  camera = new THREE.PerspectiveCamera(48, innerWidth/innerHeight, 0.1, 300);
+  camera.position.set(8.5, 4.2, 10.5);
+
+  renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.shadowMap.enabled = true;
+  document.getElementById('app').appendChild(renderer.domElement);
+
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(0,0.3,0);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.minDistance = 3.5;
+  controls.maxDistance = 45;
+  controls.maxPolarAngle = Math.PI*0.96;
+  controls.update();
+
+  clock = new THREE.Clock();
+
+  buildLighting();
+  buildLab();
+  buildAircraft();
+  buildStreamlines();
+  buildParticles();
+  buildVortices();
+  buildSchlieren();
+
+  applyVizMode(0, true);
+  applyAttitude('level', true);
+
+  window.addEventListener('resize', onResize);
+  wireUI();
+
+  if(AUTOTEST){
+    startApp();
+    if(FORCE_ATTITUDE || FORCE_VIZ!==null){
+      applyAttitude(ATTITUDES[FORCE_ATTITUDE] ? FORCE_ATTITUDE : 'level', true);
+      applyVizMode(FORCE_VIZ!==null ? Math.max(0,Math.min(5,+FORCE_VIZ)) : 0, true);
+    } else {
+      scheduleAutotest();
+    }
+  }
+  else {
+    document.getElementById('startBtn').addEventListener('click', startApp);
+  }
+
+  animate();
+}
+
+function startApp(){
+  document.getElementById('startOverlay').style.display='none';
+  document.getElementById('hud').style.display='block';
+}
+
+function onResize(){
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+}
+
+/* ==================== LIGHTING ==================== */
+function buildLighting(){
+  scene.add(new THREE.AmbientLight(0x223344, 0.9));
+  const key = new THREE.DirectionalLight(0xdfefff, 1.6);
+  key.position.set(6,10,6);
+  key.castShadow = true;
+  key.shadow.mapSize.set(1024,1024);
+  scene.add(key);
+  const fill = new THREE.DirectionalLight(0x3fa0ff, 0.5);
+  fill.position.set(-8,3,-4);
+  scene.add(fill);
+  const rim = new THREE.PointLight(0x66ddff, 1.2, 40);
+  rim.position.set(0,6,-10);
+  scene.add(rim);
+  const under = new THREE.PointLight(0xff8844, 0.4, 20);
+  under.position.set(0,-3,4);
+  scene.add(under);
+}
+
+/* ==================== LAB / TUNNEL ENVIRONMENT ==================== */
+function buildLab(){
+  const R = 6.2;      // tunnel test-section radius
+  const L = 34;       // tunnel length along Z
+
+  // floor grid (tech lab)
+  const floorGeo = new THREE.PlaneGeometry(60,60,60,60);
+  const floorMat = new THREE.MeshStandardMaterial({color:0x0a1218, roughness:0.55, metalness:0.4});
+  const floor = new THREE.Mesh(floorGeo, floorMat);
+  floor.rotation.x = -Math.PI/2;
+  floor.position.y = -4.35;
+  floor.receiveShadow = true;
+  scene.add(floor);
+
+  const grid = new THREE.GridHelper(60, 60, 0x1a5f7a, 0x0e2530);
+  grid.position.y = -4.33;
+  scene.add(grid);
+
+  // tunnel duct (glass-like cylinder), open ended, wireframe ribs
+  const ductMat = new THREE.MeshPhysicalMaterial({
+    color:0x224455, transparent:true, opacity:0.16, roughness:0.1, metalness:0.1,
+    side:THREE.DoubleSide, depthWrite:false
+  });
+  const duct = new THREE.Mesh(new THREE.CylinderGeometry(R,R,L,32,1,true), ductMat);
+  duct.rotation.x = Math.PI/2;
+  scene.add(duct);
+
+  const ribMat = new THREE.MeshStandardMaterial({color:0x3a6b82, metalness:0.8, roughness:0.35, emissive:0x0a2a33, emissiveIntensity:0.3});
+  for(let i=-1;i<=1;i++){
+    const rib = new THREE.Mesh(new THREE.TorusGeometry(R, 0.09, 8, 40), ribMat);
+    rib.position.z = i*L*0.32;
+    scene.add(rib);
+  }
+
+  // honeycomb flow-straightener at inlet (+Z end)
+  const inletGroup = new THREE.Group();
+  inletGroup.position.z = L/2 - 0.4;
+  const honeyMat = new THREE.MeshStandardMaterial({color:0x2a3f4a, metalness:0.6, roughness:0.5, emissive:0x0a1c22, emissiveIntensity:0.4});
+  for(let ring=0; ring<6; ring++){
+    const rad = 0.5 + ring*0.98;
+    if(rad > R-0.3) continue;
+    const count = Math.max(6, Math.round(rad*7));
+    for(let i=0;i<count;i++){
+      const a = (i/count)*Math.PI*2 + ring*0.3;
+      const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.42,0.5,6,1,true), honeyMat);
+      tube.rotation.x = Math.PI/2;
+      tube.position.set(Math.cos(a)*rad, Math.sin(a)*rad, 0);
+      inletGroup.add(tube);
+    }
+  }
+  scene.add(inletGroup);
+  inletFace = inletGroup;
+
+  // fan at outlet (-Z end)
+  const fanGroup = new THREE.Group();
+  fanGroup.position.z = -L/2 + 0.6;
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,0.6,16), new THREE.MeshStandardMaterial({color:0x445566,metalness:0.8,roughness:0.3}));
+  hub.rotation.x = Math.PI/2;
+  fanGroup.add(hub);
+  fanBlades = new THREE.Group();
+  const bladeMat = new THREE.MeshStandardMaterial({color:0x6b8a9a, metalness:0.85, roughness:0.25, side:THREE.DoubleSide});
+  for(let i=0;i<12;i++){
+    const bladeShape = new THREE.Shape();
+    bladeShape.moveTo(0.5,-0.15);
+    bladeShape.lineTo(R-0.5,-0.6);
+    bladeShape.lineTo(R-0.5,0.6);
+    bladeShape.lineTo(0.5,0.15);
+    bladeShape.closePath();
+    const bg = new THREE.ExtrudeGeometry(bladeShape,{depth:0.06,bevelEnabled:false});
+    const blade = new THREE.Mesh(bg, bladeMat);
+    blade.rotation.z = (i/12)*Math.PI*2;
+    fanBlades.add(blade);
+  }
+  fanGroup.add(fanBlades);
+  scene.add(fanGroup);
+
+  // control-room glow panels on the walls
+  const glowMat = new THREE.MeshBasicMaterial({color:0x2fd0ff, transparent:true, opacity:0.5});
+  for(let i=0;i<6;i++){
+    const p = new THREE.Mesh(new THREE.PlaneGeometry(1.4,0.6), glowMat);
+    const a = (i/6)*Math.PI*2;
+    p.position.set(Math.cos(a)*(R-0.05), Math.sin(a)*(R-0.05), 6 - i*2.2);
+    p.lookAt(0, p.position.y, p.position.z);
+    scene.add(p);
+  }
+
+  // sting mount support pylon (fixed, from floor up to pivot point)
+  const pylonMat = new THREE.MeshStandardMaterial({color:0x37424c, metalness:0.7, roughness:0.4});
+  const pylon = new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.22,4.2,10), pylonMat);
+  pylon.position.set(0,-2.15,0.2);
+  pylon.castShadow = true;
+  scene.add(pylon);
+  const balance = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.35,0.9), pylonMat);
+  balance.position.set(0,-0.15,0.2);
+  scene.add(balance);
+}
+
+/* ==================== PROCEDURAL F-35 MODEL ==================== */
+
+// helper: build a tapered thin panel (wing/tail) from 4 planform corners + thickness, thin axis 'y' or 'x'
+function makePanel(rootLE, rootTE, tipLE, tipTE, thickRoot, thickTip, axis){
+  const off = (v, t)=> axis==='y' ? new THREE.Vector3(v.x, v.y+t/2, v.z) : new THREE.Vector3(v.x+t/2, v.y, v.z);
+  const offN = (v,t)=> axis==='y' ? new THREE.Vector3(v.x, v.y-t/2, v.z) : new THREE.Vector3(v.x-t/2, v.y, v.z);
+
+  const pRLt = off(rootLE, thickRoot), pRLb = offN(rootLE, thickRoot);
+  const pRTt = off(rootTE, thickRoot), pRTb = offN(rootTE, thickRoot);
+  const pTLt = off(tipLE, thickTip),  pTLb = offN(tipLE, thickTip);
+  const pTTt = off(tipTE, thickTip),  pTTb = offN(tipTE, thickTip);
+
+  const verts = [pRLt,pRTt,pTTt,pTLt, pRLb,pRTb,pTTb,pTLb]; // 0-3 top, 4-7 bottom
+  const pos = [];
+  verts.forEach(v=>pos.push(v.x,v.y,v.z));
+
+  const idx = [];
+  // top (0,1,2,3) fan
+  idx.push(0,1,2, 0,2,3);
+  // bottom (reverse winding)
+  idx.push(4,6,5, 4,7,6);
+  // side strips: LE(0,4,7,3) root(0,4... use root edge 0-4-? ) tip(2,3,7,6? ) TE(1,5,6,2)
+  // root cap: 0(t) - 4(b) - 5(RTb) - 1(RTt)
+  idx.push(0,4,5, 0,5,1);
+  // tip cap: 3(TLt) - 7(TLb) - 6(TTb) - 2(TTt)
+  idx.push(3,7,6, 3,6,2);
+  // leading edge: 0(RLt)-3(TLt)-7(TLb)-4(RLb)
+  idx.push(0,3,7, 0,7,4);
+  // trailing edge: 1(RTt)-5(RTb)-6(TTb)-2(TTt)
+  idx.push(1,5,6, 1,6,2);
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+function buildAircraft(){
+  pivotGroup = new THREE.Group();      // stays fixed (sting attach point)
+  aircraft = new THREE.Group();        // rotates with AoA about this pivot
+  pivotGroup.add(aircraft);
+  pivotGroup.position.set(0, -0.15, 0.2);
+  scene.add(pivotGroup);
+
+  // ---- shared shader material for all aircraft skin meshes ----
+  aeroMaterial = new THREE.ShaderMaterial({
+    uniforms:{
+      uMode:{value:0},
+      uTime:{value:0},
+      uLocalFlow:{value:new THREE.Vector3(0,0,-1)},
+      uSeparation:{value:0},
+      uMach:{value:0.5},
+      uBaseColor:{value:new THREE.Color(0x8a97a3)},
+      uCamPos:{value:new THREE.Vector3()},
+    },
+    vertexShader:`
+      varying vec3 vNormalLocal;
+      varying vec3 vNormalWorld;
+      varying vec3 vWorldPos;
+      varying vec3 vLocalPos;
+      void main(){
+        vNormalLocal = normalize(normal);
+        vNormalWorld = normalize(mat3(modelMatrix) * normal);
+        vec4 wp = modelMatrix * vec4(position,1.0);
+        vWorldPos = wp.xyz;
+        vLocalPos = position;
+        gl_Position = projectionMatrix * viewMatrix * wp;
+      }
+    `,
+    fragmentShader:`
+      uniform int uMode;
+      uniform float uTime;
+      uniform vec3 uLocalFlow;
+      uniform float uSeparation;
+      uniform float uMach;
+      uniform vec3 uBaseColor;
+      uniform vec3 uCamPos;
+      varying vec3 vNormalLocal;
+      varying vec3 vNormalWorld;
+      varying vec3 vWorldPos;
+      varying vec3 vLocalPos;
+
+      float hash(vec3 p){ return fract(sin(dot(p, vec3(17.1,31.7,21.3)))*4358.55); }
+      float noise(vec3 p){
+        vec3 i = floor(p), f = fract(p);
+        f = f*f*(3.0-2.0*f);
+        float n000=hash(i), n100=hash(i+vec3(1,0,0)), n010=hash(i+vec3(0,1,0)), n110=hash(i+vec3(1,1,0));
+        float n001=hash(i+vec3(0,0,1)), n101=hash(i+vec3(1,0,1)), n011=hash(i+vec3(0,1,1)), n111=hash(i+vec3(1,1,1));
+        float nx00=mix(n000,n100,f.x), nx10=mix(n010,n110,f.x), nx01=mix(n001,n101,f.x), nx11=mix(n011,n111,f.x);
+        float nxy0=mix(nx00,nx10,f.y), nxy1=mix(nx01,nx11,f.y);
+        return mix(nxy0,nxy1,f.z);
+      }
+      vec3 jet(float t){
+        t=clamp(t,0.0,1.0);
+        vec3 c;
+        c.r = clamp(1.5 - abs(4.0*t-3.0),0.0,1.0);
+        c.g = clamp(1.5 - abs(4.0*t-2.0),0.0,1.0);
+        c.b = clamp(1.5 - abs(4.0*t-1.0),0.0,1.0);
+        return c;
+      }
+      vec3 diverging(float t){
+        t=clamp(t,-1.0,1.0);
+        vec3 low=vec3(0.12,0.38,0.98);
+        vec3 mid=vec3(0.92,0.93,0.95);
+        vec3 high=vec3(0.98,0.18,0.10);
+        return t<0.0 ? mix(low,mid,t+1.0) : mix(mid,high,t);
+      }
+
+      void main(){
+        vec3 Nl = normalize(vNormalLocal);
+        float stagnation = clamp(dot(Nl, -uLocalFlow), 0.0, 1.0);
+        float speedFactor = mix(1.6, 0.35, stagnation);
+        speedFactor += 0.3*max(Nl.y,0.0);
+        speedFactor = clamp(speedFactor, 0.05, 2.2);
+
+        float aftFactor = smoothstep(0.5, -3.2, vLocalPos.z);
+        float topFactor = smoothstep(-0.05, 0.5, Nl.y);
+        float sepMask = aftFactor*topFactor*uSeparation;
+        float n = noise(vWorldPos*2.2 + vec3(0.0,0.0,uTime*1.6));
+        float turbulence = sepMask*n;
+        speedFactor = mix(speedFactor, speedFactor*(0.25+0.5*n), sepMask);
+
+        vec3 N = normalize(vNormalWorld);
+        float diff = max(dot(N, normalize(vec3(0.5,0.85,0.35))), 0.0);
+        vec3 viewDir = normalize(uCamPos - vWorldPos);
+        float rim = pow(1.0-max(dot(N, viewDir),0.0), 2.2);
+        vec3 lit = uBaseColor*(0.30+0.85*diff) + vec3(0.45,0.55,0.65)*rim*0.35;
+
+        vec3 color = lit;
+
+        if(uMode==1){
+          float t = clamp((speedFactor-0.1)/2.0, 0.0, 1.0);
+          vec3 c = jet(t);
+          color = mix(lit*0.1, c, 0.94);
+          color = mix(color, vec3(0.05), turbulence*0.5);
+        } else if(uMode==2){
+          float p = mix(1.0, -1.0, clamp(speedFactor/2.0,0.0,1.0));
+          p = mix(p, 1.0, stagnation*0.7);
+          p = clamp(p + turbulence*0.4, -1.0, 1.0);
+          color = mix(lit*0.1, diverging(p), 0.94);
+        } else if(uMode==5){
+          float g = 0.045 + diff*0.10 + rim*0.05;
+          color = vec3(g);
+        } else {
+          // streamlines / vortex / particle-flow: keep clean paint job, slight separation shading
+          color = mix(lit, lit*0.4, turbulence*0.6);
+        }
+
+        gl_FragColor = vec4(color, 1.0);
+      }
+    `,
+    side: THREE.DoubleSide,
+  });
+
+  const parts = new THREE.Group();
+  aircraft.add(parts);
+
+  // ---------- FUSELAGE (faceted lathe, stealth-diamond cross-section) ----------
+  const keys = [
+    {t:-1.00, r:0.20}, {t:-0.85,r:0.30}, {t:-0.62,r:0.42}, {t:-0.35,r:0.52},
+    {t:-0.05,r:0.56}, {t:0.20,r:0.55}, {t:0.45,r:0.50}, {t:0.62,r:0.40},
+    {t:0.78,r:0.28}, {t:0.90,r:0.16}, {t:0.97,r:0.07}, {t:1.00,r:0.015},
+  ];
+  const halfLen = 5.6;
+  const pts = [];
+  const N = 40;
+  for(let i=0;i<=N;i++){
+    const tt = i/N;
+    // sample keys with cosine interpolation
+    let r=0.05;
+    for(let k=0;k<keys.length-1;k++){
+      if(tt>=(keys[k].t+1)/2 && tt<=(keys[k+1].t+1)/2){
+        const localT = (tt - (keys[k].t+1)/2) / (((keys[k+1].t+1)/2)-((keys[k].t+1)/2));
+        const smooth = 0.5-0.5*Math.cos(localT*Math.PI);
+        r = keys[k].r*(1-smooth) + keys[k+1].r*smooth;
+        break;
+      }
+    }
+    pts.push(new THREE.Vector2(Math.max(r,0.005), (tt*2-1)*halfLen));
+  }
+  const fuseGeo = new THREE.LatheGeometry(pts, 8);
+  fuseGeo.rotateX(Math.PI/2);
+  const fuseMesh = new THREE.Mesh(fuseGeo, aeroMaterial);
+  fuseMesh.scale.y = 0.8;
+  fuseMesh.castShadow = true;
+  parts.add(fuseMesh);
+
+  // canopy (dark bubble)
+  const canopyMat = new THREE.MeshPhysicalMaterial({color:0x0a1420, metalness:0.3, roughness:0.15, transmission:0.15, clearcoat:0.8, envMapIntensity:0.6});
+  const canopyGeo = new THREE.SphereGeometry(0.34,20,16,0,Math.PI*2,0,Math.PI/1.9);
+  const canopy = new THREE.Mesh(canopyGeo, canopyMat);
+  canopy.scale.set(0.62,0.55,1.55);
+  canopy.position.set(0,0.34,1.55);
+  canopy.castShadow = true;
+  parts.add(canopy);
+
+  // nose pitot boom
+  const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,0.5,6), new THREE.MeshStandardMaterial({color:0x222222,metalness:0.8,roughness:0.4}));
+  boom.rotation.x = Math.PI/2;
+  boom.position.set(0,-0.02,5.85);
+  parts.add(boom);
+
+  // ---------- WINGS (cropped-delta, blended trapezoid) ----------
+  const wingThickRoot=0.16, wingThickTip=0.045;
+  const wingRootLE = new THREE.Vector3(0.5, -0.02, 0.85);
+  const wingRootTE = new THREE.Vector3(0.5, -0.02, -1.55);
+  const wingTipLE  = new THREE.Vector3(4.05,0.12, -0.55);
+  const wingTipTE  = new THREE.Vector3(4.05,0.12, -1.05);
+  const wingGeoR = makePanel(wingRootLE,wingRootTE,wingTipLE,wingTipTE, wingThickRoot, wingThickTip, 'y');
+  const wingR = new THREE.Mesh(wingGeoR, aeroMaterial);
+  wingR.castShadow = true;
+  parts.add(wingR);
+  const wingL = new THREE.Mesh(wingGeoR, aeroMaterial);
+  wingL.scale.x = -1;
+  wingL.castShadow = true;
+  parts.add(wingL);
+
+  // wingtip pylons/rails (small stub)
+  const railMat = new THREE.MeshStandardMaterial({color:0x555f68, metalness:0.7, roughness:0.4});
+  [1,-1].forEach(s=>{
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.05,0.55), railMat);
+    rail.position.set(s*4.0, 0.16, -0.75);
+    parts.add(rail);
+  });
+
+  // ---------- HORIZONTAL TAILS (all-moving stabilators) ----------
+  const htRootLE = new THREE.Vector3(0.42,-0.02,-3.75);
+  const htRootTE = new THREE.Vector3(0.42,-0.02,-4.55);
+  const htTipLE  = new THREE.Vector3(1.95,0.05,-4.35);
+  const htTipTE  = new THREE.Vector3(1.95,0.05,-4.75);
+  const htGeo = makePanel(htRootLE,htRootTE,htTipLE,htTipTE, 0.09,0.03,'y');
+  const htR = new THREE.Mesh(htGeo, aeroMaterial); htR.castShadow=true; parts.add(htR);
+  const htL = new THREE.Mesh(htGeo, aeroMaterial); htL.scale.x=-1; htL.castShadow=true; parts.add(htL);
+
+  // ---------- TWIN CANTED VERTICAL TAILS ----------
+  const vtRootLE = new THREE.Vector3(0,-0.0,-3.15);
+  const vtRootTE = new THREE.Vector3(0,-0.0,-4.05);
+  const vtTipLE  = new THREE.Vector3(0,1.55,-3.55);
+  const vtTipTE  = new THREE.Vector3(0,1.55,-4.05);
+  const vtGeo = makePanel(vtRootLE,vtRootTE,vtTipLE,vtTipTE, 0.10,0.035,'x');
+  [1,-1].forEach(s=>{
+    const fin = new THREE.Mesh(vtGeo, aeroMaterial);
+    const g = new THREE.Group();
+    g.position.set(s*0.42,-0.15,-3.3);
+    g.rotation.z = s*0.30; // cant outward
+    fin.castShadow = true;
+    g.add(fin);
+    parts.add(g);
+  });
+
+  // ---------- INTAKES (side scoops) ----------
+  const intakeMat = new THREE.MeshStandardMaterial({color:0x6d7882, metalness:0.6, roughness:0.4});
+  const intakeDarkMat = new THREE.MeshStandardMaterial({color:0x05070a, metalness:0.1, roughness:0.9});
+  [1,-1].forEach(s=>{
+    const scoop = new THREE.Mesh(new THREE.BoxGeometry(0.55,0.42,1.6), intakeMat);
+    scoop.position.set(s*0.62, -0.06, 1.15);
+    scoop.rotation.y = s*0.08;
+    parts.add(scoop);
+    const hole = new THREE.Mesh(new THREE.BoxGeometry(0.34,0.26,0.05), intakeDarkMat);
+    hole.position.set(s*0.66, -0.06, 1.9);
+    parts.add(hole);
+  });
+
+  // ---------- ENGINE NOZZLE ----------
+  const nozzleMat = new THREE.MeshStandardMaterial({color:0x2b2f34, metalness:0.9, roughness:0.35});
+  const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.30,0.24,0.6,16,1,true), nozzleMat);
+  nozzle.rotation.x = Math.PI/2;
+  nozzle.position.set(0,-0.05,-5.85);
+  parts.add(nozzle);
+  const nozzleInner = new THREE.Mesh(new THREE.CircleGeometry(0.22,16), new THREE.MeshBasicMaterial({color:0x120800}));
+  nozzleInner.position.set(0,-0.05,-6.12);
+  nozzleInner.rotation.y = Math.PI;
+  parts.add(nozzleInner);
+
+  // apply weapon-bay panel lines via a faint darker belly strip (visual detail)
+  const belly = new THREE.Mesh(new THREE.PlaneGeometry(0.6,2.4), new THREE.MeshStandardMaterial({color:0x333c44, metalness:0.4, roughness:0.6}));
+  belly.rotation.x = -Math.PI/2;
+  belly.position.set(0,-0.42,0.3);
+  parts.add(belly);
+}
+
+/* ==================== STREAMLINES ==================== */
+function buildStreamlines(){
+  const linesMat = new THREE.ShaderMaterial({
+    uniforms:{ uTime:{value:0} },
+    vertexShader:`
+      attribute float aT;
+      varying float vT;
+      void main(){
+        vT = aT;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+      }
+    `,
+    fragmentShader:`
+      uniform float uTime;
+      varying float vT;
+      void main(){
+        float wave = sin(vT*24.0 - uTime*5.0)*0.5+0.5;
+        float glow = pow(wave, 4.0);
+        float alpha = 0.10 + glow*0.85;
+        vec3 col = mix(vec3(0.15,0.55,0.75), vec3(0.65,0.95,1.0), glow);
+        gl_FragColor = vec4(col, alpha);
+      }
+    `,
+    transparent:true, depthWrite:false, blending:THREE.AdditiveBlending,
+  });
+  aircraft.userData.streamlineMat = linesMat;
+
+  const streamGroup = new THREE.Group();
+  aircraft.add(streamGroup);
+  aircraft.userData.streamGroup = streamGroup;
+  rebuildStreamlineGeometry();
+}
+
+function rebuildStreamlineGeometry(){
+  const group = aircraft.userData.streamGroup;
+  while(group.children.length){ group.remove(group.children[0]); }
+  streamlineLines = [];
+  const mat = aircraft.userData.streamlineMat;
+
+  const rows = 7, cols = 9;
+  for(let ry=0; ry<rows; ry++){
+    for(let cx=0; cx<cols; cx++){
+      const y0 = -1.4 + (ry/(rows-1))*3.0;
+      const x0 = -3.6 + (cx/(cols-1))*7.2;
+      if(Math.hypot(x0,y0) < 0.15) continue;
+      const pts = [];
+      const steps = 46;
+      for(let i=0;i<=steps;i++){
+        const z = 8.5 - (i/steps)*17.5;
+        let x=x0, y=y0;
+        const d = localInfluence(x,y,z);
+        const influenceR = 1.1;
+        if(d < influenceR){
+          const push = (influenceR-d)/influenceR;
+          const len = Math.hypot(x,y)||0.001;
+          const nx = x/len, ny = y/len;
+          x += nx*push*0.9;
+          y += ny*push*0.9;
+        }
+        pts.push(new THREE.Vector3(x,y,z));
+      }
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const aT = new Float32Array(pts.length);
+      for(let i=0;i<pts.length;i++) aT[i]=i/pts.length;
+      geo.setAttribute('aT', new THREE.BufferAttribute(aT,1));
+      const line = new THREE.Line(geo, mat);
+      group.add(line);
+      streamlineLines.push(line);
+    }
+  }
+}
+
+/* ==================== PARTICLE FLOW ==================== */
+function buildParticles(){
+  const COUNT = 3600;
+  const geo = new THREE.BufferGeometry();
+  const base = new Float32Array(COUNT*3);
+  const phase = new Float32Array(COUNT);
+  for(let i=0;i<COUNT;i++){
+    const x = (Math.random()*2-1)*4.6;
+    const y = (Math.random()*2-1)*2.6;
+    base[i*3+0]=x; base[i*3+1]=y; base[i*3+2]=0;
+    phase[i]=Math.random();
+  }
+  geo.setAttribute('base', new THREE.BufferAttribute(base,3));
+  geo.setAttribute('phase', new THREE.BufferAttribute(phase,1));
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(COUNT*3),3));
+
+  const mat = new THREE.ShaderMaterial({
+    uniforms:{
+      uTime:{value:0}, uSpeed:{value:3.2}, uLen:{value:17.0},
+    },
+    vertexShader:`
+      attribute vec3 base;
+      attribute float phase;
+      uniform float uTime, uSpeed, uLen;
+      varying float vDefl;
+      float infl(vec3 p){
+        float halfLen=5.6;
+        float zc=clamp(p.z,-halfLen,halfLen);
+        float taper=1.0-smoothstep(halfLen*0.55,halfLen,abs(zc));
+        float fuseR=0.18+0.62*taper;
+        float dFuse=length(p.xy)-fuseR;
+        float dWing=1000.0;
+        if(p.z>-2.6 && p.z<1.8){
+          float dx=max(abs(p.x)-3.55,0.0);
+          float dy=abs(p.y)*2.6;
+          dWing=length(vec2(dx,dy))-0.05;
+        }
+        return min(dFuse,dWing);
+      }
+      void main(){
+        float z = mod((phase*uLen) - uTime*uSpeed, uLen) - uLen*0.5;
+        z += 8.5 - uLen*0.5; // shift range to [8.5-uLen, 8.5]
+        vec3 p = vec3(base.x, base.y, z);
+        float d = infl(p);
+        float influenceR = 1.15;
+        float defl = 0.0;
+        if(d < influenceR){
+          float push = (influenceR-d)/influenceR;
+          float len = max(length(p.xy),0.001);
+          p.x += (p.x/len)*push*1.0;
+          p.y += (p.y/len)*push*1.0;
+          defl = push;
+        }
+        vDefl = defl;
+        gl_PointSize = 2.2 + defl*2.5;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(p,1.0);
+      }
+    `,
+    fragmentShader:`
+      varying float vDefl;
+      void main(){
+        vec2 c = gl_PointCoord - 0.5;
+        float a = smoothstep(0.5,0.0,length(c));
+        vec3 col = mix(vec3(0.55,0.85,1.0), vec3(1.0,0.9,0.6), vDefl);
+        gl_FragColor = vec4(col, a*0.9);
+      }
+    `,
+    transparent:true, depthWrite:false, blending:THREE.AdditiveBlending,
+  });
+
+  particleSystem = new THREE.Points(geo, mat);
+  aircraft.add(particleSystem);
+}
+
+/* ==================== VORTEX VISUALIZATION ==================== */
+class SpiralCurve extends THREE.Curve{
+  constructor(startRadius, growth, turns, length, droop){
+    super();
+    this.startRadius=startRadius; this.growth=growth; this.turns=turns; this.length=length; this.droop=droop;
+  }
+  getPoint(t, target){
+    target = target || new THREE.Vector3();
+    const ang = t*this.turns*Math.PI*2;
+    const r = this.startRadius + t*this.growth;
+    const x = Math.cos(ang)*r;
+    const y = Math.sin(ang)*r - t*t*this.droop;
+    const z = -t*this.length;
+    return target.set(x,y,z);
+  }
+}
+function buildVortices(){
+  vortexGroup = new THREE.Group();
+  aircraft.add(vortexGroup);
+  const swirlMat = new THREE.ShaderMaterial({
+    uniforms:{ uTime:{value:0}, uIntensity:{value:0.4} },
+    vertexShader:`
+      varying vec2 vUv;
+      void main(){
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+      }
+    `,
+    fragmentShader:`
+      uniform float uTime, uIntensity;
+      varying vec2 vUv;
+      void main(){
+        float stripes = sin(vUv.x*40.0 - uTime*6.0)*0.5+0.5;
+        float fade = 1.0-vUv.y;
+        float alpha = stripes*fade*uIntensity*0.8;
+        vec3 col = mix(vec3(0.5,0.75,1.0), vec3(0.9,0.6,1.0), vUv.x);
+        gl_FragColor = vec4(col, alpha);
+      }
+    `,
+    transparent:true, side:THREE.DoubleSide, depthWrite:false, blending:THREE.AdditiveBlending,
+  });
+  aircraft.userData.vortexMat = swirlMat;
+
+  const anchors = [
+    {x: 4.05, y:0.12, z:-0.8, r:0.18, turns:3.2, len:6.5, key:'tipR'},
+    {x:-4.05, y:0.12, z:-0.8, r:0.18, turns:3.2, len:6.5, key:'tipL'},
+    {x: 0.55, y:0.0,  z: 0.9, r:0.10, turns:4.0, len:4.5, key:'rootR'},
+    {x:-0.55, y:0.0,  z: 0.9, r:0.10, turns:4.0, len:4.5, key:'rootL'},
+  ];
+  aircraft.userData.vortexTubes = {};
+  anchors.forEach(a=>{
+    const curve = new SpiralCurve(a.r, 0.55, a.turns, a.len, 0.4);
+    const geo = new THREE.TubeGeometry(curve, 60, 0.06, 8, false);
+    const mesh = new THREE.Mesh(geo, swirlMat);
+    mesh.position.set(a.x, a.y, a.z);
+    vortexGroup.add(mesh);
+    aircraft.userData.vortexTubes[a.key] = mesh;
+  });
+}
+
+/* ==================== SCHLIEREN BACKDROP ==================== */
+function buildSchlieren(){
+  const geo = new THREE.PlaneGeometry(13,9,1,1);
+  const mat = new THREE.ShaderMaterial({
+    uniforms:{
+      uTime:{value:0}, uPitch:{value:0}, uMach:{value:0.5},
+    },
+    vertexShader:`
+      varying vec2 vPos;
+      void main(){
+        vPos = position.xy;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+      }
+    `,
+    fragmentShader:`
+      uniform float uTime, uPitch, uMach;
+      varying vec2 vPos;
+
+      float hash(vec2 p){ return fract(sin(dot(p,vec2(41.3,289.1)))*4358.5); }
+      float noise(vec2 p){
+        vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
+        float a=hash(i), b=hash(i+vec2(1,0)), c=hash(i+vec2(0,1)), d=hash(i+vec2(1,1));
+        return mix(mix(a,b,f.x), mix(c,d,f.x), f.y);
+      }
+
+      float aircraftSDF(vec3 p){
+        float c = cos(-uPitch), s = sin(-uPitch);
+        vec3 q = vec3(p.x, c*p.y - s*p.z, s*p.y + c*p.z);
+        float halfLen=5.6;
+        float zc=clamp(q.z,-halfLen,halfLen);
+        float taper=1.0-smoothstep(halfLen*0.55,halfLen,abs(zc));
+        float fuseR=0.18+0.62*taper;
+        float dFuse=length(q.xy)-fuseR;
+        float dWing=1000.0;
+        if(q.z>-2.6 && q.z<1.8){
+          float dx=max(abs(q.x)-3.55,0.0);
+          float dy=abs(q.y)*2.6;
+          dWing=length(vec2(dx,dy))-0.05;
+        }
+        return min(dFuse,dWing);
+      }
+
+      void main(){
+        vec3 p = vec3(vPos.x, vPos.y, 0.0);
+        float d = aircraftSDF(p);
+        float body = smoothstep(0.06,-0.06,d);
+
+        // density bands radiating using distance field gradient-ish rings
+        float bands = sin(d*9.0 - uTime*1.4)*0.5+0.5;
+        bands = pow(bands, 2.0);
+
+        // shock cone from nose (local +Z tip) - mach angle
+        float noseZ = 5.9;
+        float machAngle = clamp(asin(1.0/max(uMach,0.35)), 0.15, 1.4);
+        vec2 fromNose = vec2(p.z - noseZ, length(p.xy));
+        float coneDist = abs(fromNose.y - (-fromNose.x)*tan(machAngle));
+        float shock = smoothstep(0.16,0.0, coneDist) * step(-fromNose.x, 0.0) * smoothstep(0.0,0.35,uMach-0.55);
+
+        float turb = noise(vPos*1.5 + vec2(0.0,uTime*0.6))*0.15;
+
+        float g = 0.06 + bands*0.22 + turb;
+        g = mix(g, 0.02, body);
+        g += shock*0.8;
+
+        vec3 col = vec3(g)*vec3(0.75,0.92,1.0);
+        gl_FragColor = vec4(col, 1.0);
+      }
+    `,
+  });
+  schlierenMesh = new THREE.Mesh(geo, mat);
+  schlierenMesh.position.set(0,0.3,-8.2);
+  schlierenMesh.visible = false;
+  scene.add(schlierenMesh);
+}
+
+/* ==================== ATTITUDE / VIZ SWITCHING ==================== */
+function applyAttitude(name, instant){
+  state.attitude = name;
+  const cfg = ATTITUDES[name];
+  state.targetAoA = cfg.aoaDeg*Math.PI/180;
+  state.targetMach = cfg.mach;
+  state.targetSep = cfg.sep;
+  if(instant){
+    state.curAoA = state.targetAoA;
+    state.curMach = state.targetMach;
+    state.curSep = state.targetSep;
+  }
+  document.querySelectorAll('#attitudeBtns .modeBtn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.attitude===name);
+  });
+}
+
+function applyVizMode(idx, instant){
+  state.vizMode = idx;
+  aeroMaterial.uniforms.uMode.value = idx;
+  document.getElementById('modeLabel').textContent = VIZ_NAMES[idx];
+  document.querySelectorAll('#vizBtns .modeBtn').forEach(b=>{
+    b.classList.toggle('active', +b.dataset.viz===idx);
+  });
+  aircraft.userData.streamGroup.visible = (idx===0);
+  particleSystem.visible = (idx===4);
+  vortexGroup.visible = (idx===3);
+  schlierenMesh.visible = (idx===5);
+}
+
+/* ==================== UI WIRING ==================== */
+function wireUI(){
+  document.querySelectorAll('#attitudeBtns .modeBtn').forEach(b=>{
+    b.addEventListener('click', ()=> applyAttitude(b.dataset.attitude, false));
+  });
+  document.querySelectorAll('#vizBtns .modeBtn').forEach(b=>{
+    b.addEventListener('click', ()=> applyVizMode(+b.dataset.viz, false));
+  });
+}
+
+/* ==================== AUTOTEST CYCLER ==================== */
+function scheduleAutotest(){
+  const attitudeSeq = ['level','highaoa','stall'];
+  const vizSeq = [0,1,2,3,4,5];
+  let ai=0, vi=0;
+  applyAttitude(attitudeSeq[0], true);
+  applyVizMode(vizSeq[0], true);
+  setInterval(()=>{
+    vi = (vi+1) % vizSeq.length;
+    if(vi===0) ai = (ai+1) % attitudeSeq.length;
+    applyAttitude(attitudeSeq[ai], false);
+    applyVizMode(vizSeq[vi], false);
+  }, 1800);
+  // slow auto-orbit for visual interest during autotest
+  let autoAngle = 0;
+  function autoOrbit(){
+    autoAngle += 0.0028;
+    const r = 13;
+    camera.position.x = Math.sin(autoAngle)*r;
+    camera.position.z = Math.cos(autoAngle)*r + 1;
+    camera.position.y = 4.2 + Math.sin(autoAngle*0.6)*1.2;
+    camera.lookAt(0,0.3,0);
+    requestAnimationFrame(autoOrbit);
+  }
+  autoOrbit();
+}
+
+/* ==================== READOUTS ==================== */
+function updateReadouts(){
+  const mach = state.curMach;
+  const speedKmh = mach*1225; // approx sea-level speed of sound km/h
+  const aoaDeg = state.curAoA*180/Math.PI;
+
+  // simple aerodynamic model: lift-curve slope with stall dropoff, drag polar
+  const aoaRad = state.curAoA;
+  const clMaxRegion = 22*Math.PI/180;
+  let CL;
+  if(aoaDeg <= 22){
+    CL = 5.6*Math.sin(aoaRad)*Math.cos(aoaRad*0.3);
+  } else {
+    const over = (aoaDeg-22)/14;
+    CL = 5.6*Math.sin(clMaxRegion)*Math.cos(clMaxRegion*0.3) * Math.max(0.15, 1-over*1.3);
+  }
+  const CD0 = 0.021;
+  const CD = CD0 + 0.09*CL*CL + state.curSep*0.05;
+  const LD = CD>0.001 ? CL/CD : 0;
+  const q = 0.5*1.225*Math.pow(mach*340.3,2)/1000; // kPa, rough
+
+  document.getElementById('valMach').textContent = mach.toFixed(2);
+  document.getElementById('valSpeed').innerHTML = Math.round(speedKmh).toLocaleString()+'<span class="unit">km/h</span>';
+  document.getElementById('valAoA').innerHTML = aoaDeg.toFixed(1)+'<span class="unit">deg</span>';
+  document.getElementById('valCL').textContent = CL.toFixed(2);
+  document.getElementById('valCD').textContent = CD.toFixed(3);
+  document.getElementById('valLD').textContent = LD.toFixed(1);
+  document.getElementById('valQ').innerHTML = q.toFixed(1)+'<span class="unit">kPa</span>';
+
+  const statusEl = document.getElementById('valStatus');
+  const warnEl = document.getElementById('stallWarn');
+  if(state.attitude==='stall'){
+    statusEl.textContent = 'FLOW BREAKDOWN'; statusEl.classList.add('warn');
+    warnEl.classList.add('show');
+  } else {
+    statusEl.textContent = 'RUNNING'; statusEl.classList.remove('warn');
+    warnEl.classList.remove('show');
+  }
+
+  document.getElementById('botMach').textContent = mach.toFixed(2);
+  document.getElementById('botSpeed').textContent = Math.round(speedKmh).toLocaleString();
+  document.getElementById('botAoA').textContent = aoaDeg.toFixed(1)+'°';
+  document.getElementById('botCL').textContent = CL.toFixed(2);
+  document.getElementById('botCD').textContent = CD.toFixed(3);
+}
+
+/* ==================== ANIMATION LOOP ==================== */
+let fpsAcc=0, fpsCount=0, fpsTimer=0;
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.elapsedTime;
+
+  // lerp attitude toward target
+  state.curAoA += (state.targetAoA-state.curAoA)*Math.min(1,dt*1.6);
+  state.curMach += (state.targetMach-state.curMach)*Math.min(1,dt*1.2);
+  state.curSep += (state.targetSep-state.curSep)*Math.min(1,dt*1.4);
+
+  aircraft.rotation.x = -state.curAoA;
+
+  // compute local flow direction (world flow rotated into aircraft's local frame)
+  const localFlow = flowDirWorld.clone().applyQuaternion(aircraft.getWorldQuaternion(new THREE.Quaternion()).invert());
+  aeroMaterial.uniforms.uLocalFlow.value.copy(localFlow.normalize());
+  aeroMaterial.uniforms.uTime.value = t;
+  aeroMaterial.uniforms.uSeparation.value = state.curSep;
+  aeroMaterial.uniforms.uMach.value = state.curMach;
+  aeroMaterial.uniforms.uCamPos.value.copy(camera.position);
+
+  if(aircraft.userData.streamlineMat) aircraft.userData.streamlineMat.uniforms.uTime.value = t;
+  if(particleSystem){
+    particleSystem.material.uniforms.uTime.value = t;
+    particleSystem.material.uniforms.uSpeed.value = 2.0 + state.curMach*4.0;
+  }
+  if(aircraft.userData.vortexMat){
+    aircraft.userData.vortexMat.uniforms.uTime.value = t;
+    const intensity = 0.15 + state.curSep*0.85 + (state.attitude==='highaoa'?0.15:0);
+    aircraft.userData.vortexMat.uniforms.uIntensity.value = intensity;
+  }
+  if(aircraft.userData.vortexTubes){
+    const scale = 1.0 + state.curSep*1.3;
+    Object.values(aircraft.userData.vortexTubes).forEach(m=> m.scale.setScalar(scale));
+  }
+  if(schlierenMesh){
+    schlierenMesh.material.uniforms.uTime.value = t;
+    schlierenMesh.material.uniforms.uPitch.value = state.curAoA;
+    schlierenMesh.material.uniforms.uMach.value = state.curMach;
+  }
+  if(fanBlades){ fanBlades.rotation.z += dt*(2+state.curMach*10); }
+  if(inletFace){ inletFace.rotation.z += dt*0.15; }
+
+  controls.update();
+  renderer.render(scene, camera);
+  updateReadouts();
+
+  fpsAcc += dt; fpsCount++;
+  if(fpsAcc>0.5){
+    const fps = Math.round(fpsCount/fpsAcc);
+    document.getElementById('botFPS').textContent = fps;
+    fpsAcc=0; fpsCount=0;
+  }
+
+  if(!window.__titleSet){
+    document.title = 'F-35 Digital Wind Tunnel';
+    window.__titleSet = true;
+  }
+}
+
+init();
+</script>
+</body>
+</html>

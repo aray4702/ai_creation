@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Creation Deliverables</title>
+<meta name="description" content="Completed Claude Code tasks with active build time, token usage, screenshots and live links.">
+<style>
+  :root {
+    --bg: #f6f5f1; --surface: #ffffff; --text: #1c1b18; --muted: #6b675e;
+    --line: #e2dfd6; --accent: #b0661c; --accent-soft: #f4e6d6; --chip: #efece4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121110; --surface: #1c1a18; --text: #ece8df; --muted: #9d978a;
+      --line: #2e2b27; --accent: #e3a15a; --accent-soft: #3a2a19; --chip: #26231f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121110; --surface: #1c1a18; --text: #ece8df; --muted: #9d978a;
+    --line: #2e2b27; --accent: #e3a15a; --accent-soft: #3a2a19; --chip: #26231f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Noto Sans SC", sans-serif;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 40px 16px 64px; }
+  header h1 { font-size: clamp(26px, 4vw, 36px); margin: 0 0 6px; letter-spacing: -0.01em; }
+  header p { color: var(--muted); margin: 0; max-width: 760px; }
+  .totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 28px 0 12px; }
+  .stat { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .stat b { display: block; font-size: 24px; font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--muted); font-size: 13px; }
+  .note { color: var(--muted); font-size: 13px; margin: 0 0 32px; }
+  .disclaimer { font-size: 13px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 8px; padding: 10px 14px; margin: -16px 0 32px; }
+  .disclaimer a, footer a { color: var(--accent); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; }
+  @media (max-width: 400px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+  .shots { display: grid; gap: 2px; background: var(--line); }
+  .shots.two { grid-template-columns: 1fr 1fr; }
+  .shots a { display: block; aspect-ratio: 16 / 9; background: #000; overflow: hidden; }
+  .shots img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .25s; }
+  .shots a:hover img { transform: scale(1.03); }
+  .body { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+  .body h2 { font-size: 17px; margin: 0; line-height: 1.3; }
+  .cat { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); font-weight: 600; }
+  .desc { color: var(--muted); margin: 0; font-size: 14px; }
+  .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: auto; }
+  .metrics div { background: var(--chip); border-radius: 8px; padding: 8px 10px; }
+  .metrics b { display: block; font-variant-numeric: tabular-nums; font-size: 15px; }
+  .metrics span { font-size: 11px; color: var(--muted); }
+  .shared { font-size: 12px; background: var(--accent-soft); color: var(--text); border-radius: 8px; padding: 6px 10px; }
+  .links { display: flex; flex-wrap: wrap; gap: 8px; }
+  .links a { font-size: 13px; text-decoration: none; color: var(--text); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; }
+  .links a.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  :root[data-theme="dark"] .links a.primary, .links a.primary { color: #fff; }
+  .links a:hover { border-color: var(--accent); }
+  details { margin-top: 44px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; }
+  summary { cursor: pointer; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .tablewrap { overflow-x: auto; margin-top: 12px; }
+  th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--muted); font-weight: 500; }
+  footer { color: var(--muted); font-size: 13px; margin-top: 32px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>AI Creation · Completed Deliverables</h1>
+    <p>Fifteen single-file web builds made by Claude Code, some by the main session and some by parallel subagents. Each card shows the original task brief, the time spent actively working on it, the tokens it used, and a link to the working output.</p>
+  </header>
+
+  <section class="totals" id="totals"></section>
+  <p class="note">
+    <b>Active time</b> leaves out waiting for the usage limit to reset (about 4.3 h, twice) and any idle gap over 20 minutes.
+    <b>Total tokens</b> = fresh input + cache writes + cache reads + output; cache reads are most of it.
+    The subagents ran in parallel, so their times overlap on the clock.
+  </p>
+  <p class="disclaimer"><b>Disclaimer:</b> Fan/educational project. Not affiliated with or endorsed by FromSoftware, Lockheed Martin, or any other trademark holder. Task prompts are inspired by content from the Internet; <a href="https://github.com/aray4702/ai_creation/issues">contact me</a> for credit or removal.</p>
+
+  <main class="grid" id="grid"></main>
+
+  <details>
+    <summary>Full token breakdown</summary>
+    <div class="tablewrap"><table id="table"></table></div>
+  </details>
+
+  <footer>Source: Claude Code session transcripts, 28–30 Sep 2026. Screenshots were taken with headless Chrome at 1280×720.<br>Generated code is released under the <a href="https://github.com/aray4702/ai_creation/blob/main/LICENSE">MIT License</a>; the task briefs and screenshots are not covered by it.</footer>
+</div>
+
+<script>
+// in = fresh input, cw = cache write, cr = cache read, out = output tokens; min = active minutes.
+// "shared" marks tasks built by a single agent in one run; their figures cover the pair.
+const TASKS = [
+  { dir: "cinematic-short-film", cat: "Media", title: "Pure-Code Cinematic Short Film with Synthesized Score",
+    desc: "Real-time cinematic films rendered entirely in code, with camera cuts, grading and lighting, plus an orchestral score synthesized with Web Audio. Two films: “A Chinese Ghost Story” and “The Living Light”.",
+    md: "pure code cinematic short file with synthesized score.md",
+    outputs: [["qian_nu_you_hun.html", "倩女幽魂 · A Chinese Ghost Story"], ["the-living-light-film.html", "The Living Light"]],
+    min: 56.7, in: 98, cw: 271307, cr: 12621634, out: 223652, by: "Main session" },
+  { dir: "painterly-music-video", cat: "Media", title: "Multi-Agent Painterly Animated Music Video Engine",
+    desc: "A 2.5-minute music video engine that uses brush-stroke shaders and matches its scenes to the beats and lyric timing. Two engines: Paper Sky and CHROMA, which also accepts your own uploaded track.",
+    md: "multi-agent painterly animated music video engine.md",
+    outputs: [["paper_sky_music_video.html", "Paper Sky"], ["chroma-mv-engine.html", "CHROMA"]],
+    min: 20.7, in: 28, cw: 411415, cr: 4579151, out: 89611, by: "Main session" },
+  { dir: "castle-platformer", cat: "Game", title: "Rampart: 2D Castle Platformer",
+    desc: "A complete 2D castle platformer with procedural graphics, synthesized audio and a polished UI.",
+    md: "2d castle platformer game.md", outputs: [["rampart-castle-platformer.html", "Play Rampart"]],
+    min: 28.9, in: 58, cw: 226497, cr: 2367826, out: 62498, by: "Subagent" },
+  { dir: "souls-rpg", cat: "Game", title: "Ember Souls: Dark Souls–Style Action RPG",
+    desc: "A third-person Three.js action RPG with stamina combat, dodge rolls, lock-on, bonfires and a boss fight in the Ashen Keep.",
+    md: "dark souls style browser action RPG.md", outputs: [["ember-souls-rpg.html", "Play Ember Souls"]],
+    min: 42.6, in: 52, cw: 398299, cr: 2260665, out: 64921, by: "Subagent" },
+  { dir: "apex-circuit-racing", cat: "Game", title: "Apex Circuit: 3D Arcade Racing",
+    desc: "A 3D arcade racer with car physics, AI opponents and a fully built race track.",
+    md: "apex circuit 3d arcade racing game.md", outputs: [["apex-circuit-racing.html", "Play Apex Circuit"]],
+    min: 39.4, in: 98, cw: 730308, cr: 4445102, out: 64399, by: "Subagent" },
+  { dir: "kart-racing", cat: "Game", title: "Kart Clash: Full Arcade Kart Racer",
+    desc: "A single-file Three.js kart racer with drifting, boosts, items and CPU rivals.",
+    md: "full arcade kart racing game.md", outputs: [["kart-racing-arcade.html", "Play Kart Clash"]],
+    min: 41.2, in: 66, cw: 275847, cr: 2769613, out: 49196, by: "Subagent" },
+  { dir: "black-hole-simulation", cat: "Simulation", title: "3D Interactive Black Hole Simulation",
+    desc: "A WebGL black hole with gravitational lensing, an accretion disk and interactive controls for its physical parameters.",
+    md: "3d black hole simulation.md", outputs: [["black-hole-simulation.html", "Open simulation"]],
+    shared: "Black Hole Simulator (Chinese)", min: 29.6, in: 62, cw: 198038, cr: 2173522, out: 2150, by: "Subagent" },
+  { dir: "black-hole-simulator-cn", cat: "Simulation", title: "3D 黑洞模拟器 (Black Hole Simulator, Chinese)",
+    desc: "The Chinese-language version: a single-file Three.js black hole renderer with lensing and accretion-disk physics.",
+    md: "3d black hole simulator [Chinese].md", outputs: [["black-hole-simulator-cn.html", "打开模拟器"]],
+    shared: "3D Interactive Black Hole Simulation", min: 29.6, in: 62, cw: 198038, cr: 2173522, out: 2150, by: "Subagent" },
+  { dir: "f35-wind-tunnel", cat: "Simulation", title: "F-35 Digital Wind Tunnel",
+    desc: "An interactive wind tunnel with shader-based airflow, pressure maps, schlieren view, stall behavior and live aerodynamic readouts.",
+    md: "f35 digital wind tunnel simulator.md", outputs: [["f35-wind-tunnel.html", "Open wind tunnel"]],
+    min: 24.3, in: 74, cw: 212691, cr: 3366550, out: 28548, by: "Subagent" },
+  { dir: "honey-coiling", cat: "Simulation", title: "Real-Time Viscous Thread Coiling (Honey)",
+    desc: "Honey falling onto a flat surface, showing the coiling instability of a viscous thread in real time.",
+    md: "realtime viscous thread coiling simulation.md", outputs: [["honey-coiling.html", "Open simulation"]],
+    shared: "Syrup on a Moving Conveyor Belt", min: 64.5, in: 122, cw: 660500, cr: 7615379, out: 68048, by: "Subagent" },
+  { dir: "syrup-conveyor-belt", cat: "Simulation", title: "Syrup on a Moving Conveyor Belt",
+    desc: "A viscous stream falling onto a moving belt, where belt speed produces coiling, meandering and buckling patterns.",
+    md: "syrup moving belt physics.md", outputs: [["syrup-conveyor-belt.html", "Open simulation"]],
+    shared: "Real-Time Viscous Thread Coiling (Honey)", min: 64.5, in: 122, cw: 660500, cr: 7615379, out: 68048, by: "Subagent" },
+  { dir: "saturn-bird-race", cat: "Animation", title: "Saturn’s Rings Bird Bicycle Race (SVG)",
+    desc: "A humorous interactive SVG animation of birds racing bicycles around Saturn’s rings.",
+    md: "staturn's rings bird bicycle race svg.md", outputs: [["saturn-rings-bird-race.html", "Watch the race"]],
+    min: 24.3, in: 44, cw: 194910, cr: 1515047, out: 44413, by: "Subagent" },
+  { dir: "pixel-wizard", cat: "Animation", title: "Procedural Pixel Art Wizard",
+    desc: "A retro pixel-art wizard drawn and animated entirely in code (idle, casting and spell effects) with no image files.",
+    md: "hand animated procedural pxiel art wizard character.md", outputs: [["pixel-wizard.html", "Meet the wizard"]],
+    min: 29.9, in: 56, cw: 178363, cr: 1827164, out: 17979, by: "Subagent" },
+  { dir: "antikythera-reconstruction", cat: "3D", title: "Antikythera Mechanism Reconstruction",
+    desc: "An interactive 3D reconstruction of the ancient Greek astronomical calculator, with an exploded view and working gear trains.",
+    md: "antikythera astronomical calcuator reconstruction.md", outputs: [["antikythera-reconstruction.html", "Explore the mechanism"]],
+    min: 36.5, in: 92, cw: 337400, cr: 5135200, out: 34459, by: "Subagent" },
+  { dir: "gear-calculator", cat: "3D", title: "3D Gear-Driven Mechanical Calculator",
+    desc: "A working Pascaline-style adding machine in which meshing teeth turn every digit, with a visible odometer carry train and borrow handling.",
+    md: "3d gear driver mechanical calculator.md", outputs: [["gear-mechanical-calculator.html", "Open the machine"]],
+    min: 63.7, in: 88, cw: 461041, cr: 2970492, out: 31925, by: "Subagent" },
+];
+
+const enc = (dir, f) => dir + "/" + encodeURIComponent(f);
+const png = f => f.replace(/\.html$/, ".png");
+const total = t => t.in + t.cw + t.cr + t.out;
+const fmtM = n => n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? Math.round(n / 1e3) + "K" : String(n);
+const fmtMin = m => m >= 60 ? Math.floor(m / 60) + "h " + Math.round(m % 60) + "m" : m.toFixed(1) + " min";
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// Count each shared run once in the totals.
+const seen = new Set(); let tMin = 0, tOut = 0, tAll = 0;
+for (const t of TASKS) {
+  const key = t.shared ? [t.title, t.shared].sort().join("|") : t.dir;
+  if (seen.has(key)) continue; seen.add(key);
+  tMin += t.min; tOut += t.out; tAll += total(t);
+}
+document.getElementById("totals").innerHTML = [
+  [TASKS.length, "tasks completed"], [fmtMin(tMin), "active agent time"],
+  [fmtM(tOut), "output tokens"], [fmtM(tAll), "total tokens"],
+].map(([v, l]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join("");
+
+document.getElementById("grid").innerHTML = TASKS.map(t => `
+  <article class="card">
+    <div class="shots ${t.outputs.length > 1 ? "two" : ""}">
+      ${t.outputs.map(([f, label]) => `<a href="${enc(t.dir, f)}" title="${esc(label)}"><img loading="lazy" src="${enc(t.dir, png(f))}" alt="Screenshot of ${esc(label)}"></a>`).join("")}
+    </div>
+    <div class="body">
+      <div class="cat">${t.cat} · ${t.by}</div>
+      <h2>${esc(t.title)}</h2>
+      <p class="desc">${esc(t.desc)}</p>
+      ${t.shared ? `<div class="shared">Built in the same agent run as <i>${esc(t.shared)}</i>. The figures below cover both tasks.</div>` : ""}
+      <div class="metrics">
+        <div><b>${fmtMin(t.min)}</b><span>active time</span></div>
+        <div><b>${t.out.toLocaleString()}</b><span>output tokens</span></div>
+        <div><b>${fmtM(total(t))}</b><span>total tokens</span></div>
+      </div>
+      <div class="links">
+        ${t.outputs.map(([f, label]) => `<a class="primary" href="${enc(t.dir, f)}">▶ ${esc(label)}</a>`).join("")}
+        <a href="${enc(t.dir, t.md)}">Task brief (.md)</a>
+      </div>
+    </div>
+  </article>`).join("");
+
+document.getElementById("table").innerHTML =
+  `<tr><th>Task</th><th>Active</th><th>Input</th><th>Cache write</th><th>Cache read</th><th>Output</th><th>Total</th></tr>` +
+  TASKS.map(t => `<tr><td>${esc(t.title)}${t.shared ? " *" : ""}</td><td>${fmtMin(t.min)}</td><td>${t.in.toLocaleString()}</td><td>${t.cw.toLocaleString()}</td><td>${t.cr.toLocaleString()}</td><td>${t.out.toLocaleString()}</td><td>${total(t).toLocaleString()}</td></tr>`).join("") +
+  `<tr><td colspan="7" style="text-align:left;color:var(--muted)">* Shared agent run; each pair is counted once in the totals above.</td></tr>`;
+</script>
+</body>
+</html>

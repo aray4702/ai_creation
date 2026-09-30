@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Arcanist - Pixel Wizard</title>
+<style>
+  :root{--bg:#0b0a14;--panel:#1a1630;--edge:#3d3380;--text:#c8b8ff;--dim:#8a7ae0;--hot:#8fd3ff;--gold:#ffd23f}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:ui-monospace,Menlo,Consolas,monospace;overflow:hidden}
+  body{display:flex;flex-direction:column;align-items:center}
+  header{width:100%;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:center;padding:10px 16px 6px}
+  h1{margin:0;font-size:18px;letter-spacing:4px;color:var(--gold);text-shadow:2px 2px 0 #d0306a}
+  h1 small{display:block;font-size:10px;letter-spacing:2px;color:var(--dim);text-shadow:none;margin-top:2px}
+  .btns{display:flex;gap:6px;flex-wrap:wrap}
+  button{font:inherit;font-size:12px;letter-spacing:1px;color:var(--text);background:var(--panel);border:2px solid var(--edge);
+    padding:6px 10px;cursor:pointer;box-shadow:3px 3px 0 #0b0a14;image-rendering:pixelated}
+  button:hover{border-color:var(--dim)}
+  button.on{background:#3d3380;color:#fff;border-color:var(--hot)}
+  button kbd{color:var(--gold);font:inherit;margin-left:4px}
+  #stage{flex:1;display:flex;align-items:center;justify-content:center;width:100%;min-height:0}
+  #wrap{position:relative;line-height:0;border:3px solid var(--panel);box-shadow:0 0 0 3px #0b0a14,0 0 0 6px var(--edge)}
+  #wrap.crt{border-radius:18px;overflow:hidden;box-shadow:0 0 0 3px #0b0a14,0 0 0 6px var(--edge),0 0 40px rgba(79,143,223,.25)}
+  canvas#view{display:block;image-rendering:pixelated;image-rendering:crisp-edges}
+  footer{width:100%;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;justify-content:center;padding:8px 16px 12px;font-size:11px}
+  #pal{display:grid;grid-template-columns:repeat(12,16px);gap:2px}
+  #pal div{width:16px;height:16px;border:1px solid #000}
+  .hint{color:var(--dim)} .hint b{color:var(--gold);font-weight:normal}
+  #status{color:var(--hot);min-width:170px}
+</style>
+</head>
+<body>
+<header>
+  <h1>ARCANIST<small>HAND-ANIMATED PROCEDURAL PIXEL WIZARD</small></h1>
+  <div class="btns">
+    <button id="bIdle">IDLE<kbd>1</kbd></button>
+    <button id="bCharge">CHARGE<kbd>2</kbd></button>
+    <button id="bCast">CAST<kbd>3</kbd></button>
+    <button id="bCrt">CRT<kbd>C</kbd></button>
+  </div>
+  <div id="status">STATE: IDLE</div>
+</header>
+<div id="stage"><div id="wrap"><canvas id="view"></canvas></div></div>
+<footer>
+  <span>PALETTE <b style="color:var(--gold)">24</b>/24</span>
+  <div id="pal"></div>
+  <span class="hint"><b>1</b> idle &middot; <b>2</b> charge (hold) &middot; <b>3</b>/<b>SPACE</b> cast &middot; <b>C</b> CRT scanlines</span>
+</footer>
+<script>
+window.addEventListener('error',e=>{document.title='ERROR: '+e.message+' @'+e.lineno});
+(function(){
+'use strict';
+const Q=new URLSearchParams(location.search);
+const AUTOTEST=Q.has('autotest');
+const LOCK=Q.get('state'); // optional: idle|charge|cast held for screenshots
+
+// ---------- 24-colour palette ----------
+const PAL=[
+ '#0b0a14','#1a1630','#2a2350','#3d3380','#5a4fb0','#8a7ae0','#c8b8ff','#ffffff',
+ '#1f3a5f','#2f5f9f','#4f8fdf','#8fd3ff','#3a2418','#6b4228','#a0683a','#f0c8a0',
+ '#c08868','#d8d8e8','#9090a8','#5c5c74','#ffd23f','#ff8a1f','#d0306a','#40e0a0'];
+const NAMES=['void','night','dusk','indigo','violet','lavender','mist','white','deep blue','robe','sky','arc','bark','staff','oak','skin','skin shade','beard','ash','stone','gold','ember','rose','mint'];
+// lighten / darken ramps (stay inside palette)
+const LIGHT=[1,2,3,4,5,6,7,7, 9,10,11,7, 13,14,15,7, 15,7,17,18, 7,20,21,11];
+const DARK =[0,0,1,2,3,4,5,6, 1,8,9,10, 0,12,13,16, 12,18,19,2, 21,22,3,8];
+const LUT=new Uint32Array(24);
+PAL.forEach((h,i)=>{const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);LUT[i]=(255<<24)|(b<<16)|(g<<8)|r;});
+const palEl=document.getElementById('pal');
+PAL.forEach((h,i)=>{const d=document.createElement('div');d.style.background=h;d.title=i+': '+NAMES[i]+' '+h;palEl.appendChild(d);});
+
+// ---------- buffers ----------
+const W=192,H=128;
+const buf=document.createElement('canvas');buf.width=W;buf.height=H;
+const bctx=buf.getContext('2d');
+const img=bctx.createImageData(W,H);
+const px32=new Uint32Array(img.data.buffer);
+const S=new Uint8Array(W*H);        // screen (palette indices)
+const L=new Uint8Array(W*H);        // character layer (255 = empty)
+const BG=new Uint8Array(W*H);
+const BAY=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5];
+const bay=(x,y)=>(BAY[(y&3)*4+(x&3)]+0.5)/16;
+
+function sp(x,y,c){x|=0;y|=0;if(x>=0&&y>=0&&x<W&&y<H)S[y*W+x]=c;}
+function lp(x,y,c){x=Math.round(x);y=Math.round(y);if(x>=0&&y>=0&&x<W&&y<H)L[y*W+x]=c;}
+function lline(x0,y0,x1,y1,cf){ // bresenham, cf(i,n) -> colour
+  x0=Math.round(x0);y0=Math.round(y0);x1=Math.round(x1);y1=Math.round(y1);
+  const dx=Math.abs(x1-x0),dy=-Math.abs(y1-y0),sx=x0<x1?1:-1,sy=y0<y1?1:-1;let e=dx+dy,i=0;const n=Math.max(dx,-dy)||1;
+  for(;;){lp(x0,y0,typeof cf==='function'?cf(i,n):cf);if(x0===x1&&y0===y1)break;const e2=2*e;if(e2>=dy){e+=dy;x0+=sx;}if(e2<=dx){e+=dx;y0+=sy;}i++;}
+}
+function ldisc(x,y,r,c){const R=Math.ceil(r);for(let j=-R;j<=R;j++)for(let i=-R;i<=R;i++)if(i*i+j*j<=r*r+0.3)lp(x+i,y+j,c);}
+function lthick(x0,y0,x1,y1,r0,r1,c){const n=Math.ceil(Math.hypot(x1-x0,y1-y0)*1.5)+1;for(let k=0;k<=n;k++){const t=k/n;ldisc(x0+(x1-x0)*t,y0+(y1-y0)*t,r0+(r1-r0)*t,c);}}
+
+// ---------- procedural background ----------
+let seed=1337;const rnd=()=>((seed=(seed*16807)%2147483647)/2147483647);
+const GROUND=112, HORIZON=100;
+const stars=[];
+(function buildBG(){
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    let c;
+    if(y<HORIZON){const v=Math.pow(y/HORIZON,1.25)*3;const lo=Math.floor(v),f=v-lo;const ramp=[0,1,2,3,3];c=f>bay(x,y)?ramp[lo+1]:ramp[lo];}
+    else c=1;
+    BG[y*W+x]=c;
+  }
+  // moon + halo
+  const mx=156,my=24;
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    const d=Math.hypot(x-mx,y-my);
+    if(d<=9){let c=17;if(Math.hypot(x-mx+3,y-my+3)<5)c=7;if(Math.hypot(x-mx-3,y-my-2)<2.2||Math.hypot(x-mx+2,y-my-4)<1.5||Math.hypot(x-mx-4,y-my+4)<1.2)c=18;if(d>8.2&&x>mx)c=18;BG[y*W+x]=c;}
+    else if(d<16&&(1-(d-9)/7)*0.7>bay(x,y))BG[y*W+x]=LIGHT[BG[y*W+x]];
+  }
+  for(let i=0;i<70;i++){const x=(rnd()*W)|0,y=(rnd()*72)|0;if(Math.hypot(x-mx,y-my)<18)continue;stars.push({x,y,p:rnd()*6.28,s:0.6+rnd()*2.5,b:rnd()<0.2});BG[y*W+x]=rnd()<0.5?4:5;}
+  // far mountains
+  for(let x=0;x<W;x++){
+    const h1=74+Math.sin(x*0.045)*7+Math.sin(x*0.13+1)*3+Math.sin(x*0.31)*1.2;
+    for(let y=Math.round(h1);y<HORIZON+8;y++)BG[y*W+x]=(y===Math.round(h1)&&x>100)?3:2;
+    const h2=90+Math.sin(x*0.06+2)*4+Math.sin(x*0.19)*2;
+    for(let y=Math.round(h2);y<GROUND;y++)BG[y*W+x]=1;
+  }
+  // tower silhouette with lit window
+  for(let y=58;y<92;y++)for(let x=16;x<24;x++)BG[y*W+x]=0;
+  for(let y=50;y<58;y++){const hw=(y-50)*0.7;for(let x=Math.round(20-hw-1);x<=Math.round(19+hw+1);x++)BG[y*W+x]=0;}
+  for(let x=14;x<26;x++)BG[58*W+x]=0;
+  BG[64*W+19]=20;BG[64*W+20]=20;BG[65*W+19]=21;BG[65*W+20]=21;BG[74*W+21]=21;
+  // stone floor
+  for(let y=GROUND-6;y<H;y++){
+    const row=Math.floor((y-(GROUND-6))/4),yy=(y-(GROUND-6))%4;
+    for(let x=0;x<W;x++){
+      let c;
+      if(y===GROUND-6)c=18;
+      else{const off=(row%2)*6;const bx=(x+off)%12;c=(yy===3||bx===0)?2:19;
+        if(c===19&&yy===0)c=18;
+        const fade=(y-GROUND+2)/(H-GROUND+2);
+        if(fade>bay(x,y)+0.15)c=c===2?1:(c===18?19:2);
+        if(fade>0.75&&fade-0.5>bay(x,y))c=1;}
+      BG[y*W+x]=c;
+    }
+  }
+})();
+
+// ---------- state & pose ----------
+const POSES={
+  idle:  {hover:0, hx:9,  hy:-15, gx:15, gy:-24, ang:0.0,  lx:-9,  ly:-12, flare:0,   sway:1.2, look:1},
+  charge:{hover:4, hx:11, hy:-38, gx:11, gy:-38, ang:0.1,  lx:-16, ly:-30, flare:1,   sway:3.0, look:0},
+  cast:  {hover:1, hx:16, hy:-26, gx:16, gy:-26, ang:1.36,  lx:-11, ly:-18, flare:0.6, sway:2.2, look:1}
+};
+const pose=Object.assign({},POSES.idle);
+let state='idle',stateT=0,charge=0,castPow=0.5,castFired=false;
+let shake=0,flash=0,time=0,ctime=0,lastTick=-1;
+let crt=Q.get('crt')!=='0';
+const parts=[];
+const MAXP=1100;
+
+function setState(s){
+  if(s==='cast'){castPow=Math.max(0.45,charge);castFired=false;}
+  state=s;stateT=0;updateUI();
+}
+
+// ---------- particles ----------
+function addP(o){if(parts.length<MAXP)parts.push(o);}
+const RAMP_ARC=[7,11,10,5,4,3], RAMP_EMB=[20,21,22,3,2], RAMP_DUST=[11,10,5,4,3];
+function colorOf(p){const r=p.ramp,f=1-p.life/p.max;return r[Math.min(r.length-1,Math.floor(f*r.length))];}
+
+// ---------- geometry of the rig ----------
+const CX=58;
+let rig={};
+function computeRig(t,breath){
+  const hv=Math.round(pose.hover+(state==='charge'?Math.sin(t*3)*1:0));
+  const base=GROUND-hv;
+  const robeLen=25+breath;
+  const robeTop=base-3-robeLen;
+  const headTop=robeTop-7;
+  const staffFree=state==='idle'&&stateT>0.25||(state==='idle'&&stateT===0);
+  let gx=CX+pose.gx, gy=base+pose.gy, ang=pose.ang;
+  if(state==='idle'){gy+=Math.round(Math.sin(t*2.2)*2);ang+=Math.sin(t*1.1)*0.09;}
+  if(state==='cast'&&stateT<0.17){ang=-0.35;gx-=2;}
+  const dir={x:Math.sin(ang),y:-Math.cos(ang)};
+  const top={x:gx+dir.x*20,y:gy+dir.y*20};
+  const gem={x:top.x+dir.x*3,y:top.y+dir.y*3};
+  let hx=CX+pose.hx,hy=base+pose.hy;
+  if(state==='cast'&&stateT<0.17){hx-=2;}
+  rig={hv,base,robeLen,robeTop,headTop,gx,gy,ang,dir,top,gem,hx,hy,staffFree,
+       lx:CX+pose.lx+(state==='charge'?Math.round(Math.sin(t*5)):0),ly:base+pose.ly};
+  return rig;
+}
+
+// ---------- draw the wizard into layer L ----------
+function drawWizard(t){
+  L.fill(255);
+  const r=rig, f=pose.flare, sway=pose.sway;
+  const cx=CX, top=r.robeTop, len=r.robeLen;
+  // floating staff behind body when idle
+  const drawStaff=()=>{
+    const bx=r.gx-r.dir.x*13,by=r.gy-r.dir.y*13;
+    const nx=Math.round(Math.cos(r.ang)),ny=Math.round(Math.sin(r.ang));
+    lline(bx,by,r.top.x,r.top.y,(i,n)=>{const k=i/n;return (Math.abs(k-0.39)<0.04||Math.abs(k-0.9)<0.03)?20:14;});
+    lline(bx+nx,by+ny,r.top.x+nx,r.top.y+ny,(i,n)=>{const k=i/n;return (Math.abs(k-0.39)<0.04||Math.abs(k-0.9)<0.03)?21:13;});
+    // claw head
+    const gx=r.gem.x,gy=r.gem.y;
+    for(let a=0;a<6.28;a+=0.2){const along=Math.cos(a)*r.dir.x+Math.sin(a)*r.dir.y;if(along<0.35)lp(gx+Math.cos(a)*3.6,gy+Math.sin(a)*3.6,along<-0.5?13:14);}
+    const gr=state==='charge'?2+Math.round(charge*1.5):(state==='cast'&&castFired?3:2);
+    for(let j=-gr;j<=gr;j++)for(let i=-gr;i<=gr;i++){const d=Math.abs(i)+Math.abs(j);if(d<=gr){lp(gx+i,gy+j,d===0?7:(d<gr?11:(i<0?10:4)));}}
+    if(gr<3)lp(gx-1,gy-1,7);
+  };
+  if(r.staffFree)drawStaff();
+  // feet
+  const fb=r.base-1;
+  for(const s of[-1,1]){const fx=cx+s*3+(s>0?1:0);const dang=pose.hover>1.5?1:0;
+    for(let i=-2;i<=1;i++){lp(fx+i+s*0,fb-1,12);lp(fx+i+(s>0?1:0),fb-dang*(i===1?-1:0),i===1?13:12);}}
+  // robe
+  const hem=[];
+  for(let x=0;x<W;x++)hem[x]=len-Math.round(f*2.2*(0.5+0.5*Math.sin(x*0.9-t*9)));
+  for(let rr=0;rr<=len;rr++){
+    const y=top+rr,k=rr/len;
+    let hw=6+rr*0.27+f*k*k*6; if(rr<2)hw-=(2-rr)*1.3;
+    const off=Math.sin(t*1.9-rr*0.22)*sway*Math.pow(k,1.5)+(state==='cast'?-k*k*2*f:0);
+    const c0=cx+off;
+    for(let x=Math.round(c0-hw);x<=Math.round(c0+hw);x++){
+      if(rr>hem[x])continue;
+      const rel=(x-c0)/hw;
+      let c=rel<-0.55?10:(rel>0.45?8:9);
+      if(rr>5){for(const fp of[-0.3,0.15,0.6]){const fx=Math.round(c0+hw*(fp+Math.sin(t*1.3+rr*0.15+fp*5)*0.06));if(x===fx){c=8;}else if(x===fx-1&&c===9&&rr>12)c=10;}}
+      if(rr===10||rr===11)c=rr===10?12:13;
+      if(rr===10&&Math.abs(x-c0)<1.5)c=20;
+      if(rr>=hem[x]-1)c=rel>0.45?21:20;
+      L[y*W+x]=c;
+    }
+    // embroidered stars
+    for(const st of[[-0.5,15],[0.35,19],[-0.1,22],[0.55,13],[-0.25,7]])if(rr===st[1]){const sx=Math.round(c0+hw*st[0]);if(L[y*W+sx]!==255)L[y*W+sx]=(Math.sin(t*4+st[0]*9)>0.2)?20:6;}
+  }
+  // arms (sleeves), left arm behind-ish
+  const sl=(sx,sy,hx,hy)=>{
+    lthick(sx,sy,hx,hy,1.8,2.6,8);
+    lthick(sx,sy,hx,hy,0.8,1.5,9);
+    ldisc(hx,hy,1.2,10);
+  };
+  sl(cx-6,top+2,r.lx,r.ly);
+  // hand (left)
+  lp(r.lx-1,r.ly,15);lp(r.lx-1,r.ly+1,16);lp(r.lx-2,r.ly,15);
+  // head
+  const ht=r.headTop, look=Math.round(pose.look);
+  for(let y=ht+1;y<=ht+6;y++)for(let x=cx-3;x<=cx+3;x++)L[y*W+x]=x===cx+3?16:15;
+  // hair tufts
+  for(let y=ht+2;y<=ht+5;y++){lp(cx-4,y,y%2?17:18);lp(cx+4,y,18);}
+  // brows + eyes
+  const blink=(t%3.7)<0.17;
+  const glowEye=state!=='idle';
+  lp(cx-2+look,ht+2,17);lp(cx-1+look,ht+2,17);lp(cx+1+look,ht+2,17);lp(cx+2+look,ht+2,17);
+  if(blink){lp(cx-1+look,ht+3,16);lp(cx+2+look,ht+3,16);}
+  else{lp(cx-1+look,ht+3,glowEye?11:0);lp(cx+2+look,ht+3,glowEye?11:0);}
+  lp(cx+1+look,ht+4,16);lp(cx+1+look,ht+5,16);
+  // beard + moustache
+  const bt=ht+5, blen=top+11-bt;
+  const bsway=Math.sin(t*2.1)*(state==='charge'?2.2:1);
+  for(let j=0;j<=blen;j++){
+    const k=j/blen,hw=(j<2?5:5*(1-k)+0.6),o=bsway*k*k+(state==='cast'?-k*k*2:0);
+    for(let x=Math.round(cx+o-hw);x<=Math.round(cx+o+hw);x++){
+      const rel=(x-(cx+o))/hw;let c=rel>0.4?18:(rel<-0.5?7:17);
+      if(j>2&&((x+j)%4===0))c=18;
+      if(j===0&&Math.abs(x-cx-look-0.5)<1)continue; // mouth gap
+      lp(x,bt+j,c);
+    }
+  }
+  // hat
+  const brimY=ht;
+  for(let x=cx-9;x<=cx+9;x++){lp(x,brimY,Math.abs(x-cx)>7?3:4);lp(x,brimY+1,x>cx+4?2:3);}
+  lp(cx-10,brimY+1,3);lp(cx+10,brimY+1,2);
+  const hatH=19;
+  const bend=Math.sin(t*1.3)*2.5+(state==='charge'?-3-Math.sin(t*7)*1.5:0)+(state==='cast'?-4:0)+2;
+  for(let k=1;k<=hatH;k++){
+    const q=k/hatH,hw=5.5*(1-q)+0.4,o=bend*q*q*q;
+    const y=brimY-k;
+    for(let x=Math.round(cx+o-hw);x<=Math.round(cx+o+hw);x++){
+      const rel=(x-(cx+o))/Math.max(hw,0.5);
+      let c=rel<-0.4?5:(rel>0.35?3:4);
+      if(k===1||k===2)c=k===1?20:21;
+      lp(x,y,c);
+    }
+  }
+  // hat emblem (crescent + star)
+  lp(cx-1,brimY-6,20);lp(cx,brimY-7,20);lp(cx-1,brimY-8,20);lp(cx+2,brimY-5,6);
+  // right arm + staff + hand
+  if(!r.staffFree)drawStaff();
+  sl(cx+6,top+2,r.hx,r.hy);
+  if(!r.staffFree){lp(r.hx,r.hy-1,15);lp(r.hx+1,r.hy-1,15);lp(r.hx,r.hy,16);lp(r.hx+1,r.hy,15);}
+  else{lp(r.hx+1,r.hy,15);lp(r.hx+2,r.hy-1,15);lp(r.hx+1,r.hy+1,16);}
+}
+
+// composite layer with dark outline
+function compositeLayer(){
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    const i=y*W+x,c=L[i];
+    if(c!==255){S[i]=c;continue;}
+    if((x>0&&L[i-1]!==255)||(x<W-1&&L[i+1]!==255)||(y>0&&L[i-W]!==255)||(y<H-1&&L[i+W]!==255))S[i]=0;
+  }
+}
+
+// dithered palette-lighting (stays within 24 colours)
+function lightCircle(cx,cy,rad,strength){
+  const R=Math.ceil(rad);
+  for(let y=Math.max(0,Math.floor(cy-R));y<Math.min(H,cy+R);y++)for(let x=Math.max(0,Math.floor(cx-R));x<Math.min(W,cx+R);x++){
+    const d=Math.hypot(x-cx,y-cy);if(d>=rad)continue;
+    const v=(1-d/rad)*strength;const i=y*W+x;
+    if(v>bay(x,y))S[i]=LIGHT[S[i]];
+    if(v-1>bay(x,y))S[i]=LIGHT[S[i]];
+  }
+}
+function lightAll(v){for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x;if(v>bay(x,y))S[i]=LIGHT[S[i]];if(v-1>bay(x,y))S[i]=LIGHT[S[i]];if(v-2>bay(x,y))S[i]=LIGHT[S[i]];}}
+function darkAll(v){for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x;if(v>bay(x,y))S[i]=DARK[S[i]];}}
+
+// rune circle on floor
+function runeRing(t,amt,front){
+  if(amt<=0.02)return;
+  const cx=CX,cy=GROUND-1,rx=24,ry=5;
+  for(let a=0;a<6.283;a+=0.035){
+    const s=Math.sin(a);if(front?s<0:s>=0)continue;
+    const seg=((a*8/Math.PI+t*2.5)%2+2)%2;
+    const x=Math.round(cx+Math.cos(a)*rx),y=Math.round(cy+s*ry);
+    const lv=amt*(seg<1.4?1:0.45);
+    sp(x,y,lv>0.75?11:lv>0.4?10:lv>0.2?5:4);
+    const x2=Math.round(cx+Math.cos(-a*1.0+t)*rx*0.62),y2=Math.round(cy+Math.sin(-a+t)*ry*0.62);
+    if(amt>0.3&&((a*10)|0)%3===0)sp(x2,y2,amt>0.7?10:4);
+  }
+}
+
+// beam
+let beamW=0;
+function drawBeam(t){
+  if(beamW<=0.2)return;
+  const g=rig.gem,d=rig.dir,nx=-d.y,ny=d.x;
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    const px=x-g.x,py=y-g.y;const al=px*d.x+py*d.y;if(al<1)continue;
+    let pe=px*nx+py*ny;
+    pe+=Math.sin(al*0.25-t*40)*0.9;
+    const taper=Math.min(1,al/7);
+    const w=beamW*taper*(1+0.12*Math.sin(al*0.5+t*55));
+    const a=Math.abs(pe);if(a>w+1.2)continue;
+    const q=a/Math.max(w,0.01);
+    let c;
+    if(q<0.35)c=7;else if(q<0.62)c=11;else if(q<0.88)c=10;else if(q<1.0)c=5;
+    else c=(bay(x,y)<0.5)?4:-1;
+    // helix strands
+    const hs=Math.sin(al*0.35-t*30)*w*0.8;
+    if(Math.abs(pe-hs)<0.6&&q<1)c=7;
+    if(c>=0)S[y*W+x]=c;
+  }
+}
+
+// ---------- main update ----------
+function update(dt){
+  time+=dt;stateT+=dt;
+  if(AUTOTEST&&!LOCK){
+    if(state==='idle'&&stateT>2.6)setState('charge');
+    else if(state==='charge'&&stateT>3.2)setState('cast');
+  }
+  if(LOCK&&state!==LOCK)setState(LOCK);
+  // charge level
+  if(state==='charge')charge=Math.min(1,charge+dt/2.6);
+  else if(state!=='cast')charge=Math.max(0,charge-dt*0.8);
+  // hand-animated pose: update on 12fps "twos"
+  const tick=Math.floor(time*12);
+  if(tick!==lastTick){
+    lastTick=tick;ctime=tick/12;
+    const tgt=POSES[state];
+    const k=state==='cast'?0.6:0.4;
+    for(const key in tgt)pose[key]+=(tgt[key]-pose[key])*k;
+  }
+  const breath=state==='idle'?(Math.sin(ctime*2.2)>0.1?1:0):(state==='charge'?1:0);
+  computeRig(ctime,breath);
+  const g=rig.gem;
+  // cast timeline
+  if(state==='cast'){
+    const ct=stateT;
+    if(ct>=0.17&&!castFired){castFired=true;shake=4+castPow*3;flash=1;
+      for(let i=0;i<160;i++){const a=rnd()*6.283,s=40+rnd()*160;addP({x:g.x,y:g.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:0,max:0.3+rnd()*0.5,ramp:RAMP_ARC,drag:3,gy:0,big:rnd()<0.2});}
+    }
+    const peak=3+castPow*4;
+    if(ct<0.17)beamW=0;
+    else if(ct<0.27)beamW=peak*(ct-0.17)/0.1;
+    else if(ct<1.35)beamW=peak*(0.85+0.15*Math.sin(ct*47));
+    else if(ct<1.7)beamW=peak*(1-(ct-1.35)/0.35);
+    else beamW=0;
+    if(ct>0.17&&ct<1.4)shake=Math.max(shake,1.2+castPow*1.3);
+    if(beamW>0.5){
+      const d=rig.dir,n={x:-d.y,y:d.x};
+      const rate=ct<1.35?320:520;
+      const cnt=Math.floor(rate*dt+rnd());
+      for(let i=0;i<cnt;i++){const al=rnd()*220,pe=(rnd()*2-1)*beamW;const x=g.x+d.x*al+n.x*pe,y=g.y+d.y*al+n.y*pe;if(x<0||x>W||y<0||y>H)continue;
+        const out=(rnd()*2-1)*50,fw=20+rnd()*70;
+        addP({x,y,vx:d.x*fw+n.x*out,vy:d.y*fw+n.y*out,life:0,max:0.25+rnd()*0.5,ramp:RAMP_ARC,drag:2.5,gy:0,big:rnd()<0.1});}
+      // impact sparks at screen edge
+      let ex=g.x,ey=g.y;for(let s=0;s<400;s++){ex+=d.x;ey+=d.y;if(ex<0||ex>=W||ey<0||ey>=H)break;}
+      for(let i=0;i<6;i++){const a=Math.atan2(-d.y,-d.x)+(rnd()-0.5)*2.2,s=40+rnd()*110;addP({x:ex,y:ey,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:0,max:0.2+rnd()*0.4,ramp:rnd()<0.4?RAMP_EMB:RAMP_ARC,drag:2,gy:60,big:false});}
+    }
+    if(ct>1.35&&ct<1.75){ // dissipation: beam breaks into drifting motes & embers
+      const d=rig.dir;
+      for(let i=0;i<14;i++){const al=rnd()*200;const x=g.x+d.x*al,y=g.y+d.y*al;if(x<0||x>W||y<0||y>H)continue;
+        addP({x,y,vx:(rnd()-0.5)*18,vy:-8-rnd()*22,life:0,max:0.8+rnd()*1.2,ramp:rnd()<0.35?RAMP_EMB:RAMP_DUST,drag:1.2,gy:-4,big:false});}
+    }
+    if(ct>2.7&&!LOCK)setState('idle');
+    if(ct>2.7&&LOCK==='cast'){stateT=0;castFired=false;}
+  } else beamW=0;
+  // charge motes spiralling into gem
+  if(state==='charge'){
+    const cnt=Math.floor((120+charge*220)*dt+rnd());
+    for(let i=0;i<cnt;i++)addP({mote:true,th:rnd()*6.283,rho:24+rnd()*34,w:2+rnd()*2,sp:14+rnd()*20,life:0,max:4,ramp:RAMP_DUST});
+    const dc=Math.floor(40*dt*(0.5+charge)+rnd());
+    for(let i=0;i<dc;i++){const a=rnd()*6.283;addP({x:CX+Math.cos(a)*24,y:GROUND-1+Math.sin(a)*5,vx:0,vy:-15-rnd()*30,life:0,max:0.8+rnd()*0.8,ramp:RAMP_DUST,drag:0.5,gy:0,big:false});}
+  }
+  if(state==='idle'&&rnd()<dt*7){addP({x:g.x+(rnd()-0.5)*9,y:g.y+(rnd()-0.5)*9,vx:(rnd()-0.5)*6,vy:-6-rnd()*8,life:0,max:0.6+rnd()*0.6,ramp:[7,11,5,4],drag:1,gy:0,big:false});}
+  // particles
+  for(let i=parts.length-1;i>=0;i--){
+    const p=parts[i];p.life+=dt;
+    if(p.mote){
+      p.sp+=dt*60;p.rho-=p.sp*dt;p.th+=p.w*dt*(1+18/Math.max(p.rho,3));
+      p.x=g.x+Math.cos(p.th)*p.rho;p.y=g.y+Math.sin(p.th)*p.rho*0.8;
+      if(p.rho<2.5||state!=='charge'){ if(state!=='charge'){p.mote=false;p.vx=Math.cos(p.th)*30;p.vy=Math.sin(p.th)*30;p.drag=2;p.gy=0;p.big=false;p.max=p.life+0.4;} else {parts.splice(i,1);continue;} }
+    } else {
+      const dr=Math.exp(-p.drag*dt);p.vx*=dr;p.vy*=dr;p.vy+=p.gy*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;
+    }
+    if(p.life>=p.max||p.x<-10||p.x>W+10||p.y<-10||p.y>H+10)parts.splice(i,1);
+  }
+  shake*=Math.exp(-dt*6);if(shake<0.3)shake=0;
+  flash=Math.max(0,flash-dt*4.5);
+}
+
+// ---------- render ----------
+function render(){
+  S.set(BG);
+  // twinkling stars
+  for(const s of stars){const v=Math.sin(time*s.s+s.p);const i=s.y*W+s.x;S[i]=v>0.6?(s.b?7:6):v>-0.2?5:(s.b?4:3);
+    if(s.b&&v>0.85){sp(s.x+1,s.y,4);sp(s.x-1,s.y,4);sp(s.x,s.y+1,4);sp(s.x,s.y-1,4);}}
+  // night dims while charging (mana drawn from the world)
+  if(state==='charge')darkAll(charge*0.55);
+  // shadow
+  const shw=10-rig.hv;for(let x=-shw;x<=shw;x++)for(let y=-1;y<=1;y++){const q=(x*x)/(shw*shw)+(y*y)/2;if(q<1&&(1-q)*1.3>bay(CX+x,GROUND+y))sp(CX+x,GROUND+y,DARK[S[(GROUND+y)*W+CX+x]]);}
+  const ringAmt=state==='charge'?Math.min(1,0.25+charge):(state==='cast'?Math.max(0,1-stateT/1.6):0);
+  runeRing(time,ringAmt,false);
+  drawWizard(ctime);
+  compositeLayer();
+  runeRing(time,ringAmt,true);
+  drawBeam(time);
+  // particles
+  for(const p of parts){const c=colorOf(p);const x=Math.round(p.x),y=Math.round(p.y);sp(x,y,c);
+    if(p.mote&&p.rho>3){sp(Math.round(rig.gem.x+Math.cos(p.th-0.18)*(p.rho+1)),Math.round(rig.gem.y+Math.sin(p.th-0.18)*(p.rho+1)*0.8),DARK[c]);}
+    if(p.big&&p.life<p.max*0.5){sp(x+1,y,c);sp(x-1,y,c);sp(x,y+1,c);sp(x,y-1,c);sp(x,y,7);}}
+  // lighting
+  const g=rig.gem;
+  if(state==='idle')lightCircle(g.x,g.y,7+Math.sin(time*3)*1.5,1.1);
+  if(state==='charge'){lightCircle(g.x,g.y,10+charge*22+Math.sin(time*20)*2,1.2+charge*0.8);lightCircle(CX,GROUND-1,28,charge*0.8);}
+  if(state==='cast'){
+    if(stateT<0.17)lightCircle(g.x,g.y,14+stateT*80,1.8);
+    if(beamW>0.5){lightCircle(g.x,g.y,26+beamW*3,1.8);if(Math.floor(time*30)%3===0)lightAll(0.35);}
+  }
+  if(flash>0)lightAll(flash*3.2);
+  // HUD: charge meter (in-palette pixels)
+  const mx=6,my=6,mw=40;
+  for(let x=mx-1;x<=mx+mw;x++){sp(x,my-1,19);sp(x,my+3,19);}sp(mx-1,my,19);sp(mx-1,my+1,19);sp(mx-1,my+2,19);sp(mx+mw,my,19);sp(mx+mw,my+1,19);sp(mx+mw,my+2,19);
+  const lv=state==='cast'?castPow*Math.max(0,1-stateT/1.5):charge;
+  for(let x=0;x<mw;x++)for(let y=0;y<3;y++)sp(mx+x,my+y,x<lv*mw?(y===0?11:(x%4===0?10:10)):1);
+  if(lv>=0.999&&Math.floor(time*8)%2)for(let x=0;x<mw;x++)sp(mx+x,my+1,7);
+  // blit
+  for(let i=0;i<W*H;i++)px32[i]=LUT[S[i]];
+  bctx.putImageData(img,0,0);
+}
+
+// ---------- display (integer pixel scaling + CRT) ----------
+const view=document.getElementById('view'),vctx=view.getContext('2d');
+const wrap=document.getElementById('wrap');
+const bloom=document.createElement('canvas');bloom.width=W/4;bloom.height=H/4;const blctx=bloom.getContext('2d');
+let scale=4,scanPat=null;
+function resize(){
+  const hdr=document.querySelector('header').offsetHeight,ftr=document.querySelector('footer').offsetHeight;
+  const aw=window.innerWidth-24,ah=window.innerHeight-hdr-ftr-24;
+  scale=Math.max(1,Math.floor(Math.min(aw/W,ah/H)));
+  view.width=W*scale;view.height=H*scale;
+  const pc=document.createElement('canvas');pc.width=4;pc.height=Math.max(2,scale);const pctx=pc.getContext('2d');
+  const dark=Math.max(1,Math.round(scale/3));
+  pctx.fillStyle='rgba(0,0,0,0.42)';pctx.fillRect(0,pc.height-dark,4,dark);
+  pctx.fillStyle='rgba(255,0,60,0.03)';pctx.fillRect(0,0,1,pc.height-dark);
+  pctx.fillStyle='rgba(0,255,120,0.03)';pctx.fillRect(1,0,1,pc.height-dark);
+  pctx.fillStyle='rgba(40,80,255,0.03)';pctx.fillRect(2,0,1,pc.height-dark);
+  scanPat=vctx.createPattern(pc,'repeat');
+}
+window.addEventListener('resize',resize);
+function present(){
+  vctx.imageSmoothingEnabled=false;
+  vctx.fillStyle=PAL[0];vctx.fillRect(0,0,view.width,view.height);
+  const sx=Math.round((Math.random()*2-1)*shake)*scale,sy=Math.round((Math.random()*2-1)*shake)*scale;
+  vctx.drawImage(buf,sx,sy,W*scale,H*scale);
+  if(crt){
+    blctx.imageSmoothingEnabled=true;blctx.clearRect(0,0,bloom.width,bloom.height);blctx.drawImage(buf,0,0,bloom.width,bloom.height);
+    vctx.save();vctx.globalCompositeOperation='lighter';vctx.globalAlpha=0.22;vctx.imageSmoothingEnabled=true;
+    vctx.drawImage(bloom,sx,sy,W*scale,H*scale);vctx.restore();
+    vctx.fillStyle=scanPat;vctx.fillRect(0,0,view.width,view.height);
+    const g=vctx.createRadialGradient(view.width/2,view.height/2,view.height*0.35,view.width/2,view.height/2,view.width*0.72);
+    g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,0,0,0.55)');
+    vctx.fillStyle=g;vctx.fillRect(0,0,view.width,view.height);
+    if(Math.random()<0.5){vctx.fillStyle='rgba(255,255,255,0.012)';vctx.fillRect(0,0,view.width,view.height);}
+  }
+}
+
+// ---------- UI ----------
+const bI=document.getElementById('bIdle'),bC=document.getElementById('bCharge'),bX=document.getElementById('bCast'),bR=document.getElementById('bCrt'),st=document.getElementById('status');
+function updateUI(){
+  bI.classList.toggle('on',state==='idle');bC.classList.toggle('on',state==='charge');bX.classList.toggle('on',state==='cast');bR.classList.toggle('on',crt);
+  wrap.classList.toggle('crt',crt);
+  st.textContent='STATE: '+state.toUpperCase()+(AUTOTEST?'  [AUTOTEST]':'');
+}
+bI.onclick=()=>setState('idle');bC.onclick=()=>setState('charge');bX.onclick=()=>setState('cast');
+bR.onclick=()=>{crt=!crt;updateUI();};
+window.addEventListener('keydown',e=>{
+  if(e.repeat)return;
+  if(e.key==='1')setState('idle');
+  else if(e.key==='2')setState('charge');
+  else if(e.key==='3'||e.code==='Space'){e.preventDefault();setState('cast');}
+  else if(e.key==='c'||e.key==='C'){crt=!crt;updateUI();}
+});
+
+resize();updateUI();computeRig(0,0);
+if(LOCK)setState(LOCK);
+let last=performance.now();
+function frame(now){
+  let acc=Math.min(AUTOTEST?3:0.5,(now-last)/1000);last=now;
+  while(acc>0.0001){const dt=Math.min(1/60,acc);update(dt);acc-=dt;}
+  render();present();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+document.title='Arcanist - Pixel Wizard';
+})();
+</script>
+</body>
+</html>

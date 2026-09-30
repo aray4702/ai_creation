@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Antikythera Mechanism — Interactive Reconstruction</title>
+<style>
+  :root{
+    --bronze:#c9975a; --bronze-dark:#7a5230; --parchment:#e8dcc0; --ink:#2b1e12;
+    --panel-bg: rgba(20,14,8,0.86); --panel-border: rgba(201,151,90,0.45);
+    --accent:#e0b060; --gold:#d4af37; --danger:#c0392b; --good:#5fae62;
+  }
+  html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#0a0806;
+    font-family:'Segoe UI',Georgia,'Times New Roman',serif;color:var(--parchment);}
+  #canvasHost{position:fixed;inset:0;}
+  canvas{display:block;}
+
+  /* ---------- Start screen ---------- */
+  #startScreen{
+    position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at center,#241a0f 0%,#0a0806 75%);
+    transition:opacity .6s ease;
+  }
+  #startScreen.hidden{opacity:0;pointer-events:none;}
+  .startBox{max-width:640px;padding:36px 42px;border:1px solid var(--panel-border);
+    background:var(--panel-bg);border-radius:8px;box-shadow:0 0 60px rgba(212,175,55,0.15);text-align:center;}
+  .startBox h1{margin:0 0 6px;font-size:30px;letter-spacing:1px;color:var(--accent);
+    text-shadow:0 0 18px rgba(224,176,96,0.4);}
+  .startBox h2{margin:0 0 18px;font-size:14px;font-weight:400;color:#c9b896;letter-spacing:3px;text-transform:uppercase;}
+  .startBox p{font-size:14px;line-height:1.6;color:#d8cbb0;text-align:left;}
+  .startBox ul{text-align:left;font-size:13.5px;line-height:1.65;color:#cbb98f;padding-left:20px;}
+  #beginBtn{margin-top:18px;padding:12px 30px;font-size:15px;letter-spacing:1px;cursor:pointer;
+    background:linear-gradient(180deg,var(--accent),var(--bronze-dark));border:1px solid var(--gold);
+    color:#241a0f;border-radius:4px;font-weight:600;text-transform:uppercase;}
+  #beginBtn:hover{filter:brightness(1.1);}
+
+  /* ---------- HUD ---------- */
+  .panel{position:fixed;background:var(--panel-bg);border:1px solid var(--panel-border);
+    border-radius:8px;padding:10px 14px;font-size:12.5px;backdrop-filter:blur(2px);}
+  #titleBar{top:10px;left:14px;padding:8px 16px;}
+  #titleBar .t1{font-size:16px;color:var(--accent);letter-spacing:1px;}
+  #titleBar .t2{font-size:10.5px;color:#a89877;letter-spacing:2px;text-transform:uppercase;}
+
+  #controls{top:10px;right:14px;width:250px;}
+  #controls h3{margin:0 0 8px;font-size:11px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;
+    border-bottom:1px solid var(--panel-border);padding-bottom:6px;}
+  .ctrlRow{margin-bottom:10px;}
+  .ctrlRow label{display:block;font-size:11px;color:#cbb98f;margin-bottom:4px;}
+  .ctrlRow input[type=range]{width:100%;}
+  .btnRow{display:flex;gap:6px;flex-wrap:wrap;}
+  .btnRow button{flex:1;background:#231710;border:1px solid var(--panel-border);color:var(--parchment);
+    padding:6px 4px;font-size:11px;border-radius:4px;cursor:pointer;min-width:0;}
+  .btnRow button:hover{background:#3a2718;border-color:var(--gold);}
+  .btnRow button.active{background:var(--bronze-dark);border-color:var(--gold);color:#fff3d6;}
+  #crankHint{font-size:10.5px;color:#9a8b6c;margin-top:4px;font-style:italic;}
+
+  #readouts{bottom:10px;left:14px;width:300px;}
+  #readouts h3{margin:0 0 8px;font-size:11px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;
+    border-bottom:1px solid var(--panel-border);padding-bottom:6px;}
+  .ro-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;}
+  .ro-label{color:#a89877;font-size:11px;}
+  .ro-val{color:var(--parchment);font-size:12px;text-align:right;font-weight:600;}
+  #moonIconWrap{display:flex;align-items:center;gap:8px;}
+  #moonCanvas{border-radius:50%;background:#111;box-shadow:0 0 6px rgba(0,0,0,.6) inset;}
+  #eclipseLine{font-size:11.5px;padding:6px 8px;border-radius:4px;margin-top:6px;}
+  #eclipseLine.watch{background:rgba(192,57,43,0.25);border:1px solid rgba(192,57,43,0.6);color:#ffd9d0;}
+  #eclipseLine.clear{background:rgba(95,174,98,0.12);border:1px solid rgba(95,174,98,0.35);color:#d9f2da;}
+
+  #dialStrip{bottom:10px;right:14px;width:230px;text-align:center;}
+  #dialStrip h3{margin:0 0 6px;font-size:11px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;}
+  #zodiacName{font-size:15px;color:var(--accent);margin-top:2px;}
+  #zodiacDeg{font-size:11px;color:#a89877;}
+
+  #hintBar{bottom:10px;left:50%;transform:translateX(-50%);font-size:11.5px;color:#c9b896;
+    padding:6px 16px;white-space:nowrap;}
+
+  /* ---------- Gear detail card ---------- */
+  #gearCard{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.92);
+    width:380px;max-width:88vw;background:linear-gradient(160deg,#241a10,#160f09);
+    border:1px solid var(--gold);border-radius:10px;padding:20px 22px;z-index:40;
+    box-shadow:0 12px 50px rgba(0,0,0,0.6),0 0 40px rgba(212,175,55,0.15);
+    opacity:0;pointer-events:none;transition:opacity .25s ease,transform .25s ease;}
+  #gearCard.show{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1);}
+  #gearCard .close{position:absolute;top:10px;right:12px;cursor:pointer;color:#a89877;font-size:16px;}
+  #gearCard .close:hover{color:var(--gold);}
+  #gearCard .idBadge{display:inline-block;background:var(--gold);color:#241a0f;font-weight:700;
+    font-size:12px;padding:2px 9px;border-radius:12px;letter-spacing:1px;margin-bottom:8px;}
+  #gearCard h2{margin:2px 0 2px;font-size:19px;color:var(--accent);}
+  #gearCard .sub{font-size:11.5px;color:#a89877;margin-bottom:12px;letter-spacing:.5px;}
+  #gearCard .teethRow{display:flex;gap:14px;margin-bottom:12px;}
+  #gearCard .stat{background:rgba(201,151,90,0.09);border:1px solid var(--panel-border);
+    border-radius:6px;padding:6px 12px;text-align:center;flex:1;}
+  #gearCard .stat .n{font-size:20px;font-weight:700;color:var(--parchment);}
+  #gearCard .stat .l{font-size:9.5px;color:#a89877;text-transform:uppercase;letter-spacing:1px;}
+  #gearCard p{font-size:13px;line-height:1.55;color:#d8cbb0;margin:0 0 8px;}
+  #gearCard .conf{font-size:10.5px;color:#8f7f5f;font-style:italic;border-top:1px solid var(--panel-border);
+    padding-top:8px;margin-top:6px;}
+
+  #autotestBadge{position:fixed;top:10px;left:50%;transform:translateX(-50%);
+    background:rgba(192,57,43,0.85);color:#fff;padding:4px 14px;border-radius:4px;font-size:11px;
+    letter-spacing:2px;z-index:60;display:none;}
+
+  @media (max-width:820px){
+    #controls,#readouts,#dialStrip{width:auto;max-width:40vw;font-size:10.5px;padding:8px 10px;}
+    #controls h3,#readouts h3,#dialStrip h3{font-size:9.5px;}
+    #controls{top:56px;}
+    #autotestBadge{top:6px;font-size:9.5px;padding:3px 9px;}
+    #titleBar{padding:6px 12px;}
+    #titleBar .t1{font-size:13px;}
+    #titleBar .t2{font-size:8.5px;}
+    #gearCard{width:80vw;padding:14px 16px;top:auto;bottom:8px;transform:translate(-50%,0) scale(0.92);}
+    #gearCard.show{transform:translate(-50%,0) scale(1);}
+    #hintBar{display:none;}
+  }
+</style>
+</head>
+<body>
+
+<div id="canvasHost"></div>
+
+<div id="startScreen">
+  <div class="startBox">
+    <h1>The Antikythera Mechanism</h1>
+    <h2>An Interactive 3D Reconstruction</h2>
+    <p>Recovered from a shipwreck off the Greek island of Antikythera (c. 150–100 BCE), this hand-cranked
+      bronze device is the oldest known analog computer — a geared calculator of the heavens.</p>
+    <ul>
+      <li><b>Explode</b> the case with the slider to reveal the internal gear train, including the pin-and-slot
+        lunar-anomaly differential.</li>
+      <li><b>Click any gear</b> to see its real tooth count and historically documented function.</li>
+      <li><b>Turn the hand crank</b> (drag it, or use the transport buttons) to drive the Sun pointer, the
+        Moon-phase display, and the Saros eclipse-prediction dial.</li>
+    </ul>
+    <button id="beginBtn">Enter the Workshop</button>
+  </div>
+</div>
+
+<div id="autotestBadge">AUTOTEST RUNNING</div>
+
+<div id="titleBar" class="panel">
+  <div class="t1">Antikythera Mechanism</div>
+  <div class="t2">Interactive Reconstruction</div>
+</div>
+
+<div id="controls" class="panel">
+  <h3>Mechanism Controls</h3>
+  <div class="ctrlRow">
+    <label>Case: Assembled &nbsp;&larr;&rarr;&nbsp; Exploded (<span id="explodeVal">0%</span>)</label>
+    <input type="range" id="explodeSlider" min="0" max="100" value="0">
+  </div>
+  <div class="ctrlRow">
+    <label>Hand Crank</label>
+    <div class="btnRow">
+      <button id="crankBack">&#8634; Back</button>
+      <button id="crankAuto">&#9654; Auto-Turn</button>
+      <button id="crankFwd">Fwd &#8635;</button>
+    </div>
+    <div id="crankHint">Tip: click-drag the gold crank handle in the scene to turn it by hand.</div>
+  </div>
+  <div class="ctrlRow">
+    <label>Crank Speed (<span id="speedVal">1.0</span>×)</label>
+    <input type="range" id="speedSlider" min="1" max="40" value="6">
+  </div>
+  <div class="ctrlRow">
+    <button id="resetBtn" style="width:100%;background:#231710;border:1px solid var(--panel-border);
+      color:var(--parchment);padding:7px;border-radius:4px;cursor:pointer;font-size:11px;">Reset Simulation</button>
+  </div>
+</div>
+
+<div id="readouts" class="panel">
+  <h3>Astronomical Readouts</h3>
+  <div class="ro-row"><span class="ro-label">Simulated Epoch</span><span class="ro-val" id="dateVal">—</span></div>
+  <div class="ro-row"><span class="ro-label">Solar Position</span><span class="ro-val" id="sunVal">—</span></div>
+  <div class="ro-row">
+    <span class="ro-label" style="align-self:flex-start;">Lunar Phase</span>
+    <span id="moonIconWrap">
+      <canvas id="moonCanvas" width="34" height="34"></canvas>
+      <span class="ro-val" id="moonVal">—</span>
+    </span>
+  </div>
+  <div class="ro-row"><span class="ro-label">Saros Cell</span><span class="ro-val" id="sarosVal">—</span></div>
+  <div id="eclipseLine" class="clear">Eclipse Watch: —</div>
+</div>
+
+<div id="dialStrip" class="panel">
+  <h3>Zodiac Dial</h3>
+  <div id="zodiacGlyph" style="font-size:30px;">♈</div>
+  <div id="zodiacName">Aries</div>
+  <div id="zodiacDeg">0.0° along ecliptic</div>
+</div>
+
+<div id="hintBar" class="panel">Drag = orbit camera &nbsp;|&nbsp; Scroll = zoom &nbsp;|&nbsp; Click a gear = details &nbsp;|&nbsp; Drag gold crank = turn it</div>
+
+<div id="gearCard">
+  <span class="close" id="gearCardClose">&times;</span>
+  <div class="idBadge" id="gcId">b1</div>
+  <h2 id="gcName">Gear Name</h2>
+  <div class="sub" id="gcGroup">Front Train</div>
+  <div class="teethRow">
+    <div class="stat"><div class="n" id="gcTeeth">224</div><div class="l">Teeth</div></div>
+    <div class="stat"><div class="n" id="gcRatio">—</div><div class="l">Cycle</div></div>
+  </div>
+  <p id="gcFunc">Function text.</p>
+  <div class="conf" id="gcConf">Confidence note.</div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+window.addEventListener('error', e => { document.title = 'ERROR: ' + e.message + ' @' + e.lineno; });
+document.title = 'Antikythera Mechanism — Interactive Reconstruction';
+
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* =========================================================================
+   ASTRONOMICAL CONSTANTS (real values)
+   ========================================================================= */
+const SYNODIC   = 29.530589;   // synodic month (days)  — new moon to new moon
+const SIDEREAL  = 27.321661;   // sidereal month (days) — Moon's return to same star
+const DRACONIC  = 27.212221;   // draconic/nodal month (days)
+const YEAR      = 365.24219;   // tropical year (days)
+const APSIDAL   = 8.85 * YEAR; // lunar apsidal precession period (~8.85 years) - real value
+const TWO_PI    = Math.PI * 2;
+
+const ZODIAC = [
+  ['Aries','♈'],['Taurus','♉'],['Gemini','♊'],['Cancer','♋'],['Leo','♌'],['Virgo','♍'],
+  ['Libra','♎'],['Scorpio','♏'],['Sagittarius','♐'],['Capricorn','♑'],['Aquarius','♒'],['Pisces','♓']
+];
+const EGYPT_MONTHS = ['Thoth','Phaophi','Athyr','Choiak','Tybi','Mechir','Phamenoth','Pharmuthi','Pachons','Payni','Epiphi','Mesori'];
+
+/* =========================================================================
+   GEAR DATA — grounded in published Antikythera Mechanism scholarship
+   (Freeth et al., "Decoding the ancient Greek astronomical calculator known
+   as the Antikythera Mechanism", Nature 444, 2006; Freeth & Jones 2012;
+   and the Antikythera Mechanism Research Project's X-ray CT gear counts).
+   Where the literature gives a directly-measured tooth count we use it and
+   say so. Where fragments are damaged/lost, we flag the value as an
+   approximate scholarly reconstruction rather than inventing it outright.
+   ========================================================================= */
+const GEARS = [
+  { id:'crank', name:'Hand Crank', teeth:null, group:'Input', color:0xd4af37,
+    pos:{x:1.55,y:-0.30,z:1.35}, cycle:'—',
+    func:'The crank itself was not recovered with the wreck. Every scholarly reconstruction (Wright, Freeth, the AMRP) adds one on the mechanism’s right-hand edge, coupling into the rim of gear b1 through a small bevel/crown gear. Turning it drives the entire train.',
+    conf:'The crank is a modern reconstruction of a lost part; its exact form is inferred from the surviving spindle-hole on Fragment A.' },
+
+  { id:'a1', name:'Input Crown Gear (a1)', teeth:16, group:'Input', color:0xb98a4a,
+    pos:{x:1.30,y:-0.16,z:1.18}, cycle:'—',
+    func:'A small bevel/crown gear reconstructed to carry rotation from the hand crank into the main wheel b1. This part is lost; its tooth count is a reconstruction estimate, not a measurement.',
+    conf:'Reconstructed part — not measured from any surviving fragment.' },
+
+  { id:'b1', name:'Main Drive Wheel (b1)', teeth:224, group:'Front Train — Solar', color:0xc9975a,
+    pos:{x:0,y:0,z:1.05}, cycle:'1 rotation / year',
+    func:'The largest gear in the mechanism — the four-spoked wheel visible on Fragment A. One full rotation represents one Egyptian civil year of 365 days. It carries the mean-Sun pointer around the zodiac dial and feeds the entire lunar train downstream.',
+    conf:'Tooth count directly measured by X-ray CT (Freeth et al., Nature 2006).' },
+
+  { id:'b2', name:'Transfer Wheel (b2)', teeth:64, group:'Front Train — Lunar Feed', color:0xc08a4e,
+    pos:{x:0,y:0,z:0.88}, cycle:'3.5 rev / year',
+    func:'Meshes directly with b1 (224:64 = 3.5:1), stepping the year-rate rotation up in speed and passing it into the c-train that ultimately produces the sidereal lunar rate.',
+    conf:'Tooth count measured by X-ray CT (Freeth et al., 2006).' },
+
+  { id:'c1', name:'Idler Wheel (c1)', teeth:38, group:'Front Train — Lunar Feed', color:0xb07d46,
+    pos:{x:0,y:0,z:0.72}, cycle:'~5.9 rev / year',
+    func:'First gear of the c-arbor; meshes with b2 and shares its axle with c2, carrying rotation onward into the d-train.',
+    conf:'Approximate — reconstructed by later researchers to satisfy the required gear ratio; not among the best-preserved teeth.' },
+
+  { id:'c2', name:'Idler Wheel (c2)', teeth:48, group:'Front Train — Lunar Feed', color:0xb07d46,
+    pos:{x:0,y:0,z:0.66}, cycle:'~5.9 rev / year',
+    func:'Coaxial with c1 (same arbor, same speed); meshes with d1 to continue reducing toward the sidereal Moon rate.',
+    conf:'Approximate reconstruction, as with c1.' },
+
+  { id:'d1', name:'Idler Wheel (d1)', teeth:24, group:'Front Train — Lunar Feed', color:0xa9713f,
+    pos:{x:0,y:0,z:0.50}, cycle:'~11.8 rev / year',
+    func:'Meshes with c2 and shares its axle with the large d2 wheel.',
+    conf:'Approximate reconstruction.' },
+
+  { id:'d2', name:'Sidereal Carrier (d2)', teeth:127, group:'Front Train — Lunar Feed', color:0xc9975a,
+    pos:{x:0,y:0,z:0.44}, cycle:'254 rev / 19 years',
+    func:'127 is exactly half of 254 — the number of sidereal months in 19 tropical years (the Metonic relation). This large wheel carries the sidereal lunar rate (Moon’s motion against the zodiac background) onward into the e-train and, ultimately, the front-dial Moon pointer.',
+    conf:'Tooth count (127) reported in the Nature 2006 gear scheme; a well-documented value.' },
+
+  { id:'e1', name:'Idler Wheel (e1)', teeth:32, group:'Front Train — Lunar Feed', color:0xa9713f,
+    pos:{x:0,y:0,z:0.28}, cycle:'sidereal rate',
+    func:'Meshes with d2, continuing to carry the sidereal lunar rate; shares its axle with e2.',
+    conf:'Approximate reconstruction.' },
+
+  { id:'e2', name:'Idler Wheel (e2)', teeth:32, group:'Front Train — Lunar Feed', color:0xa9713f,
+    pos:{x:0,y:0,z:0.22}, cycle:'sidereal rate',
+    func:'Coaxial with e1; hands the sidereal lunar rate into the pin-and-slot differential (k1/k2) mounted on the face of e3.',
+    conf:'Approximate reconstruction.' },
+
+  { id:'k1', name:'Pin Gear (k1) — Differential', teeth:27, group:'Lunar Anomaly Differential', color:0xd4af37,
+    pos:{x:0.16,y:0.11,z:0.06}, cycle:'anomaly period ≈ 8.85 yr',
+    func:'DIFFERENTIAL GEARING: k1 carries an off-centre pin fixed to the face of e3. As e3 turns at a uniform, mean rate, the pin sweeps in a circle offset from e3’s true axis. This is the mechanical trick, discovered by the AMRP’s 2006 CT scans, that reproduces the first lunar anomaly — the fact that the Moon appears to speed up and slow down along its elliptical orbit, a phenomenon described by Hipparchus of Rhodes in the 2nd century BCE.',
+    conf:'Tooth count is a representative estimate; this part of Fragment E/D is only partially preserved, but its differential function (pin-and-slot epicyclic gearing) is firmly established by CT imaging.' },
+
+  { id:'k2', name:'Slotted Gear (k2) — Differential', teeth:20, group:'Lunar Anomaly Differential', color:0xd4af37,
+    pos:{x:0.16,y:0.11,z:-0.02}, cycle:'anomaly period ≈ 8.85 yr',
+    func:'DIFFERENTIAL GEARING: k2 carries a radial slot that the pin on k1 rides in. Because k1 and k2 rotate about slightly offset (eccentric) centres, the pin slides back and forth in the slot once per revolution, making k2 (and the e4 wheel it drives) speed up and slow down exactly as the Moon does near perigee and apogee — with a period matching the real ~8.85-year precession of the lunar apsides.',
+    conf:'Approximate tooth count, as k1; the epicyclic pin-and-slot principle itself is a secure, published discovery (Freeth et al., 2006; Wright 2005).' },
+
+  { id:'e3', name:'Saros Wheel (e3)', teeth:223, group:'Lunar Anomaly Differential', color:0xc9975a,
+    pos:{x:0,y:0,z:-0.18}, cycle:'223 synodic months',
+    func:'A large wheel whose 223 teeth are not incidental: 223 is exactly the number of synodic months in one Saros eclipse cycle. e3 turns at the mean lunar rate and carries the eccentric pin of the k1/k2 differential on its face; further (unmodelled here) reduction gears tap e3’s rotation count to drive the Saros spiral pointer on the back dial.',
+    conf:'223-tooth count directly measured by X-ray CT — one of the mechanism’s best-attested numbers (Freeth et al., Nature 2006).' },
+
+  { id:'e4', name:'Anomaly Output Ring (e4)', teeth:188, group:'Lunar Anomaly Differential', color:0xc08a4e,
+    pos:{x:0,y:0,z:-0.24}, cycle:'true lunar motion',
+    func:'Driven through the slot of k2, e4 outputs the Moon’s TRUE (anomaly-corrected) position rather than its mean position. Because e3 and e4 are mounted on very slightly offset centres, e4’s angular speed visibly oscillates even though e3 spins at a constant rate — the differential in action. e4’s output ultimately turns the Moon pointer on the front dial.',
+    conf:'188-tooth count directly measured by X-ray CT (Freeth et al., Nature 2006).' },
+
+  { id:'r', name:'Moon-Phase Differential (r)', teeth:16, group:'Moon-Phase Display', color:0xd4af37,
+    pos:{x:0,y:0,z:-0.42}, cycle:'29.53-day synodic cycle',
+    func:'DIFFERENTIAL GEARING: this second differential subtracts the mean-Sun rotation (from the b-train) from the true-Moon rotation (from e4), yielding their difference — the Moon’s elongation from the Sun. That difference angle turns a small ball, half polished bronze and half blackened, visible through a window in the Moon pointer, so it always shows the correct current phase of the Moon.',
+    conf:'The existence and subtractive function of this phase differential is documented in Freeth et al. (2006); its exact tooth count is not among the preserved measurements and is shown here as illustrative.' },
+
+  { id:'n1', name:'Metonic Pointer Gear (n1)', teeth:24, group:'Back Dial — Metonic', color:0x9c7a4a,
+    pos:{x:-0.55,y:0.55,z:-0.95}, cycle:'235 months / 19 years',
+    func:'Final arbor of the upper back dial’s main spiral pointer. The dial itself has 235 cells arranged over 5 turns — one cell per synodic month of the 19-year Metonic cycle (the cycle after which the Moon’s phases repeat on the same solar calendar date), named for the Athenian astronomer Meton (5th c. BCE).',
+    conf:'The 235-cell, 5-turn Metonic spiral is directly measured from the surviving back-plate fragments; this pointer arbor’s own tooth count is illustrative.' },
+
+  { id:'p1', name:'Callippic Pointer Gear', teeth:18, group:'Back Dial — Callippic (subsidiary)', color:0x9c7a4a,
+    pos:{x:-0.85,y:0.85,z:-1.02}, cycle:'76 years',
+    func:'Drives a small 4-sector subsidiary dial inset in the Metonic dial. The Callippic cycle (76 years = 4 Metonic cycles minus 1 day) was devised by Callippus of Cyzicus to correct the small drift of Meton’s cycle.',
+    conf:'The 76-year, 4-sector Callippic dial is documented from the surviving fragments; the pointer gear’s own tooth count is illustrative.' },
+
+  { id:'o1', name:'Games (Olympiad) Pointer Gear', teeth:16, group:'Back Dial — Olympiad (subsidiary)', color:0x9c7a4a,
+    pos:{x:-0.25,y:0.85,z:-1.02}, cycle:'4 years',
+    func:'Drives a small 4-year subsidiary "Games" dial inset in the Metonic dial, naming the Olympic, Nemean, Isthmian and Pythian games and the Naa games at Dodona for each year of the cycle — a uniquely non-astronomical, culturally revealing feature discovered by the AMRP in 2008.',
+    conf:'The Games dial and its inscriptions are documented (Freeth & Jones et al., 2008); the pointer gear’s own tooth count is illustrative.' },
+
+  { id:'g1', name:'Saros Pointer Gear (g1)', teeth:24, group:'Back Dial — Saros', color:0x9c7a4a,
+    pos:{x:0.35,y:-0.55,z:-0.95}, cycle:'223 months / 18y 11d',
+    func:'Final arbor of the lower back dial’s main spiral pointer, which sweeps a 223-cell, 4-turn spiral — one cell per synodic month of the 223-month Saros eclipse cycle (≈18 years, 11⅓ days). Small engraved glyphs on the real dial mark which months are predicted to contain a solar or lunar eclipse.',
+    conf:'The 223-cell, 4-turn Saros spiral and its eclipse glyphs are directly documented from the fragments; this pointer arbor’s own tooth count is illustrative.' },
+
+  { id:'h1', name:'Exeligmos Pointer Gear', teeth:15, group:'Back Dial — Exeligmos (subsidiary)', color:0x9c7a4a,
+    pos:{x:0.60,y:-0.85,z:-1.02}, cycle:'54 years (3 Saros)',
+    func:'Drives a 3-sector subsidiary dial inset in the Saros spiral. One Saros cycle is 223 synodic months plus about 8 hours; after 3 Saros cycles (the Exeligmos, "turning of the wheel", 54 years) that extra time adds back up to nearly a full day, so an eclipse recurs at roughly the same time of day. The dial’s three sectors are labelled with the correction (0h, 8h, 16h).',
+    conf:'The 3-sector Exeligmos dial and its function are documented from the fragments; the pointer gear’s own tooth count is illustrative.' },
+];
+
+const CLICKABLE_GROUPS = new Map();
+
+/* =========================================================================
+   SCENE SETUP
+   ========================================================================= */
+const host = document.getElementById('canvasHost');
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+host.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b0906);
+scene.fog = new THREE.Fog(0x0b0906, 8, 22);
+
+const camera = new THREE.PerspectiveCamera(42, window.innerWidth/window.innerHeight, 0.1, 100);
+camera.position.set(2.6,1.9,4.6);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0,0,-0.1);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 2.2;
+controls.maxDistance = 14;
+
+scene.add(new THREE.AmbientLight(0x8a7454, 0.55));
+const keyLight = new THREE.DirectionalLight(0xffe8c0, 1.2);
+keyLight.position.set(4,6,5);
+keyLight.castShadow = true;
+scene.add(keyLight);
+const rimLight = new THREE.DirectionalLight(0x6699cc, 0.4);
+rimLight.position.set(-5,2,-4);
+scene.add(rimLight);
+const fillLight = new THREE.PointLight(0xffcf9e, 0.6, 12);
+fillLight.position.set(-2,-1,3);
+scene.add(fillLight);
+
+const mainGroup = new THREE.Group();
+scene.add(mainGroup);
+
+/* ---------------- Wooden outer case ---------------- */
+function woodTexture(){
+  const c = document.createElement('canvas'); c.width=c.height=256;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#5a3b22'; ctx.fillRect(0,0,256,256);
+  for(let i=0;i<40;i++){
+    ctx.strokeStyle = `rgba(40,22,10,${0.15+Math.random()*0.2})`;
+    ctx.lineWidth = 1+Math.random()*2;
+    ctx.beginPath();
+    const y = Math.random()*256;
+    ctx.moveTo(0,y);
+    ctx.bezierCurveTo(80,y+(Math.random()*20-10),180,y+(Math.random()*20-10),256,y);
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+const woodMat = new THREE.MeshStandardMaterial({ map:woodTexture(), roughness:0.85, metalness:0.05, transparent:true, opacity:1 });
+const caseGroup = new THREE.Group();
+const caseGeo = new THREE.BoxGeometry(2.6,2.6,2.9);
+const caseEdges = new THREE.EdgesGeometry(caseGeo);
+const caseBox = new THREE.Mesh(caseGeo, woodMat);
+caseBox.material = woodMat;
+const caseWire = new THREE.LineSegments(caseEdges, new THREE.LineBasicMaterial({color:0xd4af37, transparent:true, opacity:0.5}));
+caseGroup.add(caseWire);
+// thin translucent shell (not fully solid so gears remain visible through it when nearly closed)
+const shellMat = new THREE.MeshStandardMaterial({map:woodTexture(), roughness:0.9, metalness:0.05, transparent:true, opacity:0.35, side:THREE.DoubleSide});
+const shell = new THREE.Mesh(caseGeo, shellMat);
+caseGroup.add(shell);
+mainGroup.add(caseGroup);
+
+/* ---------------- Dial textures ---------------- */
+function buildFrontDialTexture(){
+  const S = 1024;
+  const c = document.createElement('canvas'); c.width=c.height=S;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#e8dcc0'; ctx.fillRect(0,0,S,S);
+  const cx=S/2, cy=S/2;
+  // outer zodiac ring
+  const rOuter=470, rOuter2=430, rMid=340, rMid2=300;
+  ctx.strokeStyle='#5a4326'; ctx.lineWidth=4;
+  ctx.beginPath(); ctx.arc(cx,cy,rOuter,0,TWO_PI); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx,cy,rOuter2,0,TWO_PI); ctx.stroke();
+  for(let d=0; d<360; d+=1){
+    const a = d*Math.PI/180 - Math.PI/2;
+    const long = d%30===0 ? 26 : (d%6===0?16:8);
+    const r0=rOuter2, r1=rOuter2-long;
+    ctx.lineWidth = d%30===0?3:1;
+    ctx.beginPath();
+    ctx.moveTo(cx+r0*Math.cos(a), cy+r0*Math.sin(a));
+    ctx.lineTo(cx+r1*Math.cos(a), cy+r1*Math.sin(a));
+    ctx.stroke();
+  }
+  ctx.fillStyle='#2b1e12'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.font='42px Georgia';
+  for(let i=0;i<12;i++){
+    const a = (i*30+15)*Math.PI/180 - Math.PI/2;
+    const x = cx+(rOuter+rOuter2)/2*Math.cos(a), y=cy+(rOuter+rOuter2)/2*Math.sin(a);
+    ctx.save(); ctx.translate(x,y); ctx.rotate(a+Math.PI/2); ctx.fillText(ZODIAC[i][1],0,0); ctx.restore();
+  }
+  // inner Egyptian calendar ring
+  ctx.strokeStyle='#7a5230'; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.arc(cx,cy,rMid,0,TWO_PI); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx,cy,rMid2,0,TWO_PI); ctx.stroke();
+  for(let d=0; d<365; d+=1){
+    const a = d/365*TWO_PI - Math.PI/2;
+    const long = d%30===0?18:6;
+    ctx.lineWidth = d%30===0?2:0.6;
+    ctx.beginPath();
+    ctx.moveTo(cx+rMid*Math.cos(a), cy+rMid*Math.sin(a));
+    ctx.lineTo(cx+(rMid-long)*Math.cos(a), cy+(rMid-long)*Math.sin(a));
+    ctx.stroke();
+  }
+  ctx.font='20px Georgia'; ctx.fillStyle='#4a331c';
+  for(let i=0;i<12;i++){
+    const a = (i/12+1/24)*TWO_PI - Math.PI/2;
+    const x = cx+(rMid+rMid2)/2*Math.cos(a), y=cy+(rMid+rMid2)/2*Math.sin(a);
+    ctx.save(); ctx.translate(x,y); ctx.rotate(a+Math.PI/2); ctx.fillText(EGYPT_MONTHS[i],0,0); ctx.restore();
+  }
+  // center plate
+  ctx.fillStyle='#d8c8a0'; ctx.beginPath(); ctx.arc(cx,cy,rMid2-10,0,TWO_PI); ctx.fill();
+  ctx.strokeStyle='#5a4326'; ctx.lineWidth=2; ctx.stroke();
+  ctx.font='italic 22px Georgia'; ctx.fillStyle='#7a5230';
+  ctx.fillText('SUN & MOON DIAL', cx, cy-70);
+  ctx.font='14px Georgia';
+  ctx.fillText('reconstructed face — Fragment A/C', cx, cy+80);
+  return new THREE.CanvasTexture(c);
+}
+
+function drawSpiral(ctx, cx, cy, turns, cells, r0, rStep, glyphCells){
+  const totalCells = turns*Math.round(cells/turns) ;
+  const angPerCell = TWO_PI/(cells/turns);
+  ctx.strokeStyle='#5a4326'; ctx.lineWidth=2.5;
+  ctx.beginPath();
+  for(let i=0;i<=cells;i++){
+    const t = i/cells*turns;
+    const a = t*TWO_PI - Math.PI/2;
+    const r = r0 + rStep*t;
+    const x=cx+r*Math.cos(a), y=cy+r*Math.sin(a);
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  // tick marks + eclipse glyphs
+  for(let i=0;i<cells;i++){
+    const t=i/cells*turns;
+    const a = t*TWO_PI - Math.PI/2;
+    const r = r0 + rStep*t;
+    const x=cx+r*Math.cos(a), y=cy+r*Math.sin(a);
+    if(glyphCells && glyphCells.has(i)){
+      ctx.fillStyle = glyphCells.get(i)==='solar' ? '#a33' : '#333';
+      ctx.beginPath(); ctx.arc(x,y,4.2,0,TWO_PI); ctx.fill();
+    } else {
+      ctx.fillStyle='#8a734a';
+      ctx.beginPath(); ctx.arc(x,y,1.6,0,TWO_PI); ctx.fill();
+    }
+  }
+}
+
+function buildBackDialTexture(eclipseCells){
+  const S=1024;
+  const c=document.createElement('canvas'); c.width=c.height=S;
+  const ctx=c.getContext('2d');
+  ctx.fillStyle='#e2d3ac'; ctx.fillRect(0,0,S,S);
+  ctx.strokeStyle='#3a2a16'; ctx.lineWidth=6;
+  ctx.strokeRect(20,20,S-40,S-40);
+  ctx.fillStyle='#2b1e12'; ctx.textAlign='center';
+
+  // Upper: Metonic spiral (5 turns, 235 cells) + subsidiary Callippic & Olympiad
+  const ucx=S/2, ucy=S*0.30;
+  ctx.font='24px Georgia'; ctx.fillText('METONIC DIAL — 235 months / 19 years', ucx, ucy-235);
+  drawSpiral(ctx, ucx, ucy, 5, 235, 20, 34, null);
+  ctx.beginPath(); ctx.arc(ucx-150, ucy+150, 70, 0, TWO_PI); ctx.strokeStyle='#5a4326'; ctx.lineWidth=2; ctx.stroke();
+  ctx.font='13px Georgia'; ctx.fillText('CALLIPPIC', ucx-150, ucy+150-84);
+  ctx.fillText('76 yr / 4 sectors', ucx-150, ucy+150+90);
+  ctx.beginPath(); ctx.arc(ucx+150, ucy+150, 70, 0, TWO_PI); ctx.stroke();
+  ctx.fillText('GAMES', ucx+150, ucy+150-84);
+  ctx.fillText('4-year Olympiad', ucx+150, ucy+150+90);
+
+  // Lower: Saros spiral (4 turns, 223 cells) + subsidiary Exeligmos, with eclipse glyphs
+  const lcx=S/2, lcy=S*0.74;
+  ctx.font='24px Georgia'; ctx.fillText('SAROS DIAL — 223 months / 18y 11d — eclipse prediction', lcx, lcy-235);
+  drawSpiral(ctx, lcx, lcy, 4, 223, 20, 42, eclipseCells);
+  ctx.beginPath(); ctx.arc(lcx+150, lcy+150, 60, 0, TWO_PI); ctx.strokeStyle='#5a4326'; ctx.stroke();
+  ctx.font='13px Georgia'; ctx.fillText('EXELIGMOS', lcx+150, lcy+150-74);
+  ctx.fillText('54 yr / 3 sectors', lcx+150, lcy+150+80);
+  ctx.font='11px Georgia'; ctx.fillStyle='#a33';
+  ctx.fillText('● red = predicted solar eclipse   ● grey = predicted lunar eclipse', lcx, S-40);
+  return new THREE.CanvasTexture(c);
+}
+
+function computeEclipseGlyphCells(){
+  const map = new Map();
+  for(let m=0;m<223;m++){
+    const days = m*SYNODIC;
+    const st = eclipseStatusAt(days);
+    if(st.solar) map.set(m,'solar');
+    else if(st.lunar) map.set(m,'lunar');
+  }
+  return map;
+}
+
+/* ---------------- Dial plates + pointers ---------------- */
+const frontPlate = new THREE.Mesh(
+  new THREE.CircleGeometry(1.28, 96),
+  new THREE.MeshStandardMaterial({ map: buildFrontDialTexture(), roughness:0.7, metalness:0.15 })
+);
+frontPlate.position.z = 1.42;
+mainGroup.add(frontPlate);
+
+const backPlate = new THREE.Mesh(
+  new THREE.PlaneGeometry(2.5,2.5),
+  new THREE.MeshStandardMaterial({ map: buildBackDialTexture(computeEclipseGlyphCells()), roughness:0.7, metalness:0.15 })
+);
+backPlate.position.z = -1.42;
+backPlate.rotation.y = Math.PI;
+mainGroup.add(backPlate);
+
+function makePointer(len, color, width=0.02){
+  const g = new THREE.Group();
+  const shaft = new THREE.Mesh(new THREE.BoxGeometry(width, len, width*1.4), new THREE.MeshStandardMaterial({color, metalness:0.7, roughness:0.3}));
+  shaft.position.y = len/2*0.85;
+  g.add(shaft);
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(width*1.6, width*4, 8), new THREE.MeshStandardMaterial({color, metalness:0.7, roughness:0.3}));
+  tip.position.y = len*0.85+width*2;
+  tip.rotation.x = Math.PI;
+  g.add(tip);
+  return g;
+}
+const sunPointer = makePointer(1.05, 0xe0b060); sunPointer.position.z = 1.44; mainGroup.add(sunPointer);
+const moonPointer = makePointer(0.82, 0xcfd6de); moonPointer.position.z = 1.47; mainGroup.add(moonPointer);
+// Moon phase ball
+const phaseBall = new THREE.Group();
+const ballR = 0.05;
+const ballLit = new THREE.Mesh(new THREE.SphereGeometry(ballR,20,20,0,Math.PI), new THREE.MeshStandardMaterial({color:0xf0e6c8, metalness:0.3, roughness:0.4}));
+const ballDark = new THREE.Mesh(new THREE.SphereGeometry(ballR,20,20,Math.PI,Math.PI), new THREE.MeshStandardMaterial({color:0x1a1a1a, metalness:0.1, roughness:0.9}));
+phaseBall.add(ballLit); phaseBall.add(ballDark);
+phaseBall.position.set(0,0.82*0.85+0.06,1.50);
+mainGroup.add(phaseBall);
+
+const metonicPointerHand = makePointer(0.62, 0xb08840, 0.014);
+mainGroup.add(metonicPointerHand);
+// Position back-dial pointers at the spiral centers in world space (approx, matches texture layout)
+function backDialWorldPos(u,v){ // u,v in [-1,1] matching texture-space offset from plate center, plate is 2.5 wide
+  return new THREE.Vector3(u*1.25, v*1.25, -1.40);
+}
+metonicPointerHand.position.copy(backDialWorldPos(0, 0.20));
+const sarosPointerHand = makePointer(0.55, 0xb08840, 0.014);
+sarosPointerHand.position.copy(backDialWorldPos(0,-0.24));
+mainGroup.add(sarosPointerHand);
+const callippicHand = makePointer(0.16, 0x8a6a3a, 0.008);
+callippicHand.position.copy(backDialWorldPos(-0.37,0.06));
+mainGroup.add(callippicHand);
+const olympiadHand = makePointer(0.16, 0x8a6a3a, 0.008);
+olympiadHand.position.copy(backDialWorldPos(0.37,0.06));
+mainGroup.add(olympiadHand);
+const exeligmosHand = makePointer(0.14, 0x8a6a3a, 0.008);
+exeligmosHand.position.copy(backDialWorldPos(0.37,-0.42));
+mainGroup.add(exeligmosHand);
+
+/* ---------------- Gear geometry factory ---------------- */
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+
+function gearShapeGeometry(visualTeeth, outerR, innerR, holeR, thickness){
+  const shape = new THREE.Shape();
+  const step = TWO_PI/visualTeeth;
+  for(let i=0;i<visualTeeth;i++){
+    const a0=i*step, a1=a0+step*0.30, a2=a0+step*0.5, a3=a0+step*0.80, a4=a0+step;
+    const pR=[ [innerR,a0],[outerR,a1],[outerR,a3],[innerR,a4] ];
+    pR.forEach(([r,a],idx)=>{
+      const x=r*Math.cos(a), y=r*Math.sin(a);
+      if(i===0 && idx===0) shape.moveTo(x,y); else shape.lineTo(x,y);
+    });
+  }
+  shape.closePath();
+  const hole = new THREE.Path(); hole.absarc(0,0,holeR,0,TWO_PI,false);
+  shape.holes.push(hole);
+  const geo = new THREE.ExtrudeGeometry(shape,{depth:thickness, bevelEnabled:true, bevelThickness:0.006, bevelSize:0.006, bevelSegments:1, curveSegments:1});
+  geo.translate(0,0,-thickness/2);
+  return geo;
+}
+
+function buildGearMesh(spec){
+  if(spec.id==='crank'){
+    const g = new THREE.Group();
+    const shaftMat = new THREE.MeshStandardMaterial({color:0x8a6a3a, metalness:0.75, roughness:0.3});
+    const handleMat = new THREE.MeshStandardMaterial({color:0xd4af37, metalness:0.85, roughness:0.2});
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.045,0.045,0.5,16), shaftMat);
+    shaft.rotation.z = Math.PI/2; g.add(shaft);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.32,0.05,0.05), handleMat);
+    arm.position.x = 0.16; g.add(arm);
+    const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,0.14,16), handleMat);
+    knob.position.set(0.32,0,0); knob.rotation.x = Math.PI/2; g.add(knob);
+    g.userData.gearInfo = spec;
+    g.userData.clickTargets = [shaft,arm,knob];
+    return g;
+  }
+  const teeth = spec.teeth;
+  const outerR = 0.22 + Math.sqrt(teeth)*0.030;
+  const innerR = outerR*0.80;
+  const holeR = outerR*0.20;
+  const thickness = teeth>90 ? 0.075 : 0.05;
+  const visualTeeth = clamp(Math.round(teeth*0.16), 10, 40);
+  const geo = gearShapeGeometry(visualTeeth, outerR, innerR, holeR, thickness);
+  const mat = new THREE.MeshStandardMaterial({ color: spec.color, metalness:0.75, roughness:0.32 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = mesh.receiveShadow = true;
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(innerR*0.5, 0.012, 8, 24), new THREE.MeshStandardMaterial({color: spec.color, metalness:0.8, roughness:0.25}));
+  mesh.add(rim);
+  const group = new THREE.Group();
+  group.add(mesh);
+  // pin (k1) / slot (k2) visual flourish for the differential pair
+  if(spec.id==='k1'){
+    const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.018,0.018,0.09,8), new THREE.MeshStandardMaterial({color:0xffe08a, metalness:0.9,roughness:0.15}));
+    pin.rotation.x = Math.PI/2;
+    pin.position.set(outerR*0.55, outerR*0.2, 0);
+    group.add(pin);
+  }
+  if(spec.id==='k2'){
+    const slot = new THREE.Mesh(new THREE.BoxGeometry(outerR*0.9,0.03,0.02), new THREE.MeshStandardMaterial({color:0x2a2a2a, metalness:0.4,roughness:0.7}));
+    slot.position.set(0,0,thickness*0.55);
+    group.add(slot);
+  }
+  group.userData.gearInfo = spec;
+  group.userData.outerR = outerR;
+  group.userData.clickTargets = [mesh];
+  return group;
+}
+
+const gearObjects = [];
+GEARS.forEach(spec=>{
+  const obj = buildGearMesh(spec);
+  obj.position.set(spec.pos.x, spec.pos.y, spec.pos.z);
+  obj.userData.assembledPos = new THREE.Vector3(spec.pos.x, spec.pos.y, spec.pos.z);
+  obj.userData.explodedPos = new THREE.Vector3(spec.pos.x*2.6, spec.pos.y*2.6, spec.pos.z*4.4);
+  mainGroup.add(obj);
+  gearObjects.push(obj);
+  CLICKABLE_GROUPS.set(obj, spec);
+});
+
+/* =========================================================================
+   SIMULATION STATE
+   ========================================================================= */
+let totalDays = 0;          // 1 crank turn = 1 simulated day
+let explodeFactor = 0;
+let autoTurn = false;
+let autoSpeed = 6;          // days/sec while auto-turning
+let dragTurn = 0;           // manual drag direction accumulator
+
+const params = new URLSearchParams(location.search);
+const isAutotest = params.has('autotest');
+
+function eclipseStatusAt(days){
+  const moonAge = ((days % SYNODIC)+SYNODIC)%SYNODIC;
+  const phaseFrac = moonAge/SYNODIC;
+  const drac = ((days % DRACONIC)+DRACONIC)%DRACONIC;
+  const dracDeg = drac/DRACONIC*360;
+  const nodeDist = Math.min(dracDeg, 360-dracDeg, Math.abs(dracDeg-180));
+  const nearNew = Math.min(phaseFrac,1-phaseFrac) < 0.05;
+  const nearFull = Math.abs(phaseFrac-0.5) < 0.05;
+  const solar = nearNew && nodeDist < 9;
+  const lunar = nearFull && nodeDist < 11;
+  return {solar, lunar, phaseFrac, nodeDist};
+}
+function scanNextEclipse(days){
+  for(let i=1;i<=400;i++){
+    const st = eclipseStatusAt(days+i);
+    if(st.solar) return {days:i, type:'solar'};
+    if(st.lunar) return {days:i, type:'lunar'};
+  }
+  return null;
+}
+
+function moonPhaseName(f){
+  if(f<0.03||f>0.97) return 'New Moon';
+  if(f<0.22) return 'Waxing Crescent';
+  if(f<0.28) return 'First Quarter';
+  if(f<0.47) return 'Waxing Gibbous';
+  if(f<0.53) return 'Full Moon';
+  if(f<0.72) return 'Waning Gibbous';
+  if(f<0.78) return 'Last Quarter';
+  return 'Waning Crescent';
+}
+
+function drawMoonIcon(f){
+  const cv = document.getElementById('moonCanvas');
+  const ctx = cv.getContext('2d');
+  const S=34, r=14, cx=S/2, cy=S/2;
+  ctx.clearRect(0,0,S,S);
+  ctx.fillStyle='#1a1a22'; ctx.beginPath(); ctx.arc(cx,cy,r,0,TWO_PI); ctx.fill();
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,TWO_PI); ctx.clip();
+  ctx.fillStyle='#f3e6bf';
+  const offset = Math.cos(f*TWO_PI)*r*1.02;
+  ctx.beginPath();
+  if(f<0.5){ ctx.arc(cx+offset, cy, r, Math.PI/2, -Math.PI/2, true); } else { ctx.arc(cx+offset, cy, r, -Math.PI/2, Math.PI/2, true); }
+  ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle='#5a4326'; ctx.lineWidth=1; ctx.beginPath(); ctx.arc(cx,cy,r,0,TWO_PI); ctx.stroke();
+}
+
+/* ---------------- Update loop ---------------- */
+const dateVal=document.getElementById('dateVal'), sunVal=document.getElementById('sunVal'),
+  moonVal=document.getElementById('moonVal'), sarosVal=document.getElementById('sarosVal'),
+  eclipseLine=document.getElementById('eclipseLine'),
+  zodiacGlyph=document.getElementById('zodiacGlyph'), zodiacName=document.getElementById('zodiacName'),
+  zodiacDeg=document.getElementById('zodiacDeg');
+
+let lastEclipseScan = -999, cachedNext=null;
+
+function updateReadouts(){
+  const sunAngle = TWO_PI*totalDays/YEAR;
+  const sunLong = ((totalDays/YEAR*360)%360+360)%360;
+  const zIdx = Math.floor(sunLong/30);
+  const moonZodiacAngle = TWO_PI*totalDays/SIDEREAL;
+  const wobble = 0.14*Math.sin(TWO_PI*totalDays/APSIDAL);
+  const e3Angle = moonZodiacAngle;
+  const e4Angle = moonZodiacAngle + wobble;
+
+  const moonAge = ((totalDays%SYNODIC)+SYNODIC)%SYNODIC;
+  const phaseFrac = moonAge/SYNODIC;
+
+  const yearCount = Math.floor(totalDays/YEAR);
+  const dayOfYear = Math.floor(totalDays - yearCount*YEAR);
+  dateVal.textContent = `Yr ${yearCount+1}, Day ${((dayOfYear%365)+365)%365}`;
+  sunVal.textContent = `${sunLong.toFixed(1)}°`;
+  zodiacGlyph.textContent = ZODIAC[zIdx][1];
+  zodiacName.textContent = ZODIAC[zIdx][0];
+  zodiacDeg.textContent = `${(sunLong%30).toFixed(1)}° into sign`;
+
+  const illum = ((1-Math.cos(TWO_PI*phaseFrac))/2*100);
+  moonVal.textContent = `${moonPhaseName(phaseFrac)} (${illum.toFixed(0)}%)`;
+  drawMoonIcon(phaseFrac);
+
+  const sarosCell = Math.floor(totalDays/SYNODIC) % 223;
+  const sarosCellPos = ((sarosCell%223)+223)%223;
+  sarosVal.textContent = `${sarosCellPos+1} / 223`;
+
+  if(Math.abs(totalDays-lastEclipseScan) > 0.5){
+    cachedNext = scanNextEclipse(totalDays);
+    lastEclipseScan = totalDays;
+  }
+  const now = eclipseStatusAt(totalDays);
+  if(now.solar){ eclipseLine.className='watch'; eclipseLine.textContent='Eclipse Watch: SOLAR ECLIPSE predicted NOW (Saros geometry aligned).'; }
+  else if(now.lunar){ eclipseLine.className='watch'; eclipseLine.textContent='Eclipse Watch: LUNAR ECLIPSE predicted NOW (Saros geometry aligned).'; }
+  else if(cachedNext){ eclipseLine.className='clear'; eclipseLine.textContent=`Eclipse Watch: next possible ${cachedNext.type} eclipse in ~${cachedNext.days} day${cachedNext.days===1?'':'s'}.`; }
+  else { eclipseLine.className='clear'; eclipseLine.textContent='Eclipse Watch: no alignment within range.'; }
+
+  // drive 3D pointers
+  sunPointer.rotation.z = -sunAngle;
+  moonPointer.rotation.z = -e4Angle;
+  phaseBall.rotation.y = TWO_PI*phaseFrac;
+
+  metonicPointerHand.rotation.z = -(TWO_PI*totalDays/(235*SYNODIC))*5;
+  sarosPointerHand.rotation.z = -(TWO_PI*totalDays/(223*SYNODIC))*4;
+  callippicHand.rotation.z = -(TWO_PI*totalDays/(76*YEAR));
+  olympiadHand.rotation.z = -(TWO_PI*totalDays/(4*YEAR));
+  exeligmosHand.rotation.z = -(TWO_PI*totalDays/(3*223*SYNODIC));
+
+  // drive internal gears
+  gearObjects.forEach(obj=>{
+    const spec = obj.userData.gearInfo;
+    let ang = 0;
+    switch(spec.id){
+      case 'crank': ang = TWO_PI*totalDays; break;
+      case 'a1': ang = TWO_PI*totalDays*2; break;
+      case 'b1': ang = sunAngle; break;
+      case 'b2': ang = sunAngle*3.5; break;
+      case 'c1': case 'c2': ang = sunAngle*3.5*(64/38); break;
+      case 'd1': case 'd2': ang = moonZodiacAngle; break;
+      case 'e1': case 'e2': ang = moonZodiacAngle; break;
+      case 'k1': ang = e3Angle; break;
+      case 'k2': ang = e4Angle; break;
+      case 'e3': ang = e3Angle; break;
+      case 'e4': ang = e4Angle; break;
+      case 'r': ang = e4Angle - sunAngle; break;
+      case 'n1': ang = TWO_PI*totalDays/(235*SYNODIC)*5; break;
+      case 'p1': ang = TWO_PI*totalDays/(76*YEAR); break;
+      case 'o1': ang = TWO_PI*totalDays/(4*YEAR); break;
+      case 'g1': ang = TWO_PI*totalDays/(223*SYNODIC)*4; break;
+      case 'h1': ang = TWO_PI*totalDays/(3*223*SYNODIC); break;
+    }
+    if(spec.id==='crank'){ obj.rotation.x = ang; }
+    else obj.rotation.z = ang;
+  });
+}
+
+/* =========================================================================
+   EXPLODE / CAMERA
+   ========================================================================= */
+function applyExplode(){
+  gearObjects.forEach(obj=>{
+    obj.position.lerpVectors(obj.userData.assembledPos, obj.userData.explodedPos, explodeFactor);
+  });
+  frontPlate.position.z = 1.42 + explodeFactor*1.2;
+  backPlate.position.z = -1.42 - explodeFactor*1.2;
+  sunPointer.position.z = frontPlate.position.z+0.02;
+  moonPointer.position.z = frontPlate.position.z+0.05;
+  phaseBall.position.z = frontPlate.position.z+0.08;
+  const backZ = backPlate.position.z+0.02;
+  [metonicPointerHand,sarosPointerHand,callippicHand,olympiadHand,exeligmosHand].forEach(h=>h.position.z = backZ + (explodeFactor*0.4));
+  shellMat.opacity = 0.35*(1-explodeFactor*0.9);
+  caseWire.material.opacity = 0.5*(1-explodeFactor*0.6);
+}
+
+/* =========================================================================
+   UI WIRING
+   ========================================================================= */
+const explodeSlider = document.getElementById('explodeSlider');
+const explodeVal = document.getElementById('explodeVal');
+explodeSlider.addEventListener('input', ()=>{
+  explodeFactor = explodeSlider.value/100;
+  explodeVal.textContent = explodeSlider.value+'%';
+  applyExplode();
+});
+
+let autoDir = 1;
+const crankAuto = document.getElementById('crankAuto');
+crankAuto.addEventListener('click', ()=>{
+  autoTurn = !autoTurn;
+  crankAuto.classList.toggle('active', autoTurn);
+  crankAuto.textContent = autoTurn ? '⏸ Pause' : '▶ Auto-Turn';
+});
+document.getElementById('crankFwd').addEventListener('click', ()=>{ dragTurn += 1; });
+document.getElementById('crankBack').addEventListener('click', ()=>{ dragTurn -= 1; });
+const speedSlider = document.getElementById('speedSlider');
+const speedVal = document.getElementById('speedVal');
+speedSlider.addEventListener('input', ()=>{ autoSpeed = +speedSlider.value; speedVal.textContent = autoSpeed.toFixed(1); });
+
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  totalDays = 0; explodeFactor = 0; explodeSlider.value = 0; explodeVal.textContent='0%';
+  autoTurn=false; crankAuto.classList.remove('active'); crankAuto.textContent='▶ Auto-Turn';
+  applyExplode(); updateReadouts();
+});
+
+/* ---------------- Gear detail card ---------------- */
+const gearCard = document.getElementById('gearCard');
+const gcId=document.getElementById('gcId'), gcName=document.getElementById('gcName'), gcGroup=document.getElementById('gcGroup'),
+  gcTeeth=document.getElementById('gcTeeth'), gcRatio=document.getElementById('gcRatio'),
+  gcFunc=document.getElementById('gcFunc'), gcConf=document.getElementById('gcConf');
+
+function showGearCard(spec){
+  gcId.textContent = spec.id;
+  gcName.textContent = spec.name;
+  gcGroup.textContent = spec.group;
+  gcTeeth.textContent = spec.teeth===null ? '—' : spec.teeth;
+  gcRatio.textContent = spec.cycle;
+  gcFunc.textContent = spec.func;
+  gcConf.textContent = spec.conf;
+  gearCard.classList.add('show');
+}
+document.getElementById('gearCardClose').addEventListener('click', ()=> gearCard.classList.remove('show'));
+
+/* ---------------- Raycast click / crank drag ---------------- */
+const raycaster = new THREE.Raycaster();
+const pointerNDC = new THREE.Vector2();
+let downPos = null, isDraggingCrank=false, lastX=0;
+const crankObj = gearObjects.find(o=>o.userData.gearInfo.id==='crank');
+
+function ndcFromEvent(e){
+  const r = renderer.domElement.getBoundingClientRect();
+  pointerNDC.x = ((e.clientX-r.left)/r.width)*2-1;
+  pointerNDC.y = -((e.clientY-r.top)/r.height)*2+1;
+}
+
+renderer.domElement.addEventListener('pointerdown', (e)=>{
+  ndcFromEvent(e);
+  downPos = {x:e.clientX,y:e.clientY,t:performance.now()};
+  raycaster.setFromCamera(pointerNDC, camera);
+  const targets = crankObj.userData.clickTargets;
+  const hits = raycaster.intersectObjects(targets, false);
+  if(hits.length){ isDraggingCrank = true; lastX = e.clientX; controls.enabled=false; }
+});
+window.addEventListener('pointermove', (e)=>{
+  if(isDraggingCrank){
+    const dx = e.clientX - lastX; lastX = e.clientX;
+    dragTurn += dx*0.01;
+  }
+});
+window.addEventListener('pointerup', (e)=>{
+  if(isDraggingCrank){ isDraggingCrank=false; controls.enabled=true; }
+  if(downPos){
+    const dx=Math.abs(e.clientX-downPos.x), dy=Math.abs(e.clientY-downPos.y);
+    const dt=performance.now()-downPos.t;
+    if(dx<5 && dy<5 && dt<400){
+      ndcFromEvent(e);
+      raycaster.setFromCamera(pointerNDC, camera);
+      const allTargets = [];
+      gearObjects.forEach(o=>allTargets.push(...o.userData.clickTargets));
+      const hits = raycaster.intersectObjects(allTargets, false);
+      if(hits.length){
+        let obj = hits[0].object;
+        while(obj && !obj.userData.gearInfo) obj = obj.parent;
+        if(obj) showGearCard(obj.userData.gearInfo);
+      }
+    }
+  }
+  downPos=null;
+});
+
+/* =========================================================================
+   START SCREEN / AUTOTEST
+   ========================================================================= */
+const startScreen = document.getElementById('startScreen');
+document.getElementById('beginBtn').addEventListener('click', ()=>{ startScreen.classList.add('hidden'); });
+
+let autotestTimeline = [];
+function beginAutotest(){
+  document.getElementById('autotestBadge').style.display='block';
+  startScreen.classList.add('hidden');
+  explodeSlider.value = 70; explodeFactor = 0.7; explodeVal.textContent='70%';
+  applyExplode();
+  autoTurn = true; autoSpeed = 18;
+  crankAuto.classList.add('active'); crankAuto.textContent='⏸ Pause';
+  // open a gear detail popup shortly after start, matching "show a gear detail popup"
+  setTimeout(()=>{ showGearCard(GEARS.find(g=>g.id==='e3')); }, 1800);
+  setTimeout(()=>{ gearCard.classList.remove('show'); showGearCard(GEARS.find(g=>g.id==='k1')); }, 6500);
+  setTimeout(()=>{ gearCard.classList.remove('show'); showGearCard(GEARS.find(g=>g.id==='b1')); }, 11000);
+}
+
+if(isAutotest){ beginAutotest(); }
+
+/* =========================================================================
+   RESIZE + ANIMATE
+   ========================================================================= */
+window.addEventListener('resize', ()=>{
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+const clock = new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+  if(autoTurn){ totalDays += autoSpeed*dt; }
+  if(dragTurn !== 0){ totalDays += dragTurn; dragTurn = 0; }
+  updateReadouts();
+  controls.update();
+  renderer.render(scene, camera);
+}
+applyExplode();
+updateReadouts();
+animate();
+</script>
+</body>
+</html>

@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CHROMA — Painterly Animated Music Video Engine</title>
+<style>
+  html,body{margin:0;height:100%;background:#0a0908;overflow:hidden;
+    font-family:Georgia,'Times New Roman',serif;color:#f2e9d8;}
+  #gl{position:fixed;inset:0;width:100%;height:100%;display:block;}
+  .bar{position:fixed;left:0;right:0;height:7vh;background:#000;z-index:20;}
+  #barT{top:0;} #barB{bottom:0;}
+  #vig{position:fixed;inset:0;pointer-events:none;z-index:15;
+    background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.5) 100%);}
+  /* lyrics */
+  #lyrics{position:fixed;left:0;right:0;bottom:17vh;text-align:center;z-index:30;
+    pointer-events:none;padding:0 8vw;}
+  #lyrCur{font-size:clamp(22px,3.6vw,44px);letter-spacing:.12em;font-style:italic;
+    text-shadow:0 2px 14px rgba(0,0,0,.85);opacity:0;transition:opacity .4s;}
+  #lyrNxt{font-size:clamp(13px,1.8vw,20px);letter-spacing:.14em;color:#cbbd97;margin-top:1vh;
+    text-shadow:0 2px 10px rgba(0,0,0,.85);opacity:0;transition:opacity .4s;}
+  #sceneCard{position:fixed;left:0;right:0;top:12vh;text-align:center;z-index:30;pointer-events:none;
+    font-size:clamp(15px,2.4vw,28px);letter-spacing:.45em;text-transform:uppercase;color:#e8dcc0;
+    text-shadow:0 2px 12px rgba(0,0,0,.9);opacity:0;transition:opacity .8s;}
+  /* controls */
+  #controls{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;align-items:center;
+    gap:12px;padding:1.2vh 2vw 1.6vh;background:linear-gradient(transparent,rgba(0,0,0,.82));
+    font-size:13px;letter-spacing:.08em;}
+  #controls button{background:#2a2419;border:1px solid #6b5f45;color:#f2e9d8;border-radius:4px;
+    padding:6px 14px;cursor:pointer;font-family:inherit;letter-spacing:.1em;}
+  #controls button:hover{background:#3d3423;}
+  #seek{flex:1;accent-color:#d8a850;cursor:pointer;}
+  #time{color:#cbbd97;min-width:110px;text-align:center;font-variant-numeric:tabular-nums;}
+  #spec{width:150px;height:34px;background:rgba(0,0,0,.5);border:1px solid #3a3226;border-radius:3px;}
+  #mode{color:#9d9176;font-size:11px;letter-spacing:.14em;}
+  /* lyric editor */
+  #lyrEdit{position:fixed;right:2vw;bottom:9vh;width:min(420px,86vw);z-index:45;display:none;
+    background:rgba(8,8,10,.94);border:1px solid #6b5f45;border-radius:6px;padding:14px;}
+  #lyrEdit textarea{width:100%;height:180px;background:#111;color:#e8dcc0;border:1px solid #3a3226;
+    font-family:monospace;font-size:12px;box-sizing:border-box;}
+  #lyrEdit .row{display:flex;gap:8px;margin-top:8px;justify-content:flex-end;}
+  /* start screen */
+  #start{position:fixed;inset:0;z-index:50;background:#0a0908;display:flex;align-items:center;
+    justify-content:center;flex-direction:column;cursor:default;text-align:center;padding:0 8vw;}
+  #start h1{font-size:clamp(38px,8vw,96px);letter-spacing:.32em;font-weight:normal;margin:0 0 1vh;}
+  #start h1 span{color:#d8a850;}
+  #start p{font-size:clamp(12px,1.7vw,17px);letter-spacing:.26em;color:#9d9176;margin:.5em 0;}
+  #start .btns{display:flex;gap:18px;margin-top:4vh;flex-wrap:wrap;justify-content:center;}
+  #start .btn{font-size:clamp(14px,2vw,20px);letter-spacing:.24em;color:#f2e9d8;cursor:pointer;
+    border:1px solid #6b5f45;padding:1.6vh 3.4vw;animation:pulse 2.6s ease-in-out infinite;background:none;font-family:inherit;}
+  #start .btn:hover{background:#2a2419;}
+  @keyframes pulse{0%,100%{opacity:.6}50%{opacity:1}}
+  #fileLbl{font-size:clamp(14px,2vw,20px);letter-spacing:.24em;color:#f2e9d8;cursor:pointer;
+    border:1px solid #6b5f45;padding:1.6vh 3.4vw;animation:pulse 2.6s ease-in-out infinite;}
+  #fileLbl:hover{background:#2a2419;}
+  #trackFile{display:none;}
+  #err{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
+    color:#e8dcc0;background:#000;padding:4vw;text-align:center;font-size:17px;letter-spacing:.08em;}
+  #agentTag{position:fixed;left:2vw;top:9.5vh;z-index:30;pointer-events:none;font-size:11px;
+    letter-spacing:.2em;color:rgba(220,200,150,.55);}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="vig"></div>
+<div class="bar" id="barT"></div>
+<div class="bar" id="barB"></div>
+<div id="agentTag"></div>
+<div id="sceneCard"></div>
+<div id="lyrics"><div id="lyrCur"></div><div id="lyrNxt"></div></div>
+<div id="controls">
+  <button id="playBtn">⏸ Pause</button>
+  <input id="seek" type="range" min="0" max="1000" value="0">
+  <span id="time">0:00 / 0:00</span>
+  <canvas id="spec" width="150" height="34"></canvas>
+  <button id="lyrBtn">Lyrics</button>
+  <label id="upLbl" for="trackFile" style="cursor:pointer;color:#d8a850;letter-spacing:.1em;">↗ Track</label>
+  <input id="trackFile" type="file" accept="audio/*" style="display:none">
+  <span id="mode">DEMO SONG</span>
+</div>
+<div id="lyrEdit">
+  <div style="letter-spacing:.2em;font-size:12px;margin-bottom:8px;color:#cbbd97;">LYRICS — LRC FORMAT [mm:ss.xx] per line</div>
+  <textarea id="lyrText" spellcheck="false"></textarea>
+  <div class="row">
+    <button id="lyrApply" style="background:#2a2419;border:1px solid #6b5f45;color:#f2e9d8;padding:6px 14px;cursor:pointer;">Apply</button>
+    <button id="lyrClose" style="background:#2a2419;border:1px solid #6b5f45;color:#f2e9d8;padding:6px 14px;cursor:pointer;">Close</button>
+  </div>
+</div>
+<div id="start">
+  <h1>CHR<span>O</span>MA</h1>
+  <p>PAINTERLY ANIMATED MUSIC VIDEO ENGINE</p>
+  <p style="font-size:11px;">BRUSH-STROKE SHADERS &middot; BEAT-SYNCED SCENES &middot; MULTI-AGENT PIPELINE</p>
+  <div class="btns">
+    <button class="btn" id="demoBtn">▶ PLAY DEMO SONG</button>
+    <label id="fileLbl" for="trackFile2">UPLOAD YOUR TRACK</label>
+    <input id="trackFile2" type="file" accept="audio/*" style="display:none">
+  </div>
+  <p style="margin-top:3vh;font-size:11px;">DEMO: FULLY SYNTHESIZED 2:30 TRACK + LYRICS &middot; NO EXTERNAL MEDIA</p>
+</div>
+<div id="err"></div>
+<script>
+'use strict';
+/* =====================================================================
+   CHROMA — a painterly animated music video engine in one file.
+   Agents: Conductor · AudioAgent · LyricAgent · SceneAgents ×5 · PainterAgent
+   All visuals: procedural canvas + WebGL brush-stroke shaders. No video.
+   All demo audio: synthesized live with the Web Audio API. No samples.
+   ===================================================================== */
+function showErr(msg){
+  const el=document.getElementById('err'); el.style.display='flex';
+  el.innerHTML='<div>'+msg+'<br><br><span style="font-size:13px;color:#9d9176;">Please reload to try again.</span></div>';
+}
+window.addEventListener('error',e=>{ showErr('Something interrupted the engine.<br><br><span style="font-size:13px;color:#9d9176;">'+String((e&&e.message)||e).replace(/</g,'&lt;')+'</span>'); });
+
+
+'use strict';
+/* =====================================================================
+   HER REFLECTION — a pure-code cinematic short film
+   Film by David Xu.
+   All visuals: procedural real-time 3D (Three.js). No video files, no
+   pre-rendered assets, no binary/base64 media.
+   All audio: synthesized live with the Web Audio API. No samples.
+   ===================================================================== */
+
+// ---------------------------------------------------------------- audio
+let AC=null, mus=null, verb=null, _nb=null;
+const n2f = m => 440*Math.pow(2,(m-69)/12);
+
+function initAudio(){
+  AC = new (window.AudioContext||window.webkitAudioContext)();
+  const comp = AC.createDynamicsCompressor();
+  comp.threshold.value=-14; comp.ratio.value=6;
+  comp.connect(AC.destination);
+  mus = AC.createGain(); mus.gain.value=0.9; mus.connect(comp);
+  // generated impulse reverb (no samples: synthesized noise decay)
+  const len = Math.floor(AC.sampleRate*2.6);
+  const ir = AC.createBuffer(2,len,AC.sampleRate);
+  for(let ch=0;ch<2;ch++){ const d=ir.getChannelData(ch);
+    for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.6); }
+  verb = AC.createConvolver(); verb.buffer=ir;
+  const vg=AC.createGain(); vg.gain.value=0.55; verb.connect(vg); vg.connect(mus);
+}
+function noiseBuf(){ if(_nb) return _nb;
+  const b=AC.createBuffer(1,AC.sampleRate*2,AC.sampleRate), d=b.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1; _nb=b; return b; }
+function sendVerb(node,amt){ const s=AC.createGain(); s.gain.value=amt;
+  node.connect(s); s.connect(verb); }
+function osc(type,f){ const o=AC.createOscillator(); o.type=type; o.frequency.value=f; return o; }
+
+// string section pad: detuned saw stack through lowpass (additive-ish)
+function pad(t,mids,dur,vel,cut,atk){
+  vel=vel||0.4; cut=cut||1200; atk=atk||1.5;
+  mids.forEach(m=>{ const f=n2f(m);
+    const g=AC.createGain(); g.connect(mus); sendVerb(g,0.5);
+    const fl=AC.createBiquadFilter(); fl.type='lowpass'; fl.frequency.value=cut; fl.connect(g);
+    [-6,6].forEach(c=>{ const o=osc('sawtooth',f); o.detune.value=c;
+      o.connect(fl); o.start(t); o.stop(t+dur+1.2); });
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.linearRampToValueAtTime(vel*0.22,t+atk);
+    g.gain.setValueAtTime(vel*0.22,t+Math.max(atk,dur-0.8));
+    g.gain.linearRampToValueAtTime(0.0001,t+dur+1.0);
+  });
+}
+// flute: sine + soft octave, breath vibrato
+function flute(t,m,dur,vel){
+  vel=vel||0.5; const f=n2f(m);
+  const g=AC.createGain(); g.connect(mus); sendVerb(g,0.45);
+  const o=osc('sine',f), o2=osc('sine',f*2);
+  const g2=AC.createGain(); g2.gain.value=0.14; o2.connect(g2); g2.connect(g);
+  const lfo=osc('sine',5.4), lg=AC.createGain(); lg.gain.value=f*0.006;
+  lfo.connect(lg); lg.connect(o.frequency);
+  o.connect(g);
+  [o,o2,lfo].forEach(x=>{x.start(t);x.stop(t+dur+0.6);});
+  const a=Math.min(0.35,dur*0.3);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.linearRampToValueAtTime(vel*0.5,t+a);
+  g.gain.setValueAtTime(vel*0.5,t+Math.max(a+0.05,dur-0.3));
+  g.gain.linearRampToValueAtTime(0.0001,t+dur+0.5);
+}
+// plucked harp/piano: harmonic stack, bright-to-dark filter sweep, exp decay
+function pluck(t,m,dur,vel){
+  vel=vel||0.5; const f=n2f(m);
+  const g=AC.createGain(); g.connect(mus); sendVerb(g,0.5);
+  const fl=AC.createBiquadFilter(); fl.type='lowpass'; fl.connect(g);
+  fl.frequency.setValueAtTime(4200,t);
+  fl.frequency.exponentialRampToValueAtTime(750,t+Math.min(1.4,dur+0.4));
+  [[1,'triangle',1],[2,'sine',0.32],[3,'sine',0.13],[4.02,'sine',0.05]].forEach(cfg=>{
+    const o=osc(cfg[1],f*cfg[0]), og=AC.createGain(); og.gain.value=cfg[2];
+    o.connect(og); og.connect(fl); o.start(t); o.stop(t+dur+0.8); });
+  const d=Math.max(dur+0.3,1.0);
+  g.gain.setValueAtTime(vel*0.55,t);
+  g.gain.exponentialRampToValueAtTime(0.0008,t+d);
+}
+// cello: low saw pair, slow bow attack, vibrato (physical-model flavor)
+function cello(t,m,dur,vel){
+  vel=vel||0.5; const f=n2f(m);
+  const g=AC.createGain(); g.connect(mus); sendVerb(g,0.35);
+  const fl=AC.createBiquadFilter(); fl.type='lowpass'; fl.frequency.value=850; fl.Q.value=1.4; fl.connect(g);
+  const o=osc('sawtooth',f), o2=osc('sawtooth',f*1.004);
+  const lfo=osc('sine',5.1), lg=AC.createGain(); lg.gain.value=f*0.009;
+  lfo.connect(lg); lg.connect(o.frequency); lg.connect(o2.frequency);
+  o.connect(fl); o2.connect(fl);
+  [o,o2,lfo].forEach(x=>{x.start(t);x.stop(t+dur+0.6);});
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.linearRampToValueAtTime(vel*0.5,t+0.28);
+  g.gain.setValueAtTime(vel*0.5,t+Math.max(0.3,dur-0.25));
+  g.gain.linearRampToValueAtTime(0.0001,t+dur+0.5);
+}
+// brass stab: saw stack, filter swell
+function brass(t,m,dur,vel){
+  vel=vel||0.5; const f=n2f(m);
+  const g=AC.createGain(); g.connect(mus); sendVerb(g,0.3);
+  const fl=AC.createBiquadFilter(); fl.type='lowpass'; fl.Q.value=2.2; fl.connect(g);
+  fl.frequency.setValueAtTime(550,t);
+  fl.frequency.linearRampToValueAtTime(2700,t+0.14);
+  fl.frequency.linearRampToValueAtTime(900,t+dur);
+  [-5,0,5].forEach(c=>{ const o=osc('sawtooth',f); o.detune.value=c;
+    o.connect(fl); o.start(t); o.stop(t+dur+0.4); });
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.linearRampToValueAtTime(vel*0.42,t+0.09);
+  g.gain.setValueAtTime(vel*0.42,t+Math.max(0.1,dur-0.12));
+  g.gain.linearRampToValueAtTime(0.0001,t+dur+0.3);
+}
+// taiko: pitch-dropping sine + skin noise
+function taiko(t,vel,base){
+  vel=vel||0.7; base=base||70;
+  const o=osc('sine',base*1.9), g=AC.createGain(); g.connect(mus);
+  o.frequency.exponentialRampToValueAtTime(base*0.55,t+0.2);
+  g.gain.setValueAtTime(vel*0.95,t);
+  g.gain.exponentialRampToValueAtTime(0.001,t+0.55);
+  o.connect(g); o.start(t); o.stop(t+0.65);
+  const ns=AC.createBufferSource(); ns.buffer=noiseBuf();
+  const nf=AC.createBiquadFilter(); nf.type='lowpass'; nf.frequency.value=480;
+  const ng=AC.createGain(); ng.gain.setValueAtTime(vel*0.3,t);
+  ng.gain.exponentialRampToValueAtTime(0.001,t+0.13);
+  ns.connect(nf); nf.connect(ng); ng.connect(mus); ns.start(t); ns.stop(t+0.16);
+}
+// thunder: long low noise swell
+function thunder(t,vel,dur){
+  vel=vel||0.5; dur=dur||2.5;
+  const ns=AC.createBufferSource(); ns.buffer=noiseBuf(); ns.loop=true;
+  const fl=AC.createBiquadFilter(); fl.type='lowpass';
+  fl.frequency.setValueAtTime(420,t);
+  fl.frequency.exponentialRampToValueAtTime(55,t+dur);
+  const g=AC.createGain(); g.connect(mus); sendVerb(g,0.4);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.linearRampToValueAtTime(vel*0.85,t+0.09);
+  g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+  ns.connect(fl); fl.connect(g); ns.start(t); ns.stop(t+dur+0.1);
+}
+// bell/chime: FM synthesis (carrier + decaying modulator index)
+function bell(t,m,vel,dur){
+  vel=vel||0.4; dur=dur||3; const f=n2f(m);
+  const car=osc('sine',f), mod=osc('sine',f*3.01);
+  const mg=AC.createGain();
+  mg.gain.setValueAtTime(f*2.4,t);
+  mg.gain.exponentialRampToValueAtTime(1.2,t+dur*0.7);
+  mod.connect(mg); mg.connect(car.frequency);
+  const g=AC.createGain(); g.connect(mus); sendVerb(g,0.65);
+  g.gain.setValueAtTime(vel*0.42,t);
+  g.gain.exponentialRampToValueAtTime(0.0008,t+dur);
+  car.connect(g);
+  [car,mod].forEach(o=>{o.start(t);o.stop(t+dur+0.25);});
+}
+// choir: detuned saw triads, slow swell ("ahh" via band-ish lowpass)
+function choir(t,mids,dur,vel){
+  vel=vel||0.4;
+  mids.forEach(m=>{ const f=n2f(m);
+    const g=AC.createGain(); g.connect(mus); sendVerb(g,0.65);
+    const fl=AC.createBiquadFilter(); fl.type='lowpass'; fl.frequency.value=1700; fl.connect(g);
+    const lfo=osc('sine',4.6+Math.random()*0.8), lg=AC.createGain(); lg.gain.value=f*0.006;
+    lfo.connect(lg);
+    for(let k=0;k<3;k++){ const o=osc('sawtooth',f);
+      o.detune.value=(k-1)*9+Math.random()*4; lg.connect(o.frequency);
+      o.connect(fl); o.start(t); o.stop(t+dur+1.2); }
+    lfo.start(t); lfo.stop(t+dur+1.2);
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.linearRampToValueAtTime(vel*0.15,t+dur*0.4);
+    g.gain.setValueAtTime(vel*0.15,t+dur*0.72);
+    g.gain.linearRampToValueAtTime(0.0001,t+dur+1.1);
+  });
+}
+// ambience beds: wind (wandering bandpass noise) / rain (highpassed noise)
+function bed(t,dur,type,vel){
+  const ns=AC.createBufferSource(); ns.buffer=noiseBuf(); ns.loop=true;
+  const fl=AC.createBiquadFilter(), g=AC.createGain();
+  if(type==='wind'){ fl.type='bandpass'; fl.frequency.value=380; fl.Q.value=0.7;
+    const lfo=osc('sine',0.12), lg=AC.createGain(); lg.gain.value=260;
+    lfo.connect(lg); lg.connect(fl.frequency); lfo.start(t); lfo.stop(t+dur+0.1);
+  } else { fl.type='highpass'; fl.frequency.value=2600; }
+  ns.connect(fl); fl.connect(g); g.connect(mus); sendVerb(g,0.5);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.linearRampToValueAtTime(vel,t+2.5);
+  g.gain.setValueAtTime(vel,t+Math.max(2.6,dur-2.5));
+  g.gain.linearRampToValueAtTime(0.0001,t+dur);
+  ns.start(t); ns.stop(t+dur+0.1);
+}
+// sequencer: events = [beatOffset, midi, beats, vel]
+function seq(t0,bpm,ev,fn){ const k=60/bpm;
+  for(const e of ev) fn(t0+e[0]*k, e[1], (e[2]||1)*k, e[3]); }
+
+
+
+
+
+/* shared math helpers */
+const lerp=(a,b,u)=>a+(b-a)*u;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const smooth=u=>u*u*(3-2*u);
+const rnd=(a,b)=>a+Math.random()*(b-a);
+
+/* ================= demo song (2:30, synthesized) ================= */
+function arp(t,chord,bpm,beats,vel){
+  const tones=[chord[0]+12,chord[1]+12,chord[2]+12,chord[2]+24,chord[1]+24];
+  const ev=[]; for(let i=0;i<beats;i++) ev.push([i*1.5,tones[i%tones.length],1.2]);
+  seq(t,bpm,ev,(tt,m,d)=>pluck(tt,m,d,vel));
+}
+function scheduleDemoSong(T){
+  mus.gain.setValueAtTime(0.85,T);
+  mus.gain.setValueAtTime(0.85,T+146);
+  mus.gain.linearRampToValueAtTime(0.0001,T+150);
+  const D=[50,54,57],G=[55,59,62],Bm=[47,50,54],A=[45,49,52];
+  // INTRO 0-14
+  pad(T,D,14,0.3,1100,3);
+  seq(T,60,[[0,74,2],[2,76,2],[4,79,3],[8,77,2],[10,76,2],[12,74,3]],
+    (t,m,d)=>pluck(t,m,d,0.4));
+  bell(T+7,86,0.2,3);
+  // VERSE 1 — 14-44
+  [D,G,Bm,A].forEach((ch,i)=>{ const t=T+14+i*7.5;
+    pad(t,ch,7.5,0.32,1200,2); cello(t,ch[0],7.5,0.28); arp(t,ch,66,5,0.32); });
+  seq(T+14,66,[[0,74,2],[2,76,2],[4,79,3],[8,81,2],[10,79,2],[12,77,3],
+    [16,76,2],[18,74,2],[20,72,3],[24,74,4]],
+    (t,m,d)=>flute(t,m,d,0.45));
+  // CHORUS — 44-74
+  [D,G,Bm,A,D,G,Bm,A].forEach((ch,i)=>{ const t=T+44+i*3.75;
+    pad(t,ch,3.75,0.4,1500,1); choir(t,ch,3.75,0.36);
+    brass(t,ch[0]+12,1.2,0.4); brass(t+1.9,ch[1]+12,1.2,0.35);
+    cello(t,ch[0]-12,3.75,0.32);
+    for(let b=0;b<4;b++) taiko(t+b*0.94,0.55+b*0.06,64);
+  });
+  bell(T+44,86,0.3,3); bell(T+59,88,0.3,3);
+  seq(T+46,96,[[0,74,1],[1,76,1],[2,79,2],[4,81,2],[6,79,1],[7,76,1],[8,74,2],
+    [12,76,1],[13,79,1],[14,81,2],[16,84,3],[20,81,2],[22,79,3]],
+    (t,m,d)=>flute(t,m,d,0.5));
+  // VERSE 2 — 74-104 (warmer)
+  [D,G,Bm,A].forEach((ch,i)=>{ const t=T+74+i*7.5;
+    pad(t,ch,7.5,0.34,1350,2); cello(t,ch[0],7.5,0.3); arp(t,ch,70,5,0.34); });
+  seq(T+74,70,[[0,76,2],[2,79,2],[4,81,3],[8,79,2],[10,77,2],[12,76,3],
+    [16,74,2],[18,76,2],[20,79,4]],
+    (t,m,d)=>flute(t,m,d,0.45));
+  bell(T+82,91,0.25,3); bell(T+97,93,0.25,3);
+  // BRIDGE — 104-124 (strip back, then build)
+  [Bm,G,D,A].forEach((ch,i)=>{ const t=T+104+i*5;
+    pad(t,ch,5,0.3,1000,2.5); cello(t,ch[0],5,0.3);
+    if(i>1) choir(t,ch,5,0.3);
+  });
+  seq(T+104,60,[[0,71,3],[3,72,3],[6,74,4],[12,72,3],[15,71,4]],
+    (t,m,d)=>pluck(t,m,d,0.4));
+  for(let i=0;i<8;i++) taiko(T+118+i*0.7,0.4+i*0.05,62);
+  // FINAL CHORUS — 124-150
+  [D,G,Bm,A,D,G,Bm,A].forEach((ch,i)=>{ const t=T+124+i*3.25;
+    pad(t,ch,3.25,0.44,1700,1); choir(t,ch,3.25,0.42);
+    brass(t,ch[0]+12,1.4,0.45); brass(t+1.6,ch[2]+12,1.2,0.4);
+    cello(t,ch[0]-12,3.25,0.34);
+    for(let b=0;b<4;b++) taiko(t+b*0.81,0.6+b*0.05,66);
+  });
+  seq(T+126,100,[[0,74,1],[1,76,1],[2,79,2],[4,81,2],[6,84,3],[10,81,2],[12,79,2],[14,76,4]],
+    (t,m,d)=>flute(t,m,d,0.5));
+  pad(T+146,D,4,0.4,1400,2); choir(T+146,D,4,0.4);
+  bell(T+146,74,0.35,5); bell(T+147,81,0.3,5); bell(T+148,86,0.35,6);
+}
+const DEMO_LRC =
+"[00:06.00]Morning opens up its eyes\n"+
+"[00:14.00]I woke before the morning sun\n"+
+"[00:19.00]With painted skies for everyone\n"+
+"[00:24.00]The road is long, the air is clear\n"+
+"[00:29.00]And every color draws me near\n"+
+"[00:34.00]So I walk on, I walk on\n"+
+"[00:44.00]Colors rising, light the way\n"+
+"[00:49.00]Every heartbeat paints the day\n"+
+"[00:54.00]Through the rain and over sea\n"+
+"[00:59.00]The world is painting me\n"+
+"[01:04.00]Colors rising, wild and free\n"+
+"[01:09.00]This is where I'm meant to be\n"+
+"[01:14.00]The city glistens in the rain\n"+
+"[01:19.00]Each window glows, each street's a vein\n"+
+"[01:24.00]Of golden light that pulls me through\n"+
+"[01:29.00]The night is deep, the stars are true\n"+
+"[01:34.00]So I sail on, I sail on\n"+
+"[01:44.00]And when the dark begins to fall\n"+
+"[01:50.00]I hear the quiet midnight call\n"+
+"[01:56.00]Rise above it, float away\n"+
+"[02:04.00]Colors rising, light the way\n"+
+"[02:09.00]Every heartbeat paints the day\n"+
+"[02:14.00]Morning breaks in shades of gold\n"+
+"[02:19.00]And I'm finally home\n"+
+"[02:24.00]I'm finally home\n";
+
+/* ================= AudioAgent ================= */
+const AudioAgent={
+  analyser:null, freq:null, mode:'demo', T0:0, pausedAt:0,
+  audioEl:null, fileURL:null, dur:150,
+  beat:0, prevBass:0, energy:{bass:0,mid:0,high:0,level:0},
+  init(){
+    initAudio();
+    this.analyser=AC.createAnalyser(); this.analyser.fftSize=256;
+    this.analyser.smoothingTimeConstant=0.78;
+    // tap the master bus: the analyser observes the mix without touching the audible path
+    mus.connect(this.analyser);
+    this.freq=new Uint8Array(this.analyser.frequencyBinCount);
+    this.audioEl=new Audio(); this.audioEl.preload='auto';
+    const src=AC.createMediaElementSource(this.audioEl);
+    src.connect(AC.destination); src.connect(this.analyser);
+    this.audioEl.addEventListener('ended',()=>{ Conductor.onEnded(); });
+  },
+  playDemo(){
+    this.mode='demo'; this.dur=150;
+    this.T0=AC.currentTime+0.6;
+    scheduleDemoSong(this.T0);
+    document.getElementById('mode').textContent='DEMO SONG · SYNTHESIZED';
+  },
+  playFile(file){
+    this.mode='file';
+    if(this.fileURL) URL.revokeObjectURL(this.fileURL);
+    this.fileURL=URL.createObjectURL(file);
+    this.audioEl.src=this.fileURL;
+    this.audioEl.play();
+    document.getElementById('mode').textContent='♪ '+file.name.toUpperCase().slice(0,28);
+    this.audioEl.onloadedmetadata=()=>{ this.dur=this.audioEl.duration||150; };
+  },
+  toggle(){
+    if(this.mode==='demo'){
+      if(AC.state==='suspended'){ AC.resume(); } else { AC.suspend(); }
+    } else {
+      if(this.audioEl.paused) this.audioEl.play(); else this.audioEl.pause();
+    }
+  },
+  playing(){
+    return this.mode==='demo' ? AC.state==='running' : !this.audioEl.paused;
+  },
+  time(){
+    if(this.mode==='demo') return Math.max(0,AC.currentTime-this.T0);
+    return this.audioEl.currentTime||0;
+  },
+  seek(frac){
+    if(this.mode==='file'&&this.dur) this.audioEl.currentTime=frac*this.dur;
+  },
+  update(){
+    this.analyser.getByteFrequencyData(this.freq);
+    const F=this.freq, avg=(a,b)=>{let s=0;for(let i=a;i<b;i++)s+=F[i];return s/(b-a)/255;};
+    const bass=avg(1,9), mid=avg(9,42), high=avg(42,110);
+    const E=this.energy, k=0.25;
+    E.bass+=(bass-E.bass)*k; E.mid+=(mid-E.mid)*k; E.high+=(high-E.high)*k;
+    E.level=(E.bass+E.mid+E.high)/3;
+    const flux=Math.max(0,bass-this.prevBass); this.prevBass=bass;
+    this.beat=Math.max(this.beat*0.92, Math.min(1,flux*4));
+  }
+};
+
+/* ================= LyricAgent ================= */
+const LyricAgent={
+  lines:[], idx:-1,
+  parse(text){
+    const out=[]; const re=/\[(\d+):(\d+(?:\.\d+)?)\]\s*(.*)/;
+    text.split('\n').forEach(ln=>{
+      const m=ln.match(re);
+      if(m) out.push({t:parseFloat(m[1])*60+parseFloat(m[2]), text:m[3].trim()});
+      else if(ln.trim()) out.push({t:-1, text:ln.trim()}); // untimed: distribute later
+    });
+    out.sort((a,b)=>a.t-b.t);
+    // distribute untimed lines evenly across the song
+    const timed=out.filter(l=>l.t>=0);
+    const untimed=out.filter(l=>l.t<0);
+    if(untimed.length){
+      const D=AudioAgent.dur||150;
+      untimed.forEach((l,i)=>{ l.t=D*(i+1)/(untimed.length+1); });
+      out.sort((a,b)=>a.t-b.t);
+    }
+    this.lines=out; this.idx=-1;
+  },
+  update(t){
+    let i=-1;
+    for(let k=0;k<this.lines.length;k++){ if(t>=this.lines[k].t-0.15) i=k; }
+    const cur=document.getElementById('lyrCur'), nxt=document.getElementById('lyrNxt');
+    if(i!==this.idx){
+      this.idx=i;
+      if(i>=0){
+        cur.textContent='♪ '+this.lines[i].text;
+        cur.style.opacity=1;
+        const n=this.lines[i+1];
+        if(n&&n.t-this.lines[i].t<14){ nxt.textContent=n.text; nxt.style.opacity=0.85; }
+        else nxt.style.opacity=0;
+      } else { cur.style.opacity=0; nxt.style.opacity=0; }
+    }
+    // fade the line out shortly before the next begins
+    if(i>=0&&this.lines[i+1]){
+      const gap=this.lines[i+1].t-t;
+      if(gap<1.2){ const o=Math.max(0,gap/1.2); cur.style.opacity=o; nxt.style.opacity=o*0.85; }
+    }
+  },
+  clear(){ this.lines=[]; this.idx=-1;
+    document.getElementById('lyrCur').style.opacity=0;
+    document.getElementById('lyrNxt').style.opacity=0; }
+};
+
+/* ================= PainterAgent helpers ================= */
+const PW=960, PH=540;
+let _s=1234567; function srnd(){ _s=(_s*16807)%2147483647; return (_s-1)/2147483646; }
+function mkc(w,h){ const c=document.createElement('canvas'); c.width=w; c.height=h; return c; }
+function dab(c,x,y,rx,ry,rot,col,a){
+  c.save(); c.translate(x,y); c.rotate(rot); c.globalAlpha=a==null?1:a;
+  c.fillStyle=col; c.beginPath(); c.ellipse(0,0,rx,ry,0,0,6.2832); c.fill(); c.restore();
+}
+function vgrad(c,x0,y0,x1,y1,stops){
+  const g=c.createLinearGradient(x0,y0,x1,y1);
+  stops.forEach(s=>g.addColorStop(s[0],s[1])); c.fillStyle=g; c.fillRect(0,0,PW,PH);
+}
+function stroke(c,x,y,len,ang,col,lw,a){
+  c.save(); c.globalAlpha=a==null?1:a; c.strokeStyle=col; c.lineWidth=lw; c.lineCap='round';
+  c.beginPath(); c.moveTo(x,y); c.lineTo(x+Math.cos(ang)*len,y+Math.sin(ang)*len); c.stroke(); c.restore();
+}
+/* the little traveler — a painted figure with a fluttering scarf */
+function traveler(c,x,y,s,t,walk,cloak){
+  const bob=walk?Math.sin(t*9)*s*0.05:0;
+  c.save(); c.translate(x,y+bob);
+  c.fillStyle=cloak||'#8a3030';
+  c.beginPath(); c.moveTo(0,-s*1.55);
+  c.quadraticCurveTo(s*0.75,-s*0.6,s*0.6,0); c.lineTo(-s*0.6,0);
+  c.quadraticCurveTo(-s*0.75,-s*0.6,0,-s*1.55); c.fill();
+  c.fillStyle='#e9c298'; c.beginPath(); c.arc(0,-s*1.78,s*0.22,0,6.2832); c.fill();
+  c.fillStyle='#5a3a22'; c.beginPath(); c.arc(0,-s*1.86,s*0.22,3.4,6.0); c.fill();
+  const fl=Math.sin(t*7)*s*0.22;
+  c.strokeStyle='#d8a850'; c.lineWidth=s*0.11; c.lineCap='round';
+  c.beginPath(); c.moveTo(0,-s*1.5);
+  c.quadraticCurveTo(-s*0.9,-s*1.35,-s*1.35,-s*1.05+fl); c.stroke();
+  if(walk){ const ph=Math.sin(t*9);
+    c.strokeStyle='#2e2118'; c.lineWidth=s*0.13;
+    c.beginPath(); c.moveTo(0,-s*0.55); c.lineTo(ph*s*0.38,-s*0.02); c.stroke();
+    c.beginPath(); c.moveTo(0,-s*0.55); c.lineTo(-ph*s*0.38,-s*0.02); c.stroke();
+  }
+  c.restore();
+}
+function birds(c,n,t,area,col){
+  c.strokeStyle=col||'#2a2a33'; c.lineWidth=2.4; c.lineCap='round';
+  for(let i=0;i<n;i++){
+    const x=((i*197+t*22)%(area[2]+120))-60, y=area[0]+((i*53)%area[1])+Math.sin(t*2+i)*8;
+    const w=7+Math.sin(t*9+i*2)*3;
+    c.beginPath(); c.moveTo(x-w,y); c.quadraticCurveTo(x-w*0.4,y-4,x,y);
+    c.quadraticCurveTo(x+w*0.4,y-4,x+w,y); c.stroke();
+  }
+}
+
+/* ================= SceneAgents ================= */
+const SceneAgents=[
+/* ---- I · First Light — dawn meadow ---- */
+{ id:'meadow', title:'I · First Light',
+  build(){
+    const bg=mkc(PW,PH), c=bg.getContext('2d'); _s=11;
+    vgrad(c,0,0,0,PH,[[0,'#2b3a5e'],[0.42,'#7a5a78'],[0.62,'#e8956b'],[0.75,'#f7c873'],[1,'#3f6b3a']]);
+    for(let i=0;i<700;i++) // sky dabs
+      dab(c,srnd()*PW,srnd()*PH*0.62,14+srnd()*26,6+srnd()*10,srnd()*0.6-0.3,
+        ['#e8956b','#f7c873','#c97a68','#8a6a80','#5a5a88'][i%5],0.16);
+    for(let i=0;i<260;i++){ // sun glow dabs
+      const a=srnd()*6.28, r=srnd()*130;
+      dab(c,PW*0.62+Math.cos(a)*r,PH*0.52+Math.sin(a)*r*0.7,10+srnd()*22,8+srnd()*14,a,'#ffdf9a',0.2);
+    }
+    for(let h=0;h<3;h++){ // rolling hills
+      const yb=PH*(0.66+h*0.1);
+      c.fillStyle=['#4a7a3f','#3a6334','#2c4f2a'][h];
+      c.beginPath(); c.moveTo(0,PH);
+      for(let x=0;x<=PW;x+=24) c.lineTo(x,yb+Math.sin(x*0.01+h*2)*22);
+      c.lineTo(PW,PH); c.fill();
+      for(let i=0;i<420;i++)
+        dab(c,srnd()*PW,yb+srnd()*PH*0.3-10,8+srnd()*16,4+srnd()*7,srnd()*0.8-0.4,
+          ['#5a8a45','#6a9a4f','#3f6b35','#7aaa55'][i%4],0.28);
+    }
+    for(let i=0;i<160;i++) // flowers
+      dab(c,srnd()*PW,PH*0.78+srnd()*PH*0.2,2.5,4,0,
+        ['#e86a8a','#f7e08a','#c96a9a','#f7f7f7'][i%4],0.85);
+    this.bg=bg;
+  },
+  draw(c,lt,t,E,beat){
+    const pan=Math.sin(lt*0.05)*30;
+    c.drawImage(this.bg,-pan-15,-8,PW+30,PH+16);
+    const sunY=PH*0.52-lt*2.2, pulse=1+beat*0.12;
+    const sg=c.createRadialGradient(PW*0.62,sunY,10,PW*0.62,sunY,150*pulse);
+    sg.addColorStop(0,'rgba(255,236,170,0.95)'); sg.addColorStop(1,'rgba(255,200,120,0)');
+    c.fillStyle=sg; c.beginPath(); c.arc(PW*0.62,sunY,150*pulse,0,6.2832); c.fill();
+    c.fillStyle='#fff3c8'; c.beginPath(); c.arc(PW*0.62,sunY,44*pulse,0,6.2832); c.fill();
+    const tx=PW*0.2+lt*16; // traveler walks across the meadow
+    traveler(c,tx,PH*0.86,46,t,true,'#8a3030');
+    c.fillStyle='rgba(40,30,20,0.25)';
+    c.beginPath(); c.ellipse(tx,PH*0.865,34,7,0,0,6.2832); c.fill();
+    birds(c,5,t,[40,120,PW],'#3a3340');
+    // drifting petal dabs
+    for(let i=0;i<26;i++){
+      const x=((i*173+t*30)%(PW+40))-20, y=PH*0.6+((i*97+t*12)%(PH*0.35))+Math.sin(t*3+i)*10;
+      dab(c,x,y,3,5,t+i,'#f7c8a0',0.7);
+    }
+  }
+},
+/* ---- II · City Rain ---- */
+{ id:'city', title:'II · City Rain',
+  build(){
+    const bg=mkc(PW,PH), c=bg.getContext('2d'); _s=22;
+    vgrad(c,0,0,0,PH,[[0,'#101623'],[0.6,'#232c40'],[0.8,'#3a3a48'],[1,'#1c1c22']]);
+    for(let i=0;i<500;i++)
+      dab(c,srnd()*PW,srnd()*PH*0.7,16+srnd()*30,8+srnd()*12,srnd()*0.5-0.25,
+        ['#2c3a55','#3a4a66','#232c40','#4a5a75'][i%4],0.2);
+    for(let b=0;b<9;b++){ // buildings
+      const bw=70+srnd()*90, bx=b*(PW/9)+srnd()*20, bh=PH*(0.3+srnd()*0.3), by=PH*0.72-bh;
+      c.fillStyle=['#1a2030','#222a3e','#161c2a'][b%3]; c.fillRect(bx,by,bw,bh);
+      for(let wy=by+14;wy<by+bh-10;wy+=26) for(let wx=bx+10;wx<bx+bw-10;wx+=24){
+        if(srnd()<0.42){ c.fillStyle=srnd()<0.7?'#e8b86a':'#9ad0e8'; c.globalAlpha=0.75; c.fillRect(wx,wy,12,16); c.globalAlpha=1; }
+      }
+      for(let i=0;i<40;i++) dab(c,bx+srnd()*bw,by+srnd()*bh,6+srnd()*10,4+srnd()*6,0,['#2a3450','#1e2638'][i%2],0.3);
+    }
+    c.fillStyle='#141419'; c.fillRect(0,PH*0.72,PW,PH*0.28); // wet street
+    for(let i=0;i<300;i++) // street dabs / reflections
+      dab(c,srnd()*PW,PH*0.74+srnd()*PH*0.24,10+srnd()*20,3+srnd()*5,0,
+        ['#e8b86a','#9ad0e8','#c97a5a','#5a6a8a'][i%4],0.22);
+    this.bg=bg;
+  },
+  draw(c,lt,t,E,beat){
+    c.drawImage(this.bg,0,0);
+    const rainN=220+Math.floor(E.level*260);
+    c.strokeStyle='rgba(170,200,230,0.4)'; c.lineWidth=1.6;
+    for(let i=0;i<rainN;i++){
+      const x=(i*89+t*60)%PW, y=(i*137+t*900)%PH;
+      c.beginPath(); c.moveTo(x,y); c.lineTo(x-4,y+16); c.stroke();
+    }
+    // street lamp glow, breathing with the beat
+    const lx=PW*0.78, ly=PH*0.52, lr=90*(1+beat*0.15);
+    const lg=c.createRadialGradient(lx,ly,5,lx,ly,lr);
+    lg.addColorStop(0,'rgba(255,205,120,0.85)'); lg.addColorStop(1,'rgba(255,180,90,0)');
+    c.fillStyle=lg; c.beginPath(); c.arc(lx,ly,lr,0,6.2832); c.fill();
+    c.fillStyle='#2a2a30'; c.fillRect(lx-4,ly,8,PH*0.72-ly);
+    // reflection shimmer
+    for(let i=0;i<40;i++){
+      const x=lx-70+((i*37+t*40)%140), y=PH*0.76+((i*53)%(PH*0.2));
+      dab(c,x,y,8+Math.sin(t*6+i)*3,2.5,0,'#ffcf7a',0.3);
+    }
+    // traveler with umbrella
+    const tx=PW*0.3+lt*10, ty=PH*0.9;
+    traveler(c,tx,ty,44,t,true,'#3a4a6a');
+    c.fillStyle='#a83a3a';
+    c.beginPath(); c.arc(tx,ty-88,52,3.1416,0); c.fill();
+    c.strokeStyle='#2a2a30'; c.lineWidth=4;
+    c.beginPath(); c.moveTo(tx,ty-88); c.lineTo(tx,ty-40); c.stroke();
+  }
+},
+/* ---- III · Open Water ---- */
+{ id:'sea', title:'III · Open Water',
+  build(){
+    const bg=mkc(PW,PH), c=bg.getContext('2d'); _s=33;
+    vgrad(c,0,0,0,PH,[[0,'#7ab0d8'],[0.45,'#b8d8e8'],[0.55,'#2a6a8a'],[1,'#0e3a55']]);
+    for(let i=0;i<600;i++)
+      dab(c,srnd()*PW,srnd()*PH*0.5,14+srnd()*26,7+srnd()*10,srnd()*0.6-0.3,
+        ['#a8d0e8','#c8e4f0','#88bcd8','#e8f4fa'][i%4],0.18);
+    for(let i=0;i<500;i++) // sea body dabs
+      dab(c,srnd()*PW,PH*0.55+srnd()*PH*0.45,16+srnd()*30,6+srnd()*9,srnd()*0.4-0.2,
+        ['#1e5a7a','#2a7a9a','#164a66','#3590b0'][i%4],0.25);
+    this.bg=bg;
+  },
+  draw(c,lt,t,E,beat){
+    c.drawImage(this.bg,0,0);
+    const wamp=6+E.bass*22; // waves breathe with the bass
+    for(let L=0;L<4;L++){ // painted wave layers
+      const yb=PH*(0.62+L*0.09);
+      c.strokeStyle=['rgba(220,240,250,0.5)','rgba(160,210,230,0.45)','rgba(120,190,215,0.4)','rgba(90,160,190,0.35)'][L];
+      c.lineWidth=10-L*1.6; c.lineCap='round';
+      for(let x=0;x<PW;x+=14){
+        const y=yb+Math.sin(x*0.02+t*(1.4+L*0.3)+L*2)*wamp;
+        if(x===0) c.beginPath(),c.moveTo(x,y); else c.lineTo(x,y);
+      }
+      c.stroke();
+    }
+    // sun glitter path
+    for(let i=0;i<60;i++){
+      const x=PW*0.5+(srnd()<0.5?-1:1)*((i*47)%180), y=PH*0.6+((i*89+t*30)%(PH*0.35));
+      dab(c,x,y,3+srnd()*6,1.6,0,'#ffeeb0',0.5);
+    }
+    // boat
+    const bx=PW*0.5+Math.sin(t*0.7)*40, by=PH*0.78+Math.sin(t*1.6)*wamp*0.5;
+    const tilt=Math.sin(t*1.6+1)*0.06;
+    c.save(); c.translate(bx,by); c.rotate(tilt);
+    c.fillStyle='#6a4526';
+    c.beginPath(); c.moveTo(-70,0); c.lineTo(70,0); c.lineTo(45,34); c.lineTo(-45,34); c.fill();
+    c.strokeStyle='#4a2f1a'; c.lineWidth=7;
+    c.beginPath(); c.moveTo(0,0); c.lineTo(0,-120); c.stroke();
+    c.fillStyle='#f2e4c8';
+    c.beginPath(); c.moveTo(0,-120); c.quadraticCurveTo(64,-70,0,-14); c.fill();
+    c.fillStyle='rgba(200,120,80,0.35)';
+    c.beginPath(); c.moveTo(0,-120); c.quadraticCurveTo(64,-70,0,-14);
+    c.lineTo(0,-120); c.fill();
+    traveler(c,0,-2,34,t,false,'#8a3030');
+    c.restore();
+    birds(c,4,t,[60,110,PW],'#2a3a44');
+  }
+},
+/* ---- IV · Night Flight ---- */
+{ id:'night', title:'IV · Night Flight',
+  build(){
+    const bg=mkc(PW,PH), c=bg.getContext('2d'); _s=44;
+    vgrad(c,0,0,0,PH,[[0,'#060818'],[0.55,'#101a38'],[0.8,'#1c2a4e'],[1,'#0a0e20']]);
+    for(let i=0;i<420;i++){ // stars
+      const x=srnd()*PW, y=srnd()*PH*0.7;
+      dab(c,x,y,1.5+srnd()*2.5,1.5+srnd()*2.5,0,'#ffffff',0.35+srnd()*0.6);
+    }
+    for(let i=0;i<200;i++) // nebula dabs
+      dab(c,srnd()*PW,srnd()*PH*0.6,20+srnd()*40,12+srnd()*20,srnd(),
+        ['#3a4a8a','#5a3a7a','#2a3a6a'][i%3],0.14);
+    // moon
+    const mg=c.createRadialGradient(PW*0.78,PH*0.22,10,PW*0.78,PH*0.22,120);
+    mg.addColorStop(0,'rgba(240,240,220,0.95)'); mg.addColorStop(0.35,'rgba(220,220,200,0.5)'); mg.addColorStop(1,'rgba(200,200,180,0)');
+    c.fillStyle=mg; c.beginPath(); c.arc(PW*0.78,PH*0.22,120,0,6.2832); c.fill();
+    c.fillStyle='#f0eee0'; c.beginPath(); c.arc(PW*0.78,PH*0.22,42,0,6.2832); c.fill();
+    for(let m=0;m<2;m++){ // mountain layers
+      const yb=PH*(0.78+m*0.1);
+      c.fillStyle=['#141c34','#0c1226'][m];
+      c.beginPath(); c.moveTo(0,PH);
+      for(let x=0;x<=PW;x+=30) c.lineTo(x,yb-Math.abs(Math.sin(x*0.008+m*3))*PH*0.22);
+      c.lineTo(PW,PH); c.fill();
+      for(let i=0;i<200;i++)
+        dab(c,srnd()*PW,yb-srnd()*PH*0.2,10+srnd()*18,6+srnd()*10,0,['#1c2644','#232e52'][i%2],0.3);
+    }
+    this.bg=bg;
+  },
+  draw(c,lt,t,E,beat){
+    const pan=Math.sin(lt*0.04)*24;
+    c.drawImage(this.bg,-pan-12,0,PW+24,PH);
+    // twinkling star overlay, driven by the high band
+    for(let i=0;i<70;i++){
+      const x=(i*173)%PW, y=(i*97)%(PH*0.6);
+      const tw=0.25+0.75*Math.abs(Math.sin(t*2.4+i*1.7))*(0.4+E.high*1.6);
+      dab(c,x,y,1.8,1.8,0,'#ffffff',Math.min(1,tw));
+    }
+    // drifting clouds
+    for(let i=0;i<5;i++){
+      const x=((i*260+t*(8+E.mid*22))%(PW+300))-150, y=PH*0.3+((i*89)%(PH*0.3));
+      for(let j=0;j<14;j++)
+        dab(c,x+j*22-140+Math.sin(j)*10,y+Math.sin(j*1.3)*12,26,14,j*0.4,'#2a3a5e',0.35);
+    }
+    // hot-air balloon
+    const bx=PW*0.5+Math.sin(t*0.5)*60, by=PH*0.42+Math.sin(t*0.9)*16;
+    c.save(); c.translate(bx,by); c.rotate(Math.sin(t*0.7)*0.05);
+    for(let sIdx=0;sIdx<9;sIdx++){ // striped envelope
+      c.fillStyle=['#c8553a','#e8956b','#f2d38a','#c8553a','#7a3a5a','#e8956b','#c8553a','#f2d38a','#a84a3a'][sIdx];
+      c.beginPath();
+      c.ellipse(0,-70,95,80,0,(sIdx/9)*6.2832,(sIdx+1)/9*6.2832);
+      c.lineTo(0,-70); c.fill();
+    }
+    c.strokeStyle='#4a2f1a'; c.lineWidth=5;
+    c.beginPath(); c.moveTo(-52,-6); c.lineTo(-30,52); c.moveTo(52,-6); c.lineTo(30,52); c.stroke();
+    c.fillStyle='#6a4526'; c.fillRect(-34,52,68,42);
+    traveler(c,0,52,30,t,false,'#8a3030');
+    c.restore();
+    // balloon glow pulses with the beat
+    const bg2=c.createRadialGradient(bx,by-70,10,bx,by-70,190);
+    bg2.addColorStop(0,'rgba(255,190,120,'+(0.10+beat*0.14)+')'); bg2.addColorStop(1,'rgba(255,180,110,0)');
+    c.fillStyle=bg2; c.beginPath(); c.arc(bx,by-70,190,0,6.2832); c.fill();
+  }
+},
+/* ---- V · Homecoming Sunrise ---- */
+{ id:'dawn', title:'V · Homecoming',
+  build(){
+    const bg=mkc(PW,PH), c=bg.getContext('2d'); _s=55;
+    vgrad(c,0,0,0,PH,[[0,'#3a4a7a'],[0.35,'#c97a6a'],[0.55,'#f7b86b'],[0.68,'#ffe29a'],[0.75,'#5a7a45'],[1,'#2c4f2a']]);
+    for(let i=0;i<700;i++)
+      dab(c,srnd()*PW,srnd()*PH*0.62,14+srnd()*26,7+srnd()*11,srnd()*0.6-0.3,
+        ['#f7b86b','#ffe29a','#e88a6a','#c97a8a','#8a7aaa'][i%5],0.18);
+    for(let i=0;i<500;i++) // meadow dabs
+      dab(c,srnd()*PW,PH*0.7+srnd()*PH*0.3,9+srnd()*18,5+srnd()*8,srnd()*0.8-0.4,
+        ['#5a8a45','#6a9a4f','#7aaa55','#4a7a3f'][i%4],0.3);
+    // cottage
+    const cx=PW*0.68, cy=PH*0.72;
+    c.fillStyle='#8a6a4a'; c.fillRect(cx-70,cy-60,140,90);
+    c.fillStyle='#5a3a2a';
+    c.beginPath(); c.moveTo(cx-86,cy-58); c.lineTo(cx,cy-120); c.lineTo(cx+86,cy-58); c.fill();
+    for(let i=0;i<40;i++) dab(c,cx-70+srnd()*140,cy-60+srnd()*90,8,6,0,['#9a7a55','#7a5a3a'][i%2],0.3);
+    c.fillStyle='#ffd97a'; c.fillRect(cx-46,cy-34,30,26); c.fillRect(cx+16,cy-34,30,26);
+    c.fillStyle='#4a2f1a'; c.fillRect(cx-13,cy-6,26,36);
+    // path
+    c.fillStyle='#b89a6a';
+    c.beginPath(); c.moveTo(PW*0.32,PH); c.quadraticCurveTo(PW*0.5,PH*0.86,cx,cy+30);
+    c.lineTo(cx+30,cy+30); c.quadraticCurveTo(PW*0.55,PH*0.88,PW*0.44,PH); c.fill();
+    this.bg=bg;
+  },
+  draw(c,lt,t,E,beat){
+    c.drawImage(this.bg,0,0);
+    const sunY=PH*0.55-lt*3.2, finale=clamp(lt/24,0,1);
+    const pulse=1+beat*0.1+E.level*0.25;
+    const sg=c.createRadialGradient(PW*0.5,sunY,20,PW*0.5,sunY,260*pulse);
+    sg.addColorStop(0,'rgba(255,240,190,0.95)'); sg.addColorStop(1,'rgba(255,200,130,0)');
+    c.fillStyle=sg; c.beginPath(); c.arc(PW*0.5,sunY,260*pulse,0,6.2832); c.fill();
+    c.fillStyle='#fff6d8'; c.beginPath(); c.arc(PW*0.5,sunY,60*pulse,0,6.2832); c.fill();
+    // cottage windows flicker warm
+    const fl=0.75+0.25*Math.sin(t*9)+beat*0.2;
+    c.fillStyle='rgba(255,217,122,'+Math.min(1,fl)+')';
+    c.fillRect(PW*0.68-46,PH*0.72-34,30,26); c.fillRect(PW*0.68+16,PH*0.72-34,30,26);
+    // traveler walks home along the path
+    const px=lerp(PW*0.3,PW*0.63,clamp(lt/20,0,1));
+    const py=PH*0.97-(PH*0.97-(PH*0.72+30))*clamp(lt/20,0,1)*0.9;
+    traveler(c,px,py,48,t,lt<20,'#8a3030');
+    // rising light rays in the finale
+    if(finale>0){
+      c.save(); c.globalAlpha=finale*0.5*(0.6+E.level);
+      c.translate(PW*0.5,sunY);
+      for(let i=0;i<9;i++){
+        c.rotate(6.2832/9);
+        const g2=c.createLinearGradient(0,0,0,-PH);
+        g2.addColorStop(0,'rgba(255,240,200,0.5)'); g2.addColorStop(1,'rgba(255,240,200,0)');
+        c.fillStyle=g2;
+        c.beginPath(); c.moveTo(0,0); c.lineTo(-24,-PH*0.7); c.lineTo(24,-PH*0.7); c.fill();
+      }
+      c.restore();
+    }
+    birds(c,6,t,[50,140,PW],'#4a3a3a');
+    for(let i=0;i<30;i++){ // golden petals rise
+      const x=(i*211)%PW, y=PH-((t*36+i*67)%(PH+40));
+      dab(c,x+Math.sin(t*2+i)*14,y,3,5,t+i,'#ffe29a',0.75);
+    }
+  }
+}
+];
+
+/* ================= PainterAgent — WebGL brush-stroke post ================= */
+const PainterAgent={
+  init(){
+    const cv=document.getElementById('gl');
+    const gl=cv.getContext('webgl',{antialias:false,alpha:false})||cv.getContext('experimental-webgl');
+    if(!gl){ showErr('WebGL is unavailable in this browser.<br>The painterly engine needs it.'); throw new Error('no webgl'); }
+    this.gl=gl;
+    const fit=()=>{ cv.width=Math.min(1920,innerWidth); cv.height=Math.min(1080,innerHeight);
+      gl.viewport(0,0,cv.width,cv.height); };
+    fit(); addEventListener('resize',fit);
+    const vs='attribute vec2 p;varying vec2 vUv;void main(){vUv=vec2(p.x*0.5+0.5,0.5-p.y*0.5);gl_Position=vec4(p,0.,1.);}';
+    const fs=[
+      'precision highp float;','varying vec2 vUv;',
+      'uniform sampler2D uTex;','uniform vec2 uRes;','uniform float uTime;','uniform float uFlow;','uniform float uBeat;',
+      'float luma(vec3 c){return dot(c,vec3(0.299,0.587,0.114));}',
+      'void main(){',
+      ' vec2 px=1.0/uRes; vec2 uv=vUv;',
+      ' float lC=luma(texture2D(uTex,uv).rgb);',
+      ' float lx1=luma(texture2D(uTex,uv+vec2(px.x,0.)).rgb);',
+      ' float lx0=luma(texture2D(uTex,uv-vec2(px.x,0.)).rgb);',
+      ' float ly1=luma(texture2D(uTex,uv+vec2(0.,px.y)).rgb);',
+      ' float ly0=luma(texture2D(uTex,uv-vec2(0.,px.y)).rgb);',
+      ' vec2 grad=vec2(lx1-lx0,ly1-ly0);',
+      ' vec2 dir=normalize(vec2(-grad.y,grad.x)+vec2(1e-5));',
+      ' float g=length(grad);',
+      ' float smear=mix(2.0,8.0,uFlow)*(0.35+0.65*smoothstep(0.0,0.4,g));',
+      ' vec3 acc=vec3(0.); float wsum=0.;',
+      ' for(int i=-6;i<=6;i++){',
+      '  float fi=float(i);',
+      '  vec2 off=dir*fi*px*smear*0.55;',
+      '  off+=vec2(-dir.y,dir.x)*sin(fi*1.7+uTime*0.7)*px*1.6;',
+      '  float w=exp(-fi*fi/16.0);',
+      '  acc+=texture2D(uTex,uv+off).rgb*w; wsum+=w;',
+      ' }',
+      ' vec3 col=acc/wsum;',
+      ' col=mix(col,floor(col*7.0+0.5)/7.0,0.45);',           // soft paint banding
+      ' vec2 cuv=vUv*uRes/3.0;',                                // canvas weave
+      ' col*=1.0+sin(cuv.x*3.1415)*sin(cuv.y*3.1415)*0.045;',
+      ' float gr=fract(sin(dot(vUv*uRes+uTime*61.0,vec2(12.9898,78.233)))*43758.5453);',
+      ' col+=(gr-0.5)*0.05*(1.0+uBeat*0.9);',                   // pigment grain breathes on beats
+      ' float d=distance(vUv,vec2(0.5));',
+      ' col*=1.0-d*d*0.5;',
+      ' gl_FragColor=vec4(col,1.0);',
+      '}'].join('\n');
+    function sh(type,src){ const s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
+      if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
+    const pr=gl.createProgram();
+    gl.attachShader(pr,sh(gl.VERTEX_SHADER,vs)); gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,fs));
+    gl.linkProgram(pr);
+    if(!gl.getProgramParameter(pr,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr));
+    gl.useProgram(pr);
+    const buf=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+    const loc=gl.getAttribLocation(pr,'p');
+    gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+    this.uRes=gl.getUniformLocation(pr,'uRes'); this.uTime=gl.getUniformLocation(pr,'uTime');
+    this.uFlow=gl.getUniformLocation(pr,'uFlow'); this.uBeat=gl.getUniformLocation(pr,'uBeat');
+    const tx=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,tx);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+    gl.uniform2f(this.uRes,PW,PH);
+    this.comp=mkc(PW,PH); this.ctx=this.comp.getContext('2d');
+  },
+  render(t,flow,beat){
+    const gl=this.gl;
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,this.comp);
+    gl.uniform1f(this.uTime,t); gl.uniform1f(this.uFlow,flow); gl.uniform1f(this.uBeat,beat);
+    gl.drawArrays(gl.TRIANGLES,0,3);
+  }
+};
+
+/* ================= Conductor ================= */
+const Conductor={
+  cardIdx:-1, ended:false,
+  windows(){
+    const n=SceneAgents.length, D=AudioAgent.dur||150, out=[];
+    for(let i=0;i<n;i++) out.push([D*i/n, D*(i+1)/n]);
+    return out;
+  },
+  sceneAt(t){
+    const w=this.windows();
+    for(let i=0;i<w.length;i++) if(t<w[i][1]||i===w.length-1) return {sc:SceneAgents[i],i,w0:w[i][0],w1:w[i][1]};
+  },
+  frame(){
+    requestAnimationFrame(()=>this.frame());
+    const wallT=performance.now()/1000;
+    let t=AudioAgent.time();
+    const D=AudioAgent.dur||150;
+    if(t>D) t=D;
+    AudioAgent.update();
+    LyricAgent.update(t);
+    // --- paint scene(s) to the composite canvas
+    const c=PainterAgent.ctx, XF=1.8;
+    c.fillStyle='#000'; c.fillRect(0,0,PW,PH);
+    const cur=this.sceneAt(t), lt=t-cur.w0;
+    if(cur.i>0&&lt<XF){
+      const prev=SceneAgents[cur.i-1], wPrev=this.windows()[cur.i-1];
+      prev.draw(c,t-wPrev[0],wallT,AudioAgent.energy,AudioAgent.beat);
+      c.save(); c.globalAlpha=Math.min(1,lt/XF);
+      cur.sc.draw(c,lt,wallT,AudioAgent.energy,AudioAgent.beat);
+      c.restore();
+    } else cur.sc.draw(c,lt,wallT,AudioAgent.energy,AudioAgent.beat);
+    // --- painterly post: stroke flow follows audio energy, grain pulses on beats
+    PainterAgent.render(wallT,clamp(AudioAgent.energy.level*2.4,0,1),AudioAgent.beat);
+    // --- overlays
+    if(cur.i!==this.cardIdx){
+      this.cardIdx=cur.i;
+      const el=document.getElementById('sceneCard');
+      el.textContent=cur.sc.title; el.style.opacity=1;
+      document.getElementById('agentTag').textContent=
+        'AGENTS · CONDUCTOR + AUDIO + LYRIC + SCENE:'+cur.sc.id.toUpperCase()+' + PAINTER';
+      setTimeout(()=>{ el.style.opacity=0; },4200);
+    }
+    drawSpec();
+    // --- transport UI
+    if(!this.ended){
+      document.getElementById('seek').value=Math.round(t/D*1000);
+      document.getElementById('time').textContent=fmt(t)+' / '+fmt(D);
+      document.getElementById('playBtn').textContent=AudioAgent.playing()?'⏸ Pause':'▶ Play';
+      if(t>=D-0.3) this.onEnded();
+    }
+  },
+  onEnded(){
+    this.ended=true;
+    document.getElementById('playBtn').textContent='↻ Replay';
+  }
+};
+function fmt(s){ s=Math.max(0,Math.floor(s)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+let specCtx=null;
+function drawSpec(){
+  if(!specCtx) specCtx=document.getElementById('spec').getContext('2d');
+  const c=specCtx, F=AudioAgent.freq; if(!F) return;
+  c.clearRect(0,0,150,34);
+  for(let i=0;i<48;i++){
+    const v=(F[2+i*2]||0)/255, h=Math.max(1,v*30);
+    c.fillStyle='hsl('+(28+v*150)+',72%,'+(26+v*32)+'%)';
+    c.fillRect(i*3.12,34-h,2.4,h);
+  }
+}
+
+/* ================= boot & controls ================= */
+let booted=false;
+function boot(){
+  if(booted) return; booted=true;
+  AudioAgent.init();
+  PainterAgent.init();
+  SceneAgents.forEach(s=>s.build());
+  document.getElementById('start').style.display='none';
+  document.getElementById('lyrText').value=DEMO_LRC;
+  Conductor.frame();
+}
+document.getElementById('demoBtn').addEventListener('click',()=>{
+  try{ boot(); LyricAgent.parse(DEMO_LRC); AudioAgent.playDemo(); Conductor.ended=false; }
+  catch(e){ showErr('The engine could not start.<br><br><span style="font-size:13px;color:#9d9176;">'+String(e&&e.message||e).replace(/</g,'&lt;')+'</span>'); }
+});
+function handleFile(file){
+  if(!file) return;
+  try{ boot(); LyricAgent.parse(document.getElementById('lyrText').value||''); AudioAgent.playFile(file); Conductor.ended=false; }
+  catch(e){ showErr('The engine could not start.<br><br><span style="font-size:13px;color:#9d9176;">'+String(e&&e.message||e).replace(/</g,'&lt;')+'</span>'); }
+}
+document.getElementById('trackFile').addEventListener('change',e=>handleFile(e.target.files[0]));
+document.getElementById('trackFile2').addEventListener('change',e=>handleFile(e.target.files[0]));
+document.getElementById('playBtn').addEventListener('click',()=>{
+  if(Conductor.ended&&AudioAgent.mode==='demo'){ AudioAgent.playDemo(); Conductor.ended=false; return; }
+  if(Conductor.ended&&AudioAgent.mode==='file'){ AudioAgent.audioEl.currentTime=0; AudioAgent.audioEl.play(); Conductor.ended=false; return; }
+  AudioAgent.toggle();
+});
+document.getElementById('seek').addEventListener('change',e=>{ AudioAgent.seek(e.target.value/1000); });
+document.getElementById('lyrBtn').addEventListener('click',()=>{
+  const el=document.getElementById('lyrEdit');
+  el.style.display=el.style.display==='block'?'none':'block';
+});
+document.getElementById('lyrClose').addEventListener('click',()=>{ document.getElementById('lyrEdit').style.display='none'; });
+document.getElementById('lyrApply').addEventListener('click',()=>{
+  LyricAgent.parse(document.getElementById('lyrText').value);
+  document.getElementById('lyrEdit').style.display='none';
+});
+</script>
+</body>
+</html>

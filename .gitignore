@@ -1,0 +1,4 @@
+.agents/
+.tasks/
+.completed_tasks/
+.DS_Store
