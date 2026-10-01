@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>土星环自行车大赛 · Saturn's Rings Bird Bicycle Race</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#05060f;font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,-apple-system,sans-serif;color:#eef;user-select:none}
+  #scene{position:fixed;inset:0;width:100%;height:100%;display:block}
+  .tw{animation:tw 3.2s ease-in-out infinite alternate}
+  @keyframes tw{from{opacity:.25}to{opacity:1}}
+  .sunPulse{animation:sp 5s ease-in-out infinite alternate;transform-origin:150px 150px}
+  @keyframes sp{from{transform:scale(1)}to{transform:scale(1.07)}}
+  .jDrift{animation:jd 60s linear infinite}
+  @keyframes jd{from{transform:translateX(0)}to{transform:translateX(-420px)}}
+  .eDrift{animation:ed 30s linear infinite}
+  @keyframes ed{from{transform:translateX(0)}to{transform:translateX(-120px)}}
+  .mDrift{animation:ed2 45s linear infinite}
+  @keyframes ed2{from{transform:translateX(0)}to{transform:translateX(-72px)}}
+  .shoot{animation:shoot 9s linear infinite;opacity:0}
+  @keyframes shoot{0%{transform:translate(0,0);opacity:0}2%{opacity:1}9%{transform:translate(-520px,260px);opacity:0}100%{opacity:0;transform:translate(-520px,260px)}}
+  .rider{cursor:pointer}
+  .rider:hover .tag rect{stroke:#fff;stroke-width:2}
+
+  .panel{position:fixed;background:rgba(10,12,30,.72);border:1px solid rgba(160,170,255,.25);border-radius:14px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-shadow:0 8px 30px rgba(0,0,0,.4)}
+  #hudTitle{left:16px;bottom:16px;padding:10px 16px}
+  #hudTitle h1{margin:0;font-size:18px;letter-spacing:2px;background:linear-gradient(90deg,#ffd27a,#ffb36b,#f4e3b8);-webkit-background-clip:text;background-clip:text;color:transparent}
+  #hudTitle .sub{font-size:11px;opacity:.7;letter-spacing:1px}
+  #hudTitle .timer{font-variant-numeric:tabular-nums;font-size:22px;font-weight:700;margin-top:4px;color:#fff}
+  #board{right:16px;bottom:16px;padding:10px 12px;min-width:250px}
+  #board .hd{font-size:11px;opacity:.65;letter-spacing:1px;margin-bottom:6px;display:flex;justify-content:space-between}
+  .row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:8px;font-size:13px;transition:background .3s}
+  .row .pos{width:18px;font-weight:800;text-align:center}
+  .row .dot{width:10px;height:10px;border-radius:50%}
+  .row .nm{flex:1;white-space:nowrap}
+  .row .lap{font-variant-numeric:tabular-nums;opacity:.85;font-size:12px}
+  .row .st{width:46px;height:5px;background:rgba(255,255,255,.12);border-radius:3px;overflow:hidden}
+  .row .st i{display:block;height:100%;background:linear-gradient(90deg,#6cf,#9f9);width:100%}
+  .row.lead{background:rgba(255,210,120,.13)}
+  #ticker{left:50%;transform:translateX(-50%);bottom:16px;padding:8px 18px;font-size:13px;max-width:min(560px,calc(100vw - 600px));text-align:center;min-height:18px}
+  #ticker b{color:#ffd27a}
+  #hint{position:fixed;top:12px;left:50%;transform:translateX(-50%);font-size:12px;opacity:.75;background:rgba(10,12,30,.55);padding:6px 14px;border-radius:20px;border:1px solid rgba(160,170,255,.2);white-space:nowrap}
+  #hint kbd{background:rgba(255,255,255,.14);border-radius:4px;padding:0 5px;font-family:inherit}
+
+  .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+  .overlay .card{pointer-events:auto;text-align:center;padding:26px 34px;max-width:min(680px,92vw)}
+  #menu h2{margin:0 0 4px;font-size:40px;letter-spacing:6px;background:linear-gradient(90deg,#ffe3a3,#ffb36b,#f7d794);-webkit-background-clip:text;background-clip:text;color:transparent}
+  #menu .en{font-size:13px;letter-spacing:4px;opacity:.75;margin-bottom:18px}
+  .cast{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:18px}
+  .cast div{flex:1;min-width:150px;background:rgba(255,255,255,.05);border-radius:10px;padding:10px;font-size:12px;line-height:1.5;border-top:3px solid var(--c)}
+  .cast b{font-size:15px;color:var(--c)}
+  button.go{pointer-events:auto;font:inherit;font-size:17px;font-weight:700;letter-spacing:3px;padding:11px 34px;border-radius:30px;border:none;cursor:pointer;color:#1b1030;background:linear-gradient(90deg,#ffd27a,#ff9f6b);box-shadow:0 4px 20px rgba(255,170,90,.45);transition:transform .15s}
+  button.go:hover{transform:scale(1.06)}
+  .small{font-size:11px;opacity:.6;margin-top:12px}
+  #banner{display:none}
+  #banner.show{display:flex}
+  #banner .card{animation:pop .6s cubic-bezier(.2,1.6,.4,1)}
+  @keyframes pop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
+  #banner h2{margin:6px 0 2px;font-size:34px;letter-spacing:3px}
+  #banner .res{margin:12px auto 16px;font-size:14px;line-height:1.9;text-align:left;display:inline-block;font-variant-numeric:tabular-nums}
+  #menu.hide{display:none}
+  @media (max-width:900px){#ticker{display:none}#hint{font-size:10px}#menu h2{font-size:28px}}
+</style>
+</head>
+<body>
+<svg id="scene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bgGrad" cx="30%" cy="20%" r="95%">
+      <stop offset="0" stop-color="#1a1740"/><stop offset=".45" stop-color="#0b0c24"/><stop offset="1" stop-color="#04050d"/>
+    </radialGradient>
+    <radialGradient id="neb1"><stop offset="0" stop-color="#7a3fbf" stop-opacity=".35"/><stop offset="1" stop-color="#7a3fbf" stop-opacity="0"/></radialGradient>
+    <radialGradient id="neb2"><stop offset="0" stop-color="#2f7fbf" stop-opacity=".28"/><stop offset="1" stop-color="#2f7fbf" stop-opacity="0"/></radialGradient>
+    <radialGradient id="sunGlow"><stop offset="0" stop-color="#fff2c0" stop-opacity=".9"/><stop offset=".18" stop-color="#ffc861" stop-opacity=".5"/><stop offset=".45" stop-color="#ff8a3d" stop-opacity=".14"/><stop offset="1" stop-color="#ff6a2d" stop-opacity="0"/></radialGradient>
+    <radialGradient id="sunCore" cx="45%" cy="45%"><stop offset="0" stop-color="#fffef0"/><stop offset=".55" stop-color="#ffe98a"/><stop offset=".85" stop-color="#ffb640"/><stop offset="1" stop-color="#ff8f2a"/></radialGradient>
+    <!-- light from upper-left (the Sun) -->
+    <radialGradient id="shade" cx="32%" cy="30%" r="80%">
+      <stop offset="0" stop-color="#fff" stop-opacity=".18"/><stop offset=".38" stop-color="#000" stop-opacity="0"/><stop offset=".75" stop-color="#000" stop-opacity=".55"/><stop offset="1" stop-color="#000" stop-opacity=".88"/>
+    </radialGradient>
+    <radialGradient id="shadeSat" cx="30%" cy="22%" r="85%">
+      <stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset=".4" stop-color="#000" stop-opacity="0"/><stop offset=".7" stop-color="#000" stop-opacity=".45"/><stop offset="1" stop-color="#000" stop-opacity=".9"/>
+    </radialGradient>
+    <linearGradient id="satBands" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d9c59a"/><stop offset=".12" stop-color="#e9d6a6"/><stop offset=".2" stop-color="#c9a871"/>
+      <stop offset=".3" stop-color="#e8d2a0"/><stop offset=".4" stop-color="#d6b47a"/><stop offset=".47" stop-color="#f0dfb2"/>
+      <stop offset=".55" stop-color="#cfa76b"/><stop offset=".62" stop-color="#e5c992"/><stop offset=".72" stop-color="#bf955e"/>
+      <stop offset=".82" stop-color="#dcc08a"/><stop offset="1" stop-color="#b58b58"/>
+    </linearGradient>
+    <linearGradient id="jupBase" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b9a48a"/><stop offset=".1" stop-color="#e6d7bd"/><stop offset=".18" stop-color="#b98a62"/>
+      <stop offset=".26" stop-color="#efe3cc"/><stop offset=".34" stop-color="#c79468"/><stop offset=".42" stop-color="#a8704c"/>
+      <stop offset=".5" stop-color="#f3e7d2"/><stop offset=".6" stop-color="#d7b48e"/><stop offset=".68" stop-color="#9c6b4a"/>
+      <stop offset=".76" stop-color="#ead9bf"/><stop offset=".86" stop-color="#bf9c7c"/><stop offset="1" stop-color="#8f7a66"/>
+    </linearGradient>
+    <radialGradient id="atmoE"><stop offset=".82" stop-color="#6cc6ff" stop-opacity="0"/><stop offset=".9" stop-color="#6cc6ff" stop-opacity=".55"/><stop offset="1" stop-color="#6cc6ff" stop-opacity="0"/></radialGradient>
+    <radialGradient id="atmoM"><stop offset=".84" stop-color="#ffb08a" stop-opacity="0"/><stop offset=".92" stop-color="#ffb08a" stop-opacity=".4"/><stop offset="1" stop-color="#ffb08a" stop-opacity="0"/></radialGradient>
+    <linearGradient id="ravenSheen" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2a2d4d"/><stop offset=".35" stop-color="#15151f"/><stop offset=".7" stop-color="#1d1a2e"/><stop offset="1" stop-color="#0d0d14"/>
+    </linearGradient>
+    <radialGradient id="pelBody" cx="35%" cy="30%"><stop offset="0" stop-color="#ffffff"/><stop offset=".7" stop-color="#eeeae2"/><stop offset="1" stop-color="#cfc8bb"/></radialGradient>
+    <radialGradient id="kiwiBody" cx="38%" cy="30%"><stop offset="0" stop-color="#a07650"/><stop offset=".7" stop-color="#7a5433"/><stop offset="1" stop-color="#5a3c22"/></radialGradient>
+    <clipPath id="jClip"><circle cx="1400" cy="190" r="105"/></clipPath>
+    <clipPath id="eClip"><circle cx="470" cy="118" r="30"/></clipPath>
+    <clipPath id="mClip"><circle cx="1090" cy="100" r="18"/></clipPath>
+    <clipPath id="satClip"><circle cx="0" cy="0" r="190"/></clipPath>
+    <clipPath id="backClip" clipPathUnits="userSpaceOnUse"><rect x="-900" y="-400" width="1800" height="400"/></clipPath>
+    <clipPath id="frontClip" clipPathUnits="userSpaceOnUse"><rect x="-900" y="0" width="1800" height="400"/></clipPath>
+    <pattern id="checker" width="8" height="8" patternUnits="userSpaceOnUse">
+      <rect width="8" height="8" fill="#fff"/><rect width="4" height="4" fill="#111"/><rect x="4" y="4" width="4" height="4" fill="#111"/>
+    </pattern>
+    <g id="ringBands"></g>
+  </defs>
+
+  <rect x="-400" y="-300" width="2400" height="1500" fill="url(#bgGrad)"/>
+  <ellipse cx="1150" cy="620" rx="520" ry="260" fill="url(#neb1)"/>
+  <ellipse cx="330" cy="700" rx="460" ry="240" fill="url(#neb2)"/>
+  <ellipse cx="900" cy="140" rx="380" ry="120" fill="url(#neb2)" opacity=".6"/>
+  <!-- milky way streak -->
+  <g opacity=".35"><ellipse cx="820" cy="420" rx="1100" ry="60" transform="rotate(-24 820 420)" fill="#9fa8ff" opacity=".08"/><ellipse cx="820" cy="420" rx="900" ry="26" transform="rotate(-24 820 420)" fill="#c9ceff" opacity=".08"/></g>
+  <g id="stars"></g>
+  <g class="shoot"><line x1="1500" y1="40" x2="1580" y2="0" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".9"/><line x1="1500" y1="40" x2="1620" y2="-20" stroke="#bcd" stroke-width="1" opacity=".4"/></g>
+
+  <!-- SUN -->
+  <circle cx="150" cy="150" r="440" fill="url(#sunGlow)"/>
+  <g class="sunPulse">
+    <circle cx="150" cy="150" r="96" fill="#ffcf66" opacity=".22"/>
+    <circle cx="150" cy="150" r="78" fill="url(#sunCore)"/>
+  </g>
+  <g opacity=".22" stroke="#ffe6a8" stroke-width="2">
+    <circle cx="560" cy="368" r="14" fill="#ffd27a" stroke="none" opacity=".5"/><circle cx="700" cy="442" r="6" fill="#9fdcff" stroke="none"/>
+  </g>
+
+  <!-- EARTH + MOON -->
+  <circle cx="470" cy="118" r="38" fill="url(#atmoE)"/>
+  <g clip-path="url(#eClip)">
+    <circle cx="470" cy="118" r="30" fill="#2466c9"/>
+    <g class="eDrift">
+      <g id="earthLand" fill="#3f9b4f"></g>
+    </g>
+    <g class="eDrift" style="animation-duration:22s" fill="#fff" opacity=".75" id="earthClouds"></g>
+    <circle cx="470" cy="118" r="30" fill="url(#shade)"/>
+  </g>
+  <circle cx="518" cy="96" r="7" fill="#c9c6c0"/><circle cx="518" cy="96" r="7" fill="url(#shade)"/>
+
+  <!-- MARS -->
+  <circle cx="1090" cy="100" r="23" fill="url(#atmoM)"/>
+  <g clip-path="url(#mClip)">
+    <circle cx="1090" cy="100" r="18" fill="#c8552f"/>
+    <g class="mDrift" id="marsSpots" fill="#8f3a22" opacity=".65"></g>
+    <ellipse cx="1090" cy="83" rx="8" ry="3" fill="#fff" opacity=".85"/>
+    <circle cx="1090" cy="100" r="18" fill="url(#shade)"/>
+  </g>
+
+  <!-- JUPITER -->
+  <g clip-path="url(#jClip)">
+    <circle cx="1400" cy="190" r="105" fill="url(#jupBase)"/>
+    <g class="jDrift" id="jupSwirl" fill="none" stroke-linecap="round"></g>
+    <circle cx="1400" cy="190" r="105" fill="url(#shade)"/>
+  </g>
+  <circle cx="1400" cy="190" r="106" fill="none" stroke="#ffe7c4" stroke-opacity=".18" stroke-width="2"/>
+
+  <!-- SATURN SYSTEM -->
+  <g id="satBack" transform="translate(800,500) rotate(-7)">
+    <use href="#ringBands" clip-path="url(#backClip)"/>
+    <g id="partBack" clip-path="url(#backClip)"></g>
+  </g>
+  <g id="backRiders"></g>
+  <g transform="translate(800,500) rotate(-7)">
+    <g clip-path="url(#satClip)">
+      <circle r="190" fill="url(#satBands)"/>
+      <g opacity=".25" fill="none" stroke="#8a6a44" stroke-width="2">
+        <path d="M-200,-60 Q0,-50 200,-66"/><path d="M-200,40 Q0,52 200,36"/><path d="M-200,100 Q0,108 200,96"/>
+      </g>
+      <ellipse cx="-30" cy="-120" rx="26" ry="8" fill="#f4e7c3" opacity=".35"/>
+      <!-- ring shadow cast on the globe -->
+      <path d="M-200,72 Q0,150 200,72" fill="none" stroke="#2a1d10" stroke-opacity=".4" stroke-width="12"/>
+      <circle r="190" fill="url(#shadeSat)"/>
+    </g>
+    <circle r="190.5" fill="none" stroke="#ffeec8" stroke-opacity=".25" stroke-width="1.5"/>
+  </g>
+  <g id="satFront" transform="translate(800,500) rotate(-7)">
+    <use href="#ringBands" clip-path="url(#frontClip)"/>
+    <g id="partFront" clip-path="url(#frontClip)"></g>
+    <g id="finishLine"></g>
+  </g>
+  <g id="frontRiders"></g>
+  <g id="fx"></g>
+  <g id="bigText" pointer-events="none"></g>
+</svg>
+
+<div id="hint">点击小鸟加油冲刺 Click a bird to cheer &amp; boost · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 加油 · <kbd>R</kbd> 重新开始</div>
+<div class="panel" id="hudTitle"><h1>土星环自行车大赛</h1><div class="sub">SATURN'S RINGS GRAND PRIX · 3 LAPS</div><div class="timer" id="timer">00:00.0</div></div>
+<div class="panel" id="ticker">欢迎来到土星环！Welcome to the rings of Saturn!</div>
+<div class="panel" id="board"><div class="hd"><span>排名 STANDINGS</span><span>圈 LAP · 体力</span></div><div id="rows"></div></div>
+
+<div class="overlay" id="menu"><div class="card panel" style="position:relative">
+  <h2>土星环自行车大赛</h2>
+  <div class="en">SATURN'S RINGS BIRD BICYCLE RACE</div>
+  <div class="cast">
+    <div style="--c:#a4d65e"><b>1 · 几维鸟 Kiwi</b><br>BMX 小轮车 · 踩踏频率极高<br>没有翅膀，用长喙掌舵</div>
+    <div style="--c:#ff5d6c"><b>2 · 渡鸦 Raven</b><br>碳纤维公路车 · 稳如老狗<br>擅长跟车破风 drafting</div>
+    <div style="--c:#ffb347"><b>3 · 鹈鹕 Pelican</b><br>维多利亚高轮车 · 大器晚成<br>喉囊里藏了一条鱼</div>
+  </div>
+  <button class="go" id="startBtn">开始比赛 START</button>
+  <div class="small">比赛中点击任意小鸟为它加油，获得短暂冲刺（消耗体力）· Space / Enter 开始</div>
+</div></div>
+
+<div class="overlay" id="banner"><div class="card panel" style="position:relative">
+  <svg width="90" height="90" viewBox="0 0 90 90"><defs><linearGradient id="gold" x1="0" x2="1"><stop offset="0" stop-color="#ffe38a"/><stop offset=".5" stop-color="#ffc233"/><stop offset="1" stop-color="#d9901a"/></linearGradient></defs>
+    <path d="M22,12 H68 V30 Q68,56 45,60 Q22,56 22,30Z" fill="url(#gold)"/><path d="M22,18 Q6,18 8,32 Q10,44 24,44" fill="none" stroke="#e8a82a" stroke-width="5"/><path d="M68,18 Q84,18 82,32 Q80,44 66,44" fill="none" stroke="#e8a82a" stroke-width="5"/>
+    <rect x="40" y="58" width="10" height="12" fill="#d9901a"/><rect x="28" y="70" width="34" height="9" rx="2" fill="#8a5a1a"/><path d="M45,22 l3.5,7 7.5,1 -5.5,5 1.5,7.5 -7,-3.7 -7,3.7 1.5,-7.5 -5.5,-5 7.5,-1Z" fill="#fff6c9"/></svg>
+  <div style="font-size:12px;letter-spacing:4px;opacity:.7">冠军 WINNER</div>
+  <h2 id="winName">—</h2>
+  <div id="winQuip" style="font-size:13px;opacity:.85"></div>
+  <div class="res" id="results"></div><br>
+  <button class="go" id="againBtn">再来一局 RESTART</button>
+</div></div>
+
+<script>
+window.addEventListener('error',e=>{document.title='ERROR: '+e.message+' @'+e.lineno});
+(()=>{
+'use strict';
+const NS='http://www.w3.org/2000/svg';
+const Q=new URLSearchParams(location.search);
+const AUTOTEST=Q.has('autotest');
+const TIME_SCALE=Math.max(0.1,Math.min(20,parseFloat(Q.get('speed')||'1')||1));
+const $=id=>document.getElementById(id);
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const f1=v=>v.toFixed(1);
+
+/* ---------------- geometry of the ring track ---------------- */
+const CX=800,CY=500,TILT=-7*Math.PI/180,K=0.26;
+const cT=Math.cos(TILT),sT=Math.sin(TILT);
+function ringLocal(rx,a){return [rx*Math.cos(a),rx*K*Math.sin(a)];}
+function toScreen(x,y){return [CX+x*cT-y*sT,CY+x*sT+y*cT];}
+
+/* ---------------- background: stars, planets ---------------- */
+(function buildSky(){
+  let s='';
+  for(let i=0;i<260;i++){
+    const x=rnd(-200,1800),y=rnd(-100,1000),r=Math.random()<.9?rnd(.4,1.3):rnd(1.4,2.2);
+    const col=['#fff','#dfe6ff','#ffe9d0','#cfe0ff'][i%4];
+    const tw=Math.random()<.45;
+    s+=`<circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(r)}" fill="${col}" ${tw?`class="tw" style="animation-delay:${f1(-rnd(0,6))}s;animation-duration:${f1(rnd(1.8,4.5))}s"`:`opacity="${f1(rnd(.35,.9))}"`}/>`;
+    if(r>1.9) s+=`<path d="M${f1(x-5)},${f1(y)}H${f1(x+5)}M${f1(x)},${f1(y-5)}V${f1(y+5)}" stroke="${col}" stroke-width=".5" opacity=".6"/>`;
+  }
+  $('stars').innerHTML=s;
+  // earth continents (two copies for seamless drift of 120px)
+  const blobs=[[440,105,14,9],[455,128,9,12],[486,110,11,7],[498,132,7,6],[470,92,8,4]];
+  let e='';for(const k of [0,120])for(const [x,y,rx,ry] of blobs)e+=`<ellipse cx="${x+k}" cy="${y}" rx="${rx}" ry="${ry}" transform="rotate(-20 ${x+k} ${y})"/>`;
+  $('earthLand').innerHTML=e;
+  let c='';for(const k of [0,120])c+=`<path d="M${440+k},100 q14,-4 26,1 q-12,3 -26,-1Z M${468+k},138 q18,-3 30,1 q-14,4 -30,-1Z M${490+k},96 q9,-3 18,0 q-9,3 -18,0Z"/>`;
+  $('earthClouds').innerHTML=c;
+  let m='';for(const k of [0,72])m+=`<ellipse cx="${1082+k}" cy="102" rx="9" ry="4"/><ellipse cx="${1100+k}" cy="110" rx="6" ry="3"/><ellipse cx="${1072+k}" cy="94" rx="4" ry="2"/>`;
+  $('marsSpots').innerHTML=m;
+  // jupiter swirls + great red spot (two copies, 420 apart)
+  let j='';
+  for(const k of [0,420]){
+    for(let i=0;i<9;i++){
+      const y=105+i*21+rnd(-4,4),x0=1280+k;
+      let d=`M${x0},${f1(y)}`;for(let x=0;x<420;x+=35)d+=` q17,${f1(rnd(-5,5))} 35,0`;
+      j+=`<path d="${d}" stroke="${i%2?'#8b5a3c':'#fff4e0'}" stroke-width="${f1(rnd(1.2,3))}" opacity=".35"/>`;
+    }
+    j+=`<g transform="translate(${1440+k},232)"><ellipse rx="24" ry="13" fill="#c0573a"/><ellipse rx="16" ry="8" fill="#d8744f"/><ellipse rx="30" ry="17" fill="none" stroke="#f1dcc0" stroke-width="2" opacity=".6"/></g>`;
+    j+=`<ellipse cx="${1350+k}" cy="160" rx="9" ry="4" fill="#fff7ea" opacity=".6"/>`;
+  }
+  $('jupSwirl').innerHTML=j;
+})();
+
+/* ---------------- Saturn's rings ---------------- */
+const LANES=[500,560,620];
+(function buildRings(){
+  let s='';
+  const band=(rx,w,col,op)=>{s+=`<ellipse rx="${rx}" ry="${f1(rx*K)}" fill="none" stroke="${col}" stroke-width="${f1(w*K*1.6)}" opacity="${op}"/>`;};
+  // Each band drawn as thick elliptical stroke; stroke width is approximate across the band.
+  const bands=[
+    [255,14,'#6b5d4c',.35],[272,14,'#7a6a55',.4],[290,14,'#8a7760',.45],   // C ring (faint)
+    [312,22,'#bfa27a',.75],[336,22,'#d8bf93',.85],[360,22,'#e6cfa2',.9],[384,22,'#d9bc8c',.9],[408,20,'#c7a676',.85], // B ring
+    // Cassini division (gap ~ 420..440)
+    [452,20,'#b89b74',.8],[474,20,'#a88c68',.8],
+    // A ring = race track (lanes) 470..650
+    [500,40,'#b39570',.9],[560,40,'#a88b67',.9],[620,40,'#b39570',.9],
+    [665,14,'#8e765a',.6],[690,10,'#7c6750',.35]
+  ];
+  // use real filled annuli for smoothness: ring between rIn and rOut as path with evenodd
+  const ann=(r0,r1,col,op)=>{
+    const e=(r)=>`M${r},0 A${r},${f1(r*K)} 0 1 0 ${-r},0 A${r},${f1(r*K)} 0 1 0 ${r},0Z`;
+    s+=`<path d="${e(r1)} ${e(r0)}" fill="${col}" fill-rule="evenodd" opacity="${op}"/>`;
+  };
+  ann(248,300,'#6f604d',.35);
+  ann(300,330,'#b69a72',.7);ann(330,372,'#dcc398',.88);ann(372,404,'#e9d4a8',.92);ann(404,420,'#c9a979',.85);
+  ann(420,438,'#2b2430',.25);
+  ann(438,470,'#b59872',.8);
+  ann(470,650,'#a78a66',.92); // track base
+  ann(470,530,'#b89b75',.35);ann(590,650,'#b89b75',.35);
+  ann(650,662,'#1d1822',.2);
+  ann(662,700,'#8c7458',.5);ann(700,712,'#6c5a47',.3);
+  // fine ringlets
+  for(let r=305;r<700;r+=rnd(3,9)){ if(r>470&&r<650) continue; s+=`<ellipse rx="${f1(r)}" ry="${f1(r*K)}" fill="none" stroke="${Math.random()<.5?'#fff3d6':'#5a4632'}" stroke-width=".7" opacity="${f1(rnd(.08,.25))}"/>`;}
+  // lane dividers (velodrome paint on the ice!)
+  for(const r of [470,530,590,650]) s+=`<ellipse rx="${r}" ry="${f1(r*K)}" fill="none" stroke="#fff" stroke-width="${r===470||r===650?2:1.4}" stroke-dasharray="${r===470||r===650?'':'14 12'}" opacity="${r===470||r===650?.55:.4}"/>`;
+  // speckle texture on track
+  for(let i=0;i<260;i++){const r=rnd(472,648),a=rnd(0,Math.PI*2);const [x,y]=ringLocal(r,a);s+=`<circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(rnd(.5,1.6))}" fill="${Math.random()<.5?'#e9dcc2':'#6d5a45'}" opacity=".5"/>`;}
+  // sunlit sheen on the left part & shadow of planet on the back rings (sun is upper-left, so shadow falls back-right)
+  const e=(r)=>`M${r},0 A${r},${f1(r*K)} 0 1 0 ${-r},0 A${r},${f1(r*K)} 0 1 0 ${r},0Z`;
+  s+=`<clipPath id="annClip"><path clip-rule="evenodd" d="${e(712)} ${e(240)}"/></clipPath><path clip-path="url(#annClip)" d="M150,-10 L760,-150 L760,-40 L185,30Z" fill="#000" opacity=".3"/>`;
+  $('ringBands').innerHTML=s;
+  // finish line across the lanes at a=PI/2 (front)
+  const p0=ringLocal(470,Math.PI/2-0.016),p1=ringLocal(650,Math.PI/2-0.016),p2=ringLocal(650,Math.PI/2+0.016),p3=ringLocal(470,Math.PI/2+0.016);
+  $('finishLine').innerHTML=`<path d="M${p0}L${p1}L${p2}L${p3}Z" fill="url(#checker)" opacity=".92" transform="translate(0,0)"/>
+    <text x="0" y="${f1(650*K+22)}" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" opacity=".7" letter-spacing="3">START · FINISH</text>`;
+})();
+
+/* ring ice particles orbiting (split front/back) */
+const parts=[];
+(function(){
+  const back=$('partBack'),front=$('partFront');
+  for(let i=0;i<110;i++){
+    const r=rnd(300,700);
+    const el=document.createElementNS(NS,'circle');
+    el.setAttribute('r',f1(rnd(.8,2.6)));
+    el.setAttribute('fill',Math.random()<.7?'#f4ead7':'#bfd8ea');
+    el.setAttribute('opacity',f1(rnd(.4,.9)));
+    parts.push({r,a:rnd(0,6.283),w:0.9*Math.pow(300/r,1.5)*0.12,el,b:back,f:front,side:0});
+  }
+})();
+
+/* ---------------- birds & bikes ---------------- */
+const BIRDS=[
+ {id:'kiwi',no:1,name:'几维鸟',en:'Kiwi',color:'#a4d65e',lane:LANES[0],scale:1.12,
+  rear:{x:-38,r:22},front:{x:40,r:22},C:[0,-24],L:10,H:[-8,-60],a:24,b:26,gear:0.85,drive:22,
+  leg:'#d8c4a0',legW:5,top:114,frame:'#16b3a6',tire:'#222',
+  cheers:['Kia ora!','冲鸭！','我腿短但我快！','喙也能掌舵!'],
+  quip:'小短腿蹬出了光速！踏频高达每分钟 400 转。'},
+ {id:'raven',no:2,name:'渡鸦',en:'Raven',color:'#ff5d6c',lane:LANES[1],scale:1.0,
+  rear:{x:-50,r:30},front:{x:54,r:30},C:[0,-30],L:12,H:[-16,-90],a:38,b:40,gear:1.25,drive:30,
+  leg:'#34343c',legW:4,top:144,frame:'#e63946',tire:'#1b1b1f',
+  cheers:['嘎——！','Caw!','Nevermore 放弃!','空气动力学!'],
+  quip:'"永不言弃" —— Nevermore! 黑色闪电夺冠。'},
+ {id:'pelican',no:3,name:'鹈鹕',en:'Pelican',color:'#ffb347',lane:LANES[2],scale:0.8,
+  rear:{x:-64,r:16},front:{x:30,r:62},C:[30,-62],L:13,H:[6,-136],a:46,b:47,gear:1,drive:62,penny:true,
+  leg:'#f28c28',legW:4.5,top:266,frame:'#274c77',tire:'#1b1b1f',
+  cheers:['Splendid!','好极了!','鱼还在嘴里…','咕噜咕噜!'],
+  quip:'绅士风度，高轮车之王！鱼也一直没掉。'}
+];
+
+function wheel(x,r,col,tire){
+  const n=r>40?22:12;let sp='';
+  for(let i=0;i<n;i++){const a=i/n*Math.PI*2;sp+=`M0,0L${f1(Math.cos(a)*(r-3))},${f1(Math.sin(a)*(r-3))}`;}
+  const circ=2*Math.PI*(r-2.5),arc=circ*0.14;
+  return `<g transform="translate(${x},${-r})">
+    <circle r="${r}" fill="none" stroke="${tire}" stroke-width="${r>40?5:4}"/>
+    <circle r="${r-2.5}" fill="none" stroke="#c9ccd6" stroke-width="1.3"/>
+    <g class="spin"><path d="${sp}" stroke="#d5d8e0" stroke-width="${r>40?.9:.8}" opacity=".85"/>
+      <circle r="${r-2.5}" fill="none" stroke="${col}" stroke-width="2.4" stroke-dasharray="${f1(arc)} ${f1(circ-arc)}"/>
+      <rect x="-2" y="${-r+4}" width="4" height="3" fill="#ffcc33"/></g>
+    <circle r="${r>40?4.5:3}" fill="#9aa0ad" stroke="#555" stroke-width="1"/>
+  </g>`;
+}
+
+function frameSVG(B){
+  const c=B.frame;
+  if(B.id==='kiwi') return `<g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M-38,-22L0,-24L-12,-50L-38,-22M-12,-48L30,-50M0,-24L30,-45" stroke="${c}" stroke-width="4.2"/>
+    <path d="M31,-52L40,-22" stroke="${c}" stroke-width="4"/>
+    <path d="M31,-52L33,-60L49,-63" stroke="#888" stroke-width="3"/>
+    <path d="M47,-64L52,-63" stroke="#222" stroke-width="4.5"/>
+    <path d="M-12,-50L-14,-55" stroke="#999" stroke-width="3"/>
+    <ellipse cx="-15" cy="-56.5" rx="9" ry="2.8" fill="#222" stroke="none"/>
+    <circle cx="-38" cy="-22" r="4" fill="${c}" stroke="none"/>
+    <text x="8" y="-40" font-size="6" font-weight="800" fill="#fff" stroke="none" transform="rotate(-6 8 -40)">BMX</text>
+  </g>`;
+  if(B.id==='raven') return `<g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M-50,-30L0,-30L-17,-80L-50,-30M-16,-78L40,-78M0,-30L42,-68" stroke="${c}" stroke-width="3.8"/>
+    <path d="M40,-80L43,-66Q48,-48 54,-30" stroke="${c}" stroke-width="3.5"/>
+    <path d="M40,-80L48,-83Q60,-84 58,-74Q56,-66 48,-67" stroke="#222" stroke-width="3"/>
+    <path d="M-17,-80L-19,-86" stroke="#aaa" stroke-width="2.6"/>
+    <path d="M-30,-87.5Q-19,-90 -8,-86.5" stroke="#111" stroke-width="4"/>
+    <rect x="14" y="-58" width="6" height="15" rx="2" fill="#6cc9ff" stroke="#fff" stroke-width=".8" transform="rotate(42 17 -50)"/>
+    <text x="-2" y="-73" font-size="5.5" font-weight="800" fill="#fff" stroke="none" letter-spacing=".5">CAW-BON</text>
+  </g>`;
+  // penny-farthing
+  return `<g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M26,-128C-6,-134 -52,-96 -64,-16" stroke="${c}" stroke-width="5"/>
+    <path d="M26,-128L30,-62" stroke="${c}" stroke-width="4.2"/>
+    <path d="M26,-128L27,-137Q36,-135 44,-141" stroke="#b58b2a" stroke-width="3"/>
+    <path d="M42,-141L48,-141" stroke="#5a3a1a" stroke-width="4.5"/>
+    <path d="M-30,-86l-6,3" stroke="#b58b2a" stroke-width="3"/>
+    <path d="M1,-131v4M8,-132v4" stroke="#b58b2a" stroke-width="1.6"/>
+    <path d="M-6,-134.5Q6,-139 16,-134Q6,-131 -6,-134.5Z" fill="#7a4a24" stroke="#4a2a12" stroke-width="1"/>
+  </g>`;
+}
+
+function bodySVG(B){
+  if(B.id==='kiwi'){
+    let fuzz='';
+    for(let i=0;i<70;i++){const a=rnd(0,Math.PI*2),rr=rnd(.55,1);const x=-6+Math.cos(a)*30*rr,y=-78+Math.sin(a)*24*rr;const d=a+rnd(2.4,3.3);
+      fuzz+=`M${f1(x)},${f1(y)}l${f1(Math.cos(d)*5)},${f1(Math.sin(d)*5)}`;}
+    return `
+    <ellipse cx="-6" cy="-78" rx="31" ry="25" fill="url(#kiwiBody)"/>
+    <path d="${fuzz}" stroke="#4b331d" stroke-width="1.1" stroke-linecap="round" opacity=".7"/>
+    <path d="M-36,-78q-3,5 -1,9M-34,-70q-4,3 -3,8M-30,-62q-2,4 0,7" stroke="#6e4d2e" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <ellipse cx="-8" cy="-78" rx="5" ry="2.6" fill="#5a3c22" transform="rotate(-15 -8 -78)"/>
+    <g transform="rotate(-8 -14 -74)"><rect x="-22" y="-80" width="14" height="11" rx="2" fill="#fff" opacity=".93"/><text x="-15" y="-71.3" font-size="9" font-weight="900" text-anchor="middle" fill="#2a6b1f">1</text></g>
+    <circle cx="18" cy="-90" r="13.5" fill="#7a5433"/>
+    <path d="M12,-86q3,-1 5,1M8,-94q3,0 4,2" stroke="#4b331d" stroke-width="1" fill="none"/>
+    <path d="M29,-92Q44,-84 52.5,-67.5L50.2,-66.6Q40,-78 28.5,-85.5Z" fill="#e6d3a2" stroke="#b39a66" stroke-width=".7"/>
+    <circle cx="50.8" cy="-67.4" r=".9" fill="#7a6040"/>
+    <path d="M6,-97Q17,-114 32,-99Z" fill="#ff4d5e"/><path d="M12,-104Q18,-108 26,-104" stroke="#fff" stroke-width="2" fill="none"/>
+    <path d="M6,-97L32,-99" stroke="#c7253a" stroke-width="1.5"/>
+    <path d="M7,-92Q16,-95 29,-93" stroke="#333" stroke-width="2.2" fill="none"/>
+    <circle cx="23.5" cy="-92.5" r="5.6" fill="#bff0ff" stroke="#2b2b2b" stroke-width="2"/>
+    <ellipse class="eye" cx="24.2" cy="-92.4" rx="2.1" ry="2.1" fill="#111"/>
+    <circle cx="22" cy="-94.6" r="1.4" fill="#fff" opacity=".9"/>`;
+  }
+  if(B.id==='raven') return `
+    <path d="M-28,-98L-70,-94L-80,-86L-71,-78L-26,-88Z" fill="#141420"/>
+    <path d="M-40,-95L-72,-88M-40,-90L-74,-84" stroke="#2c3055" stroke-width="1" opacity=".8"/>
+    <ellipse cx="2" cy="-104" rx="39" ry="19" fill="url(#ravenSheen)" transform="rotate(-14 2 -104)"/>
+    <path d="M-26,-104Q0,-120 26,-116" stroke="#4a4f8a" stroke-width="2" fill="none" opacity=".55"/>
+    <g transform="rotate(-10 -6 -96)"><rect x="-14" y="-102" width="15" height="12" rx="2" fill="#fff" opacity=".93"/><text x="-6.5" y="-92.7" font-size="9.5" font-weight="900" text-anchor="middle" fill="#b3202e">2</text></g>
+    <path d="M26,-114L30,-103L34,-110L38,-101L42,-108L46,-100L48,-114Z" fill="#141420"/>
+    <circle cx="37" cy="-123" r="14.5" fill="#17171f"/>
+    <path d="M28,-133Q34,-128 46,-130" stroke="#3b4170" stroke-width="1.5" fill="none" opacity=".7"/>
+    <path d="M46,-129Q64,-128 75,-116.5Q63,-116 47,-113Z" fill="#26262e"/>
+    <path d="M48,-127Q62,-126 72,-117.5" stroke="#555a6e" stroke-width="1" fill="none"/>
+    <path d="M47,-120L60,-119" stroke="#0a0a0e" stroke-width=".8"/>
+    <path d="M46,-128q4,-2 9,0" stroke="#2c2c36" stroke-width="2" fill="none"/>
+    <circle cx="41.5" cy="-125.5" r="4" fill="#33334a"/>
+    <ellipse class="eye" cx="42" cy="-125.5" rx="2.6" ry="2.6" fill="#050507"/>
+    <circle cx="43" cy="-126.6" r="1" fill="#fff"/>
+    <path d="M23,-128Q35,-146 50,-131Z" fill="#e63946"/><path d="M26,-133Q35,-140 46,-133" stroke="#fff" stroke-width="2" fill="none"/>
+    <path d="M47,-132L55,-140" stroke="#e63946" stroke-width="4" stroke-linecap="round"/>`;
+  // pelican
+  return `
+    <path d="M-34,-166Q-50,-162 -52,-152Q-42,-150 -32,-154Z" fill="#dcd6ca"/>
+    <ellipse cx="-2" cy="-160" rx="37" ry="28" fill="url(#pelBody)" transform="rotate(-10 -2 -160)"/>
+    <g transform="rotate(-8 -12 -150)"><rect x="-20" y="-158" width="15" height="12" rx="2" fill="#fff" stroke="#ddd"/><text x="-12.5" y="-148.6" font-size="9.5" font-weight="900" text-anchor="middle" fill="#c26a0a">3</text></g>
+    <path d="M12,-180C30,-196 4,-212 20,-230" stroke="#f3efe7" stroke-width="14" fill="none" stroke-linecap="round"/>
+    <path d="M18,-182C31,-196 10,-210 22,-226" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round" opacity=".7"/>
+    <path class="pouch" fill="#f28c28" d=""/>
+    <path d="M78,-219q7,-5 10,-1q4,-5 7,-1q-5,4 -8,2Z" fill="#6aa9d8" class="fish"/>
+    <path d="M33,-237Q70,-234 104,-223Q109,-220 103,-216.5Q70,-224 33,-227Z" fill="#f6b33e"/>
+    <path d="M36,-233Q70,-230 101,-221" stroke="#d68a1c" stroke-width="1" fill="none"/>
+    <path d="M103,-223q4,2 1,7" stroke="#c9471f" stroke-width="2" fill="none"/>
+    <ellipse cx="23" cy="-233" rx="15" ry="11.5" fill="#fff"/>
+    <path d="M10,-238q-6,-4 -2,-8q2,4 6,5Z" fill="#f7e6a6"/>
+    <circle cx="28" cy="-234.5" r="3.6" fill="#d9ecf7"/>
+    <ellipse class="eye" cx="28.4" cy="-234.5" rx="2" ry="2" fill="#1a1a22"/>
+    <circle cx="28.4" cy="-234.5" r="5.4" fill="none" stroke="#d4a62a" stroke-width="1.4"/>
+    <path d="M24,-230q-6,10 -14,14" stroke="#d4a62a" stroke-width=".7" fill="none"/>
+    <rect x="10" y="-266" width="22" height="22" rx="1.5" fill="#1c1c24"/>
+    <rect x="10" y="-251" width="22" height="4" fill="#b3202e"/>
+    <rect x="5" y="-245.5" width="32" height="3.5" rx="1.6" fill="#1c1c24"/>`;
+}
+
+function footSVG(B){
+  if(B.id==='pelican') return `<path d="M-4,0L10,-2L12,3L-3,3Z" fill="#f28c28" stroke="#c96a12" stroke-width=".8"/>`;
+  if(B.id==='kiwi') return `<path d="M-3,0L9,-1M-2,0L8,3M-3,0L-7,1" stroke="#d8c4a0" stroke-width="3" stroke-linecap="round"/>`;
+  return `<path d="M-2,0L9,-1M-2,0L8,2.5M-2,0L-7,1" stroke="#34343c" stroke-width="2.2" stroke-linecap="round"/>`;
+}
+
+const riders=[];
+function makeRider(B){
+  const g=document.createElementNS(NS,'g');
+  g.setAttribute('class','rider');
+  const pedal=`<rect x="-6" y="-1.8" width="12" height="3.6" rx="1" fill="#555" stroke="#222" stroke-width=".6"/>`;
+  g.innerHTML=`
+   <g class="inner">
+    <ellipse cx="4" cy="2" rx="${B.id==='pelican'?100:80}" ry="7" fill="#000" opacity=".28"/>
+    <g class="speed" opacity="0" stroke="#fff" stroke-linecap="round">
+      <path d="M-70,-40h-40M-80,-70h-55M-66,-100h-36M-90,-20h-30" stroke-width="2.4"/>
+    </g>
+    <g class="bob">
+      <path class="legFar" fill="none" stroke="${B.leg}" stroke-width="${B.legW}" stroke-linecap="round" stroke-linejoin="round" opacity=".6"/>
+      <g class="footFar" opacity=".6">${footSVG(B)}</g>
+    </g>
+    <path class="armFar" stroke="#666" stroke-width="3" stroke-linecap="round"/>
+    <g class="pedFar" opacity=".7">${pedal}</g>
+    <g class="wR">${wheel(B.rear.x,B.rear.r,B.color,B.tire)}</g>
+    <g class="wF">${wheel(B.front.x,B.front.r,B.color,B.tire)}</g>
+    ${B.penny?'':`<path d="M${B.rear.x},${-B.rear.r} L${B.C[0]},${B.C[1]}" stroke="#555" stroke-width="1.2" stroke-dasharray="2 1.5"/>`}
+    ${frameSVG(B)}
+    <g transform="translate(${B.C[0]},${B.C[1]})"><g class="ring"><circle r="${B.penny?7:8}" fill="none" stroke="#bbb" stroke-width="2" stroke-dasharray="2 1.4"/><circle r="3" fill="#888"/></g></g>
+    <g class="bob">
+      ${B.id==='pelican'||B.id==='raven'?`<path class="wing" fill="none" stroke="${B.id==='raven'?'#16161e':'#e6e1d8'}" stroke-width="${B.id==='raven'?11:13}" stroke-linecap="round"/><path class="wingTip" fill="none" stroke="${B.id==='raven'?'#2a2c48':'#222'}" stroke-width="${B.id==='raven'?5:8}" stroke-linecap="round"/>`:''}
+      ${bodySVG(B)}
+    </g>
+    <path class="armNear" stroke="#aaa" stroke-width="3.2" stroke-linecap="round"/>
+    <g class="pedNear">${pedal}</g>
+    <g class="bob">
+      <path class="legNear" fill="none" stroke="${B.leg}" stroke-width="${B.legW+.6}" stroke-linecap="round" stroke-linejoin="round"/>
+      <g class="footNear">${footSVG(B)}</g>
+    </g>
+    <rect x="-90" y="${-B.top-10}" width="200" height="${B.top+14}" fill="transparent"/>
+   </g>
+   <g class="tag"><rect x="-38" y="-11" width="76" height="20" rx="10" fill="rgba(10,12,30,.72)" stroke="${B.color}" stroke-width="1.2"/>
+     <text y="3.5" text-anchor="middle" font-size="11" font-weight="700" fill="${B.color}">${B.no} ${B.name}</text></g>
+   <g class="bubble" opacity="0"><path d="M-60,-30H60Q68,-30 68,-22V-6Q68,2 60,2H10L0,12L-6,2H-60Q-68,2 -68,-6V-22Q-68,-30 -60,-30Z" fill="#fff" stroke="${B.color}" stroke-width="2"/>
+     <text y="-9" text-anchor="middle" font-size="14" font-weight="800" fill="#1b1030">加油!</text></g>`;
+  const q=s=>g.querySelector(s);
+  const R={B,g,inner:q('.inner'),bobs:[...g.querySelectorAll('.bob')],speedG:q('.speed'),
+    legFar:q('.legFar'),legNear:q('.legNear'),footFar:q('.footFar'),footNear:q('.footNear'),
+    armFar:q('.armFar'),armNear:q('.armNear'),pedFar:q('.pedFar'),pedNear:q('.pedNear'),
+    spinR:q('.wR .spin'),spinF:q('.wF .spin'),ring:q('.ring'),wing:q('.wing'),wingTip:q('.wingTip'),
+    pouch:q('.pouch'),fish:q('.fish'),eye:q('.eye'),tag:q('.tag'),bubble:q('.bubble'),bubbleText:q('.bubble text'),
+    phi:0,phi0:0,prog:0,dist:0,omega:0,boost:0,stamina:1,lap:1,done:false,time:0,bubbleT:0,blinkT:rnd(1,4),
+    seed:[rnd(0,9),rnd(0,9),rnd(.3,.6),rnd(.7,1.3)],layer:null,x:0,y:0,depth:0,celebrate:0};
+  R.eyeRy=+R.eye.getAttribute('ry');
+  g.addEventListener('pointerdown',e=>{e.stopPropagation();cheer(R);});
+  riders.push(R);
+  return R;
+}
+BIRDS.forEach(makeRider);
+
+/* two-bone IK: knee bends forward (+x) */
+function ik(H,P,a,b){
+  let dx=P[0]-H[0],dy=P[1]-H[1];let d=Math.hypot(dx,dy);
+  d=clamp(d,Math.abs(a-b)+1,a+b-.4);
+  const base=Math.atan2(dy,dx);
+  const al=Math.acos(clamp((a*a+d*d-b*b)/(2*a*d),-1,1));
+  const ang=base-al;
+  return [H[0]+Math.cos(ang)*a,H[1]+Math.sin(ang)*a];
+}
+
+/* ---------------- race logic ---------------- */
+const LAPS=3,TWO_PI=Math.PI*2,FULL=LAPS*TWO_PI;
+const BASE_OMEGA=TWO_PI/12.5;
+let state='menu',raceT=0,countT=0,finishOrder=[],lastOrder='',tickerT=0,nextFiller=6,bannerShown=false,postT=0;
+
+function resetRace(){
+  riders.forEach((R,i)=>{R.phi0=[0.22,0,-0.22][i];R.phi=R.phi0;R.prog=0;R.boost=0;R.stamina=1;R.lap=1;R.done=false;R.time=0;R.celebrate=0;R.omega=0;});
+  finishOrder=[];raceT=0;lastOrder='';bannerShown=false;postT=0;
+  $('banner').classList.remove('show');
+}
+function startCountdown(){
+  resetRace();
+  $('menu').classList.add('hide');
+  state='countdown';countT=AUTOTEST?0.01:3.2;
+  say('各就各位… <b>Ready?</b>');
+}
+function cheer(R){
+  if(state==='menu'||state==='countdown'){showBubble(R,R.B.cheers[0]);return;}
+  if(R.done){showBubble(R,'赢麻了!');burst(R,10);return;}
+  if(R.stamina<0.3){showBubble(R,'累了… tired');return;}
+  R.stamina-=0.3;R.boost=Math.min(R.boost+0.55,1.1);
+  showBubble(R,R.B.cheers[(Math.random()*R.B.cheers.length)|0]);
+  burst(R,14);
+}
+function showBubble(R,txt){R.bubbleText.textContent=txt;R.bubbleT=1.6;}
+
+function speedFor(R,i,t,ranked){
+  const s=R.seed;
+  let n=1+0.10*Math.sin(t*s[2]+s[0])+0.06*Math.sin(t*s[3]*1.7+s[1]);
+  const lapIdx=Math.floor(R.prog/TWO_PI);
+  if(R.B.id==='kiwi') n+=0.07*Math.sin(t*1.9+s[0]);                // bursty
+  if(R.B.id==='pelican') n*= lapIdx===0?0.93:lapIdx===2?1.07:1.0;   // slow start, strong finish
+  if(R.B.id==='raven'){ // drafting bonus when just behind someone
+    for(const o of riders){if(o!==R){const gap=o.prog-R.prog;if(gap>0.02&&gap<0.35)n+=0.05;}}
+  }
+  const rank=ranked.indexOf(R);
+  n*= rank===0?0.975:rank===2?1.03:1;                                  // gentle rubber band
+  n+= R.boost*0.55;
+  return BASE_OMEGA*n;
+}
+
+/* ---------------- effects ---------------- */
+const fx=$('fx');const particles=[];
+function spawn(x,y,vx,vy,life,shape,col,size,grav){
+  const el=document.createElementNS(NS,shape==='rect'?'rect':'path');
+  if(shape==='rect'){el.setAttribute('width',size);el.setAttribute('height',size*0.5);el.setAttribute('x',-size/2);el.setAttribute('y',-size/4);}
+  else el.setAttribute('d',`M0,${-size}L${size*.3},${-size*.3}L${size},0L${size*.3},${size*.3}L0,${size}L${-size*.3},${size*.3}L${-size},0L${-size*.3},${-size*.3}Z`);
+  el.setAttribute('fill',col);fx.appendChild(el);
+  particles.push({el,x,y,vx,vy,life,max:life,rot:rnd(0,360),vr:rnd(-400,400),grav});
+}
+function burst(R,n){
+  const cols=['#fff6b0','#ffd27a',R.B.color,'#9ff'];
+  for(let i=0;i<n;i++){const a=rnd(-Math.PI,0);const sp=rnd(80,220);
+    spawn(R.x,R.y-R.B.top*R.s*0.6,Math.cos(a)*sp,Math.sin(a)*sp,rnd(.6,1.1),'star',cols[i%4],rnd(3,6),260);}
+}
+function confetti(){
+  const cols=['#ffd27a','#ff5d6c','#a4d65e','#6cc6ff','#ffb347','#fff'];
+  for(let i=0;i<120;i++) spawn(rnd(200,1400),rnd(-80,-10),rnd(-60,60),rnd(60,220),rnd(3.5,6),'rect',cols[i%6],rnd(8,14),60);
+}
+function updateParticles(dt){
+  for(let i=particles.length-1;i>=0;i--){const p=particles[i];
+    p.life-=dt;if(p.life<=0){p.el.remove();particles.splice(i,1);continue;}
+    p.vy+=p.grav*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.rot+=p.vr*dt;
+    p.el.setAttribute('transform',`translate(${f1(p.x)},${f1(p.y)}) rotate(${f1(p.rot)})`);
+    p.el.setAttribute('opacity',f1(Math.min(1,p.life/p.max*2)));
+  }
+}
+
+/* ---------------- HUD ---------------- */
+const rowsEl=$('rows');
+rowsEl.innerHTML=riders.map(R=>`<div class="row" id="row-${R.B.id}"><span class="pos"></span><span class="dot" style="background:${R.B.color}"></span><span class="nm">${R.B.name} <span style="opacity:.6;font-size:11px">${R.B.en}</span></span><span class="lap"></span><span class="st"><i></i></span></div>`).join('');
+const rowEls=riders.map(R=>{const el=$('row-'+R.B.id);return {el,pos:el.querySelector('.pos'),lap:el.querySelector('.lap'),st:el.querySelector('.st i')};});
+function ranking(){
+  return [...riders].sort((a,b)=>{
+    if(a.done&&b.done) return a.time-b.time;
+    if(a.done) return -1; if(b.done) return 1;
+    return b.prog-a.prog;});
+}
+function say(html){$('ticker').innerHTML=html;tickerT=0;}
+const FILLERS=[
+  '几维鸟没有翅膀，所以它用<b>喙</b>掌舵——土星自行车联合会表示：完全合法。',
+  '鹈鹕的喉囊里有一条鱼，裁判表示<b>不算违禁物品</b>。',
+  '渡鸦的车架号称 <b>CAW-BON</b> 碳纤维，重量只有两根羽毛。',
+  '赛道由 99.9% 的<b>冰晶</b>构成，请各位选手注意防滑。',
+  '木星在远处观战，大红斑激动得又大了一圈。',
+  '地球观众来电：<b>“这是真的吗？”</b> 解说：是的。',
+  '太阳正从左上方洒下光芒——所有星球的阴影都朝向右下。',
+  '温馨提示：点击选手即可为它加油，获得短暂冲刺！'
+];
+function fmt(t){const m=Math.floor(t/60),s=t-m*60;return String(m).padStart(2,'0')+':'+(s<10?'0':'')+s.toFixed(1);}
+
+function updateHUD(){
+  const r=ranking();
+  r.forEach((R,i)=>{const e=rowEls[riders.indexOf(R)];
+    e.el.style.order=i;e.pos.textContent=i+1;
+    e.lap.textContent=R.done?fmt(R.time):(state==='race'?`${Math.min(LAPS,R.lap)}/${LAPS}`:`0/${LAPS}`);
+    e.st.style.width=Math.round(R.stamina*100)+'%';
+    e.el.classList.toggle('lead',i===0&&state!=='menu');
+  });
+  rowsEl.style.display='flex';rowsEl.style.flexDirection='column';
+  $('timer').textContent=fmt(raceT);
+  // overtakes
+  if(state==='race'){
+    const key=r.map(R=>R.B.id).join();
+    if(lastOrder&&key!==lastOrder&&raceT>2){
+      const prev=lastOrder.split(',');
+      const up=r.find((R,i)=>prev.indexOf(R.B.id)>i&&!R.done);
+      if(up){const other=riders.find(o=>o.B.id===prev[r.indexOf(up)]);if(other&&other!==up)say(`<b>${up.B.name}</b> 超越了 ${other.B.name}！Overtake!`);}
+    }
+    lastOrder=key;
+  }
+}
+
+/* ---------------- frame update ---------------- */
+function placeRider(R,dt,t){
+  const B=R.B;
+  const a=Math.PI/2-R.phi;
+  const [lx,ly]=ringLocal(B.lane,a);
+  const [x,y]=toScreen(lx,ly);
+  const depth=Math.sin(a);
+  const s=(0.6+0.42*(depth+1)/2)*B.scale;
+  // tangent on screen
+  const tlx=B.lane*Math.sin(a),tly=-B.lane*K*Math.cos(a);   // d/dphi of local pos
+  const tx=tlx*cT-tly*sT,ty=tlx*sT+tly*cT;
+  const face=Math.sin(a); // >0 moving right
+  const sx=Math.sign(face||1)*Math.max(0.18,Math.pow(Math.abs(face),0.55));
+  let tilt=(tx>=0?Math.atan2(ty,tx):Math.atan2(-ty,-tx))*180/Math.PI;tilt=clamp(tilt,-11,11);
+  R.x=x;R.y=y;R.depth=depth;R.s=s;
+  // pedalling & wheels
+  const cr=R.dist/(B.drive*B.gear);
+  const bob=Math.sin(cr*2)*1.6+Math.sin(R.dist*0.045)*1.2 - (R.celebrate>0?Math.abs(Math.sin(t*9))*10:0);
+  const rock=Math.sin(cr)*1.4;
+  R.g.setAttribute('transform',`translate(${f1(x)},${f1(y)})`);
+  R.inner.setAttribute('transform',`rotate(${f1(tilt+rock*0.4)}) scale(${(sx*s).toFixed(3)},${s.toFixed(3)})`);
+  R.tag.setAttribute('transform',`translate(0,${f1(-(B.top+26)*s)}) scale(${f1(Math.max(.75,s))})`);
+  const bs=Math.max(.8,s);
+  R.bubble.setAttribute('transform',`translate(0,${f1(-(B.top+44)*s)}) scale(${f1(bs)})`);
+  R.bubbleT=Math.max(0,R.bubbleT-dt);
+  R.bubble.setAttribute('opacity',R.bubbleT>0?f1(Math.min(1,R.bubbleT*3)):'0');
+  R.tag.setAttribute('opacity',R.bubbleT>0?'0':'.92');
+  R.spinR.setAttribute('transform',`rotate(${f1(R.dist/B.rear.r*57.2958%360)})`);
+  R.spinF.setAttribute('transform',`rotate(${f1(R.dist/B.front.r*57.2958%360)})`);
+  R.ring.setAttribute('transform',`rotate(${f1(cr*57.2958%360)})`);
+  const C=B.C,L=B.L;
+  const pn=[C[0]+Math.cos(cr)*L,C[1]+Math.sin(cr)*L];
+  const pf=[C[0]-Math.cos(cr)*L,C[1]-Math.sin(cr)*L];
+  R.armNear.setAttribute('d',`M${C[0]},${C[1]}L${f1(pn[0])},${f1(pn[1])}`);
+  R.armFar.setAttribute('d',`M${C[0]},${C[1]}L${f1(pf[0])},${f1(pf[1])}`);
+  R.pedNear.setAttribute('transform',`translate(${f1(pn[0])},${f1(pn[1])})`);
+  R.pedFar.setAttribute('transform',`translate(${f1(pf[0])},${f1(pf[1])})`);
+  for(const bg of R.bobs) bg.setAttribute('transform',`translate(0,${f1(bob)})`);
+  // legs in bob space: pedal y relative to bobbed hip -> subtract bob
+  const H=B.H;
+  const pnB=[pn[0],pn[1]-bob],pfB=[pf[0],pf[1]-bob];
+  const kn=ik(H,pnB,B.a,B.b),kf=ik([H[0]+3,H[1]],pfB,B.a,B.b);
+  R.legNear.setAttribute('d',`M${H[0]},${H[1]}L${f1(kn[0])},${f1(kn[1])}L${f1(pnB[0])},${f1(pnB[1]-2)}`);
+  R.legFar.setAttribute('d',`M${H[0]+3},${H[1]}L${f1(kf[0])},${f1(kf[1])}L${f1(pfB[0])},${f1(pfB[1]-2)}`);
+  R.footNear.setAttribute('transform',`translate(${f1(pnB[0])},${f1(pnB[1]-2)})`);
+  R.footFar.setAttribute('transform',`translate(${f1(pfB[0])},${f1(pfB[1]-2)})`);
+  // wings reach down to the grips (grip is on the bike, so compensate bob)
+  if(R.wing){
+    const sh=B.id==='raven'?[14,-108]:[6,-166];
+    const G=B.id==='raven'?[55,-76-bob]:[44,-141-bob];
+    const lift=R.celebrate>0?-40:0;
+    const g2=[G[0],G[1]+lift];
+    const mx=(sh[0]+g2[0])/2+(B.id==='raven'?4:8),my=(sh[1]+g2[1])/2-(B.id==='raven'?10:6);
+    R.wing.setAttribute('d',`M${sh[0]},${sh[1]}Q${f1(mx)},${f1(my)} ${f1(g2[0])},${f1(g2[1])}`);
+    const tx0=mx*0.35+g2[0]*0.65,ty0=my*0.35+g2[1]*0.65;
+    R.wingTip.setAttribute('d',`M${f1(tx0)},${f1(ty0)}L${f1(g2[0])},${f1(g2[1])}`);
+  }
+  if(R.pouch){
+    const sag=4*Math.sin(t*7.3)+R.omega/BASE_OMEGA*2+(R.celebrate>0?6:0);
+    R.pouch.setAttribute('d',`M35,-227Q64,${f1(-190+sag)} 101,-217Q70,-219 35,-227Z`);
+    R.fish.setAttribute('transform',`rotate(${f1(Math.sin(t*6)*12)} 82 -219)`);
+  }
+  // blink
+  R.blinkT-=dt;let ry=R.eyeRy;
+  if(R.blinkT<0){ry=R.eyeRy*0.15;if(R.blinkT<-0.12)R.blinkT=rnd(2,5);}
+  R.eye.setAttribute('ry',ry);
+  R.speedG.setAttribute('opacity',f1(clamp(R.boost*1.2,0,.8)));
+  // layer by depth
+  const want=depth<0?'back':'front';
+  if(R.layer!==want){R.layer=want;$(want==='back'?'backRiders':'frontRiders').appendChild(R.g);}
+}
+
+let last=performance.now(),T=0,autoCheerT=1.5;
+function frame(now){
+  let dt=Math.min(0.05,(now-last)/1000)*TIME_SCALE;last=now;T+=dt;
+  // ring particles
+  for(const p of parts){p.a+=p.w*dt;const [x,y]=ringLocal(p.r,p.a);p.el.setAttribute('cx',f1(x));p.el.setAttribute('cy',f1(y));
+    const side=y<0?1:2;if(p.side!==side){p.side=side;(side===1?p.b:p.f).appendChild(p.el);}}
+
+  const ranked=ranking();
+  if(state==='menu'){
+    riders.forEach((R,i)=>{R.omega=BASE_OMEGA*0.55*(1+0.05*i);R.phi+=R.omega*dt;R.dist+=R.omega*dt*560*0.9;R.stamina=1;});
+  } else if(state==='countdown'){
+    countT-=dt;
+    const n=Math.ceil(countT);
+    drawBig(countT>0?String(n):'GO!',countT>0?(countT%1):1);
+    riders.forEach(R=>{R.omega=0;});
+    if(countT<=0){state='race';say('<b>出发！GO!</b> 三圈定胜负 —— 3 laps around Saturn!');bigT=0.9;}
+  } else {
+    if(state==='race') raceT+=dt;
+    riders.forEach((R,i)=>{
+      R.boost=Math.max(0,R.boost-dt*0.5);
+      R.stamina=Math.min(1,R.stamina+dt*0.09);
+      let w;
+      if(R.done){w=BASE_OMEGA*0.45;R.celebrate=Math.max(0,R.celebrate-dt);}
+      else w=speedFor(R,i,raceT,ranked);
+      R.omega+= (w-R.omega)*Math.min(1,dt*2.5);
+      const dphi=R.omega*dt;
+      R.phi+=dphi;R.dist+=dphi*560*0.9;
+      if(!R.done){
+        R.prog+=dphi;
+        const lap=Math.floor(R.prog/TWO_PI)+1;
+        if(lap>R.lap&&lap<=LAPS){R.lap=lap;if(lap===LAPS&&ranked[0]===R)say(`最后一圈！<b>${R.B.name}</b> 领先进入 FINAL LAP!`);else if(ranked[0]===R)say(`<b>${R.B.name}</b> 领先进入第 ${lap} 圈`);}
+        if(R.prog>=FULL){R.done=true;R.time=raceT;R.celebrate=2.2;finishOrder.push(R);burst(R,26);
+          if(finishOrder.length===1){say(`🏁 <b>${R.B.name} ${R.B.en}</b> 冲过终点！夺得冠军！`.replace('🏁 ',''));confetti();showBubble(R,'冠军!!');}
+          else say(`<b>${R.B.name}</b> 第 ${finishOrder.length} 名完赛，用时 ${fmt(R.time)}`);
+        }
+      }
+    });
+    if(state==='race'&&finishOrder.length===riders.length){state='finished';}
+    if(finishOrder.length>0){postT+=dt;if(!bannerShown&&postT>1.6){bannerShown=true;showBanner();}}
+    if(bannerShown) fillResults();
+    // autotest: simulate cheering clicks
+    if(AUTOTEST&&state==='race'){autoCheerT-=dt;if(autoCheerT<0){autoCheerT=2.2;cheer(riders[(Math.random()*3)|0]);}}
+    drawBig(bigT>0?'GO!':'',0);bigT=Math.max(0,bigT-dt);
+  }
+  // sort within layers by screen y (closer = lower on screen = drawn later)
+  for(const id of ['backRiders','frontRiders']){const L=$(id);const kids=[...L.children];
+    for(let i=1;i<kids.length;i++){const a=riders.find(r=>r.g===kids[i-1]),b=riders.find(r=>r.g===kids[i]);if(a&&b&&a.y>b.y){L.insertBefore(kids[i],kids[i-1]);break;}}}
+  riders.forEach(R=>placeRider(R,dt,T));
+  updateParticles(dt);
+  // ticker filler
+  tickerT+=dt;if(tickerT>nextFiller){say(FILLERS[(Math.random()*FILLERS.length)|0]);nextFiller=rnd(6,9);}
+  updateHUD();
+  requestAnimationFrame(frame);
+}
+let bigT=0,bigLast='';
+function drawBig(txt,frac){
+  const el=$('bigText');
+  if(txt!==bigLast){bigLast=txt;el.innerHTML=txt?`<text x="800" y="470" text-anchor="middle" font-size="150" font-weight="900" fill="#ffd27a" stroke="#3a1d00" stroke-width="5" paint-order="stroke" style="letter-spacing:6px">${txt}</text>`:'';}
+  if(txt){const sc=1+(frac||0)*0.35;el.setAttribute('transform',`translate(800,420) scale(${sc.toFixed(3)}) translate(-800,-420)`);el.setAttribute('opacity',f1(txt==='GO!'?Math.min(1,bigT*1.5+0.001):0.35+0.65*(1-(frac||0))));}
+}
+function showBanner(){
+  const W=finishOrder[0];
+  $('winName').innerHTML=`<span style="color:${W.B.color}">${W.B.name} ${W.B.en}</span>`;
+  $('winQuip').textContent=W.B.quip;
+  fillResults();
+  $('banner').classList.add('show');
+}
+function fillResults(){
+  const html=ranking().map((R,i)=>`<div><b style="color:${R.B.color}">${['🥇','🥈','🥉'][i]?['第1名','第2名','第3名'][i]:''}</b>&nbsp; ${R.B.name} ${R.B.en} &nbsp;—&nbsp; ${R.done?fmt(R.time):'骑行中… riding'}</div>`).join('');
+  if($('results').innerHTML!==html)$('results').innerHTML=html;
+}
+
+/* ---------------- input ---------------- */
+$('startBtn').addEventListener('click',startCountdown);
+$('againBtn').addEventListener('click',startCountdown);
+addEventListener('keydown',e=>{
+  if(e.key==='r'||e.key==='R'){startCountdown();}
+  else if((e.key===' '||e.key==='Enter')&&(state==='menu'||bannerShown)){e.preventDefault();startCountdown();}
+  else if(e.key>='1'&&e.key<='3'){cheer(riders[+e.key-1]);}
+});
+
+resetRace();
+if(AUTOTEST){startCountdown();const sk=parseFloat(Q.get('skip')||'0');
+  if(sk>0&&sk<1)riders.forEach((R,i)=>{R.prog=FULL*sk-i*0.06;R.phi=R.phi0+R.prog;R.lap=Math.floor(R.prog/TWO_PI)+1;});}
+document.title="土星环自行车大赛 · Saturn's Rings Bird Bicycle Race";
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chinese Ink-Wash Painting</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;background:#171009;overflow:hidden;}
+  canvas{display:block;position:absolute;top:0;left:0;}
+  #startOverlay{
+    position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;
+    background:radial-gradient(ellipse at 50% 40%, #241a10 0%, #100b06 100%);
+    color:#e9dcbd;font-family:"Noto Serif SC","STKaiti","KaiTi","Songti SC",Georgia,serif;
+    cursor:pointer; transition:opacity .8s ease;
+  }
+  #startOverlay h1{font-size:40px;letter-spacing:10px;margin:0 0 10px 0;font-weight:400;text-shadow:0 0 22px rgba(233,220,180,.35);}
+  #startOverlay p.sub{font-size:13px;letter-spacing:3px;color:#c8b98d;margin:4px 0 26px 0;opacity:.85;}
+  #startOverlay .acts{font-size:12px;letter-spacing:3px;color:#a9976a;line-height:2;max-width:560px;opacity:.8;}
+  #startOverlay .btn{
+    margin-top:30px;padding:10px 34px;border:1px solid #cbb87f;border-radius:2px;
+    font-size:15px;letter-spacing:5px;color:#f1e6c4;background:rgba(255,255,255,0.03);
+  }
+  #startOverlay .btn:hover{background:rgba(255,255,255,0.08);}
+  #hud{
+    position:absolute;left:16px;bottom:12px;z-index:5;pointer-events:none;
+    font-family:"Noto Serif SC","STKaiti","KaiTi",Georgia,serif;color:rgba(235,224,196,0.55);
+    font-size:13px;letter-spacing:2px; text-shadow:0 1px 3px rgba(0,0,0,.5);
+  }
+  #sceneName{
+    position:absolute;right:22px;top:18px;z-index:5;pointer-events:none;
+    font-family:"Noto Serif SC","STKaiti","KaiTi",Georgia,serif;color:rgba(235,224,196,0.72);
+    font-size:19px;letter-spacing:3px;text-shadow:0 1px 4px rgba(0,0,0,.6);
+    opacity:0;transition:opacity .6s ease;text-align:right;
+  }
+  #progressWrap{position:absolute;left:0;bottom:0;width:100%;height:3px;background:rgba(0,0,0,0.25);z-index:5;}
+  #progressBar{height:100%;width:0%;background:linear-gradient(90deg,#7a2b22,#c9a24a);}
+  #replayHint{
+    position:absolute;left:0;right:0;bottom:26px;text-align:center;z-index:6;
+    font-family:"Noto Serif SC","STKaiti","KaiTi",Georgia,serif;color:rgba(235,224,196,0.0);
+    font-size:14px;letter-spacing:3px;pointer-events:none;transition:color 1s ease;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="sceneName"></div>
+<div id="hud">水墨畫　Chinese Ink-Wash Painting</div>
+<div id="progressWrap"><div id="progressBar"></div></div>
+<div id="replayHint">C L I C K   T O   W A T C H   A G A I N</div>
+<div id="startOverlay">
+  <h1>水 墨 畫</h1>
+  <p class="sub">C H I N E S E   I N K - W A S H   P A I N T I N G</p>
+  <div class="acts">Mountains &amp; Sun&nbsp;&nbsp;·&nbsp;&nbsp;Lotus Pond&nbsp;&nbsp;·&nbsp;&nbsp;Plum Blossoms</div>
+  <div class="btn">C L I C K   T O   B E G I N</div>
+</div>
+
+<script>
+window.addEventListener('error', e=>{ document.title = 'ERROR: ' + e.message + ' @' + e.lineno; });
+document.title = 'Chinese Ink-Wash Painting';
+
+(function(){
+"use strict";
+const AUTOTEST = /autotest/.test(location.search);
+
+/* ============================== canvas / viewport ============================== */
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d', {alpha:false});
+const VW = 1600, VH = 900;
+let DPR = Math.min(window.devicePixelRatio||1, 2);
+let scaleFit = 1, offX = 0, offY = 0;
+
+function resize(){
+  const w = window.innerWidth, h = window.innerHeight;
+  canvas.width = Math.round(w*DPR);
+  canvas.height = Math.round(h*DPR);
+  canvas.style.width = w+'px';
+  canvas.style.height = h+'px';
+  scaleFit = Math.min(w/VW, h/VH);
+  offX = (w - VW*scaleFit)/2;
+  offY = (h - VH*scaleFit)/2;
+}
+window.addEventListener('resize', resize);
+resize();
+
+function beginFrame(){
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillStyle = '#100b06';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.setTransform(DPR*scaleFit,0,0,DPR*scaleFit, offX*DPR, offY*DPR);
+}
+
+/* ============================== math / noise utils ============================== */
+function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+function lerp(a,b,t){ return a+(b-a)*t; }
+function smoothstep(a,b,x){ x=clamp((x-a)/(b-a),0,1); return x*x*(3-2*x); }
+function hash(n){ const s=Math.sin(n*12.9898+78.233)*43758.5453123; return s-Math.floor(s); }
+function hash2(x,y){ const s=Math.sin(x*127.1+y*311.7)*43758.5453123; return s-Math.floor(s); }
+function vnoise(x,y){
+  const x0=Math.floor(x), y0=Math.floor(y), xf=x-x0, yf=y-y0;
+  const h00=hash2(x0,y0), h10=hash2(x0+1,y0), h01=hash2(x0,y0+1), h11=hash2(x0+1,y0+1);
+  const u=xf*xf*(3-2*xf), v=yf*yf*(3-2*yf);
+  return h00*(1-u)*(1-v)+h10*u*(1-v)+h01*(1-u)*v+h11*u*v;
+}
+function fbm(x,y){
+  let s=0, amp=0.6, freq=1, tot=0;
+  for(let o=0;o<4;o++){ s+=vnoise(x*freq,y*freq)*amp; tot+=amp; amp*=0.5; freq*=2; }
+  return s/tot;
+}
+function ramp(localT, dur, edge){
+  edge = edge===undefined?1.6:edge;
+  if(localT<0 || localT>dur) return 0;
+  const a = smoothstep(0, edge, localT);
+  const b = 1 - smoothstep(dur-edge, dur, localT);
+  return Math.max(0, Math.min(a,b));
+}
+
+/* ============================== rice paper texture ============================== */
+const paperCanvas = document.createElement('canvas');
+paperCanvas.width = VW; paperCanvas.height = VH;
+(function buildPaper(){
+  const pctx = paperCanvas.getContext('2d');
+  const grad = pctx.createLinearGradient(0,0,VW,VH);
+  grad.addColorStop(0,'#f3ecd6');
+  grad.addColorStop(0.5,'#eee5c9');
+  grad.addColorStop(1,'#e9dfc0');
+  pctx.fillStyle = grad;
+  pctx.fillRect(0,0,VW,VH);
+  for(let i=0;i<50;i++){
+    const x=hash(i*3.1)*VW, y=hash(i*7.7+2)*VH, r=60+hash(i*5.3)*160;
+    const g = pctx.createRadialGradient(x,y,0,x,y,r);
+    const tone = hash(i*9.9)>0.5 ? '210,195,150' : '180,170,140';
+    g.addColorStop(0, `rgba(${tone},${0.05+hash(i)*0.05})`);
+    g.addColorStop(1, 'rgba(200,190,150,0)');
+    pctx.fillStyle=g;
+    pctx.beginPath(); pctx.arc(x,y,r,0,Math.PI*2); pctx.fill();
+  }
+  pctx.globalAlpha = 1;
+  for(let i=0;i<900;i++){
+    const x = Math.random()*VW, y = Math.random()*VH;
+    const len = 4+Math.random()*14;
+    const ang = Math.random()*Math.PI;
+    const dx = Math.cos(ang)*len, dy=Math.sin(ang)*len;
+    pctx.strokeStyle = `rgba(150,135,95,${0.03+Math.random()*0.05})`;
+    pctx.lineWidth = 0.6;
+    pctx.beginPath(); pctx.moveTo(x-dx,y-dy); pctx.lineTo(x+dx,y+dy); pctx.stroke();
+  }
+  for(let i=0;i<2500;i++){
+    const x=Math.random()*VW, y=Math.random()*VH;
+    pctx.fillStyle = `rgba(120,105,75,${0.02+Math.random()*0.05})`;
+    pctx.fillRect(x,y,1,1);
+  }
+  const vg = pctx.createRadialGradient(VW/2,VH/2,VH*0.3,VW/2,VH/2,VW*0.72);
+  vg.addColorStop(0,'rgba(0,0,0,0)');
+  vg.addColorStop(1,'rgba(60,45,25,0.14)');
+  pctx.fillStyle=vg; pctx.fillRect(0,0,VW,VH);
+})();
+
+/* ============================== brush stroke helper ============================== */
+function catmullRomPoints(pts, samples){
+  if(pts.length<2) return pts.slice();
+  if(pts.length===2){
+    const res=[]; for(let s=0;s<=samples;s++){ const t=s/samples; res.push({x:lerp(pts[0].x,pts[1].x,t), y:lerp(pts[0].y,pts[1].y,t)}); } return res;
+  }
+  const res=[];
+  const p=[pts[0], ...pts, pts[pts.length-1]];
+  for(let i=0;i<pts.length-1;i++){
+    const p0=p[i], p1=p[i+1], p2=p[i+2], p3=p[i+3];
+    for(let s=0;s<samples;s++){
+      const t=s/samples, t2=t*t, t3=t2*t;
+      const x=0.5*((2*p1.x)+(-p0.x+p2.x)*t+(2*p0.x-5*p1.x+4*p2.x-p3.x)*t2+(-p0.x+3*p1.x-3*p2.x+p3.x)*t3);
+      const y=0.5*((2*p1.y)+(-p0.y+p2.y)*t+(2*p0.y-5*p1.y+4*p2.y-p3.y)*t2+(-p0.y+3*p1.y-3*p2.y+p3.y)*t3);
+      res.push({x,y});
+    }
+  }
+  res.push(pts[pts.length-1]);
+  return res;
+}
+function brushStroke(ctx, rawPts, opts={}){
+  const {width=8, color='rgba(20,20,22,0.85)', taper=true, jitter=0, passes=1, seed=1, minTaper=0.06} = opts;
+  const pts = catmullRomPoints(rawPts, 8);
+  for(let pass=0; pass<passes; pass++){
+    const left=[], right=[];
+    for(let i=0;i<pts.length;i++){
+      const p=pts[i];
+      const prev=pts[Math.max(0,i-1)], next=pts[Math.min(pts.length-1,i+1)];
+      let nx=-(next.y-prev.y), ny=(next.x-prev.x);
+      const len=Math.hypot(nx,ny)||1; nx/=len; ny/=len;
+      const u=i/(pts.length-1);
+      let w = width;
+      if(taper) w *= Math.sin(Math.PI*clamp(u,minTaper,1-minTaper))*0.9+0.15;
+      const jig = jitter ? (hash(i*13.7+seed*7.3+pass*3.1)-0.5)*jitter : 0;
+      const hw=(w+jig)/2;
+      left.push({x:p.x+nx*hw, y:p.y+ny*hw});
+      right.push({x:p.x-nx*hw, y:p.y-ny*hw});
+    }
+    ctx.beginPath();
+    ctx.moveTo(left[0].x,left[0].y);
+    for(const p of left) ctx.lineTo(p.x,p.y);
+    for(let i=right.length-1;i>=0;i--) ctx.lineTo(right[i].x,right[i].y);
+    ctx.closePath();
+    ctx.fillStyle=color;
+    ctx.fill();
+  }
+}
+// draws only the first `growT` (0..1) fraction of a stroke's control points, so a branch
+// or trunk appears to be painted stroke-by-stroke over time
+function brushStrokeGrow(ctx, rawPts, growT, opts){
+  if(growT<=0.01) return;
+  const n = rawPts.length;
+  const count = Math.max(2, Math.round(clamp(growT,0,1)*(n-1))+1);
+  brushStroke(ctx, rawPts.slice(0,count), opts);
+}
+
+/* ============================== ink diffusion grid (reaction-diffusion style) ============================== */
+const GW=200, GH=113;
+class InkGrid{
+  constructor(gw,gh){
+    this.gw=gw; this.gh=gh;
+    this.cur=new Float32Array(gw*gh);
+    this.nxt=new Float32Array(gw*gh);
+    this.dry=new Float32Array(gw*gh);
+    this.bias=new Float32Array(gw*gh);
+    for(let y=0;y<gh;y++)for(let x=0;x<gw;x++){
+      const n = fbm(x*0.06, y*0.09);
+      this.bias[y*gw+x] = 0.55+n*0.9;
+    }
+    this.small = document.createElement('canvas');
+    this.small.width=gw; this.small.height=gh;
+    this.sctx = this.small.getContext('2d');
+    this.imgData = this.sctx.createImageData(gw,gh);
+    const d = this.imgData.data;
+    for(let i=0;i<gw*gh;i++) d[i*4]=16, d[i*4+1]=15, d[i*4+2]=19;
+    this.r=16; this.g=15; this.b=19;
+  }
+  setColor(r,g,b){ this.r=r; this.g=g; this.b=b; const d=this.imgData.data; for(let i=0;i<this.gw*this.gh;i++){ d[i*4]=r; d[i*4+1]=g; d[i*4+2]=b; } }
+  reset(){ this.cur.fill(0); this.nxt.fill(0); this.dry.fill(0); }
+  addDrop(nx,ny,amt,radX,radY){
+    radY = radY===undefined ? radX : radY;
+    const gw=this.gw, gh=this.gh;
+    const cx=nx*gw, cy=ny*gh;
+    const x0=Math.max(0,Math.floor(cx-radX*1.7)), x1=Math.min(gw-1,Math.ceil(cx+radX*1.7));
+    const y0=Math.max(0,Math.floor(cy-radY*1.7)), y1=Math.min(gh-1,Math.ceil(cy+radY*1.7));
+    for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
+      const dx=x-cx, dy=y-cy;
+      const d2 = (dx*dx)/(radX*radX) + (dy*dy)/(radY*radY);
+      const g = Math.exp(-d2/0.62);
+      if(g>0.003){
+        const idx=y*gw+x;
+        this.cur[idx] = Math.min(1.5, this.cur[idx]+amt*g);
+      }
+    }
+  }
+  eraseRegion(nx,ny,radX,radY,strength){
+    const gw=this.gw, gh=this.gh;
+    const cx=nx*gw, cy=ny*gh;
+    const x0=Math.max(0,Math.floor(cx-radX*1.7)), x1=Math.min(gw-1,Math.ceil(cx+radX*1.7));
+    const y0=Math.max(0,Math.floor(cy-radY*1.7)), y1=Math.min(gh-1,Math.ceil(cy+radY*1.7));
+    for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
+      const dx=x-cx, dy=y-cy;
+      const d2=(dx*dx)/(radX*radX)+(dy*dy)/(radY*radY);
+      const g=Math.exp(-d2/0.62);
+      const idx=y*gw+x;
+      const f = Math.max(0, 1-strength*g);
+      this.cur[idx]*=f; this.dry[idx]*=f;
+    }
+  }
+  // NOTE: explicit diffusion is only numerically stable while diffRate*maxBias stays below
+  // ~0.25 (bias field ranges ~0.55..1.45); exceeding it produces a checkerboard-like
+  // odd-even numerical instability that compounds over many steps. Keep rates <=0.17.
+  step(diffRate, decay, drySpeed, substeps){
+    const gw=this.gw, gh=this.gh;
+    for(let s=0;s<substeps;s++){
+      const cur=this.cur, nxt=this.nxt, bias=this.bias;
+      for(let y=0;y<gh;y++){
+        const yUp = y>0?y-1:y, yDn = y<gh-1?y+1:y;
+        const rowUp = yUp*gw, rowDn = yDn*gw, row=y*gw;
+        for(let x=0;x<gw;x++){
+          const i = row+x;
+          const xL = x>0?x-1:x, xR = x<gw-1?x+1:x;
+          const lap = cur[row+xL]+cur[row+xR]+cur[rowUp+x]+cur[rowDn+x]-4*cur[i];
+          let v = cur[i] + diffRate*bias[i]*lap - decay*cur[i];
+          if(v<0) v=0; else if(v>1.5) v=1.5;
+          nxt[i]=v;
+        }
+      }
+      this.cur.set(nxt);
+    }
+    const cur=this.cur, dry=this.dry;
+    for(let i=0;i<gw*gh;i++){
+      const target = cur[i]*drySpeed;
+      if(target>dry[i]) dry[i]+= (target-dry[i])*0.16;
+      else dry[i]*=0.9993;
+    }
+  }
+  renderTo(ctx, vx,vy,vw,vh, visibility){
+    if(visibility<=0.002) return;
+    const gw=this.gw, gh=this.gh, cur=this.cur, dry=this.dry, data=this.imgData.data;
+    for(let i=0;i<gw*gh;i++){
+      const val = Math.min(1, cur[i]*0.62 + dry[i]*0.62);
+      data[i*4+3] = Math.min(255, val*255*visibility);
+    }
+    this.sctx.putImageData(this.imgData,0,0);
+    ctx.save();
+    // plain alpha compositing avoids a dithering/checkerboard artifact that 'multiply'
+    // over large dark areas can trigger under software canvas rasterization.
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(this.small, 0,0,gw,gh, vx,vy,vw,vh);
+    ctx.restore();
+  }
+}
+const inkGrid = new InkGrid(GW,GH);
+const lotusGrid = new InkGrid(120,80); // dedicated grid for lotus-leaf ink blooms (scene 2)
+
+/* ============================== timeline ============================== */
+const SCENES = [
+  {name:'', start:-1, end:0}, // placeholder
+];
+const TOTAL = 112;
+const T = {
+  introEnd: 8,
+  s1: {start:6, end:41},
+  s2: {start:38, end:75},
+  s3: {start:72, end:106},
+  endStart: 104
+};
+
+/* ============================== shared ridge / mountain backdrop (scene 1) ============================== */
+function ridgeShape(baseY, amp, seedOffset, points){
+  points = points||24;
+  const pts=[];
+  for(let i=0;i<=points;i++){
+    const x = i/points*VW;
+    const n = fbm(i*0.45+seedOffset, seedOffset*3.7);
+    const y = baseY - amp*(0.35+0.65*n);
+    pts.push({x,y});
+  }
+  return pts;
+}
+const farRidge = ridgeShape(420, 120, 1.1, 22);
+const midRidge = ridgeShape(540, 150, 4.4, 24);
+const nearRidge = ridgeShape(660, 190, 8.8, 26);
+function fillSilhouette(pts, bottomY, color){
+  ctx.beginPath();
+  ctx.moveTo(-10, bottomY);
+  for(const p of pts) ctx.lineTo(p.x,p.y);
+  ctx.lineTo(VW+10, bottomY);
+  ctx.closePath();
+  ctx.fillStyle=color;
+  ctx.fill();
+}
+
+function ridgeWashEvents(ridgePts, startT, endT, amt, radX, radY, yOffset){
+  const events=[];
+  for(let i=1;i<ridgePts.length;i+=2){
+    const p = ridgePts[i];
+    const tt = lerp(startT, endT, i/(ridgePts.length-1));
+    events.push({t:tt, gx:p.x/VW, gy:(p.y+(yOffset||26))/VH, amt, radX, radY});
+  }
+  return events;
+}
+const INK_EVENTS = [
+  {t:0.6, gx:0.5, gy:0.14, amt:1.35, radX:4.2},
+  {t:0.95, gx:0.505, gy:0.165, amt:0.5, radX:7},
+  {t:1.3, gx:0.49, gy:0.18, amt:0.3, radX:10},
+  {t:5.2, gx:0.495, gy:0.175, erase:true, radX:15, radY:15, strength:1.0},
+  ...ridgeWashEvents(farRidge, 6.2, 10.5, 0.16, 11, 5, 22),
+  ...ridgeWashEvents(midRidge, 9.5, 13.5, 0.20, 12, 6, 24),
+  ...ridgeWashEvents(nearRidge, 12.8, 17.0, 0.26, 13, 7, 26),
+];
+INK_EVENTS.sort((a,b)=>a.t-b.t);
+let inkEventPtr=0, inkSimTime=0;
+const INK_DT=1/24;
+function ensureInkAt(target){
+  if(target < inkSimTime-1e-6){ inkGrid.reset(); inkSimTime=0; inkEventPtr=0; }
+  let guard=0;
+  while(inkSimTime<target-1e-6 && guard<200000){
+    guard++;
+    const dt=Math.min(INK_DT, target-inkSimTime);
+    while(inkEventPtr<INK_EVENTS.length && INK_EVENTS[inkEventPtr].t<=inkSimTime+dt+1e-6){
+      const e=INK_EVENTS[inkEventPtr++];
+      if(e.erase) inkGrid.eraseRegion(e.gx,e.gy,e.radX,e.radY,e.strength);
+      else inkGrid.addDrop(e.gx,e.gy,e.amt,e.radX,e.radY);
+    }
+    inkGrid.step(0.16, 0.0026, 0.55, 1);
+    inkSimTime+=dt;
+  }
+}
+
+function drawMountains(t){
+  const a = smoothstep(6, 17, t) * (1-smoothstep(T.s1.end-1, T.s1.end+2.5, t));
+  if(a<=0.002) return;
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.globalCompositeOperation='multiply';
+  fillSilhouette(farRidge, 460, 'rgba(150,150,158,0.42)');
+  fillSilhouette(midRidge, 590, 'rgba(95,95,102,0.55)');
+  fillSilhouette(nearRidge, 730, 'rgba(35,33,38,0.72)');
+  ctx.restore();
+  ctx.save();
+  ctx.globalAlpha = a;
+  brushStroke(ctx, farRidge, {width:3, color:'rgba(120,120,128,0.5)', jitter:1.5, seed:2});
+  brushStroke(ctx, midRidge, {width:4, color:'rgba(60,58,64,0.6)', jitter:2, seed:5});
+  brushStroke(ctx, nearRidge, {width:5.5, color:'rgba(18,16,20,0.75)', jitter:2.5, seed:9});
+  ctx.restore();
+}
+
+function drawRiverS1(t){
+  const a = ramp(t-T.s1.start, T.s1.end-T.s1.start, 3.5);
+  if(a<=0.002) return;
+  const localT = clamp(t-T.s1.start,0,T.s1.end-T.s1.start);
+  ctx.save();
+  ctx.globalAlpha=a;
+  const baseY=780;
+  ctx.globalCompositeOperation='multiply';
+  ctx.beginPath();
+  ctx.moveTo(-10, baseY-30);
+  for(let i=0;i<=20;i++){ const x=i/20*VW; ctx.lineTo(x, baseY-30+Math.sin(x*0.006+t*0.3)*8); }
+  ctx.lineTo(VW+10, VH+10); ctx.lineTo(-10, VH+10);
+  ctx.closePath();
+  const rg=ctx.createLinearGradient(0,baseY-30,0,VH);
+  rg.addColorStop(0,'rgba(90,95,100,0.32)');
+  rg.addColorStop(1,'rgba(60,65,72,0.46)');
+  ctx.fillStyle=rg; ctx.fill();
+  ctx.restore();
+  ctx.save();
+  ctx.globalAlpha=a*0.5;
+  for(let i=0;i<14;i++){
+    const yy=baseY+10+(i%7)*20;
+    const off=(t*36+i*97)%(VW+200)-100;
+    ctx.strokeStyle='rgba(255,252,240,0.18)';
+    ctx.lineWidth=1.2;
+    ctx.beginPath(); ctx.moveTo(off,yy); ctx.lineTo(off+56,yy); ctx.stroke();
+  }
+  ctx.restore();
+
+  // lone boat, drifting gently
+  const bx = 820+Math.sin(localT*0.22)*160;
+  const by = 806+Math.sin(t*1.1)*3;
+  ctx.save(); ctx.globalAlpha=a;
+  ctx.beginPath();
+  ctx.moveTo(bx-36,by);
+  ctx.quadraticCurveTo(bx,by+13,bx+36,by);
+  ctx.quadraticCurveTo(bx,by+5,bx-36,by);
+  ctx.fillStyle='rgba(210,198,165,0.92)'; ctx.fill();
+  ctx.lineWidth=1.6; ctx.strokeStyle='rgba(20,18,16,0.85)'; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bx,by-2); ctx.lineTo(bx,by-30); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bx,by-26); ctx.lineTo(bx+18,by-19); ctx.lineTo(bx,by-13); ctx.closePath();
+  ctx.fillStyle='rgba(210,198,165,0.8)'; ctx.fill(); ctx.stroke();
+  ctx.restore();
+}
+
+function drawSunS1(t){
+  const a = ramp(t-T.s1.start-1, T.s1.end-T.s1.start-2, 4);
+  if(a<=0.002) return;
+  const localT = clamp(t-T.s1.start-1,0,30);
+  const y = lerp(540, 300, smoothstep(0,13,localT));
+  const x = 1220, r = 44+smoothstep(0,10,localT)*10;
+  ctx.save();
+  ctx.globalAlpha=a;
+  const g=ctx.createRadialGradient(x,y,0,x,y,r*2.2);
+  g.addColorStop(0,'rgba(198,60,40,0.9)');
+  g.addColorStop(0.4,'rgba(190,70,40,0.5)');
+  g.addColorStop(1,'rgba(190,70,40,0)');
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r*2.2,0,Math.PI*2); ctx.fill();
+  ctx.globalCompositeOperation='multiply';
+  ctx.fillStyle='rgba(196,58,42,0.75)';
+  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+function drawBirdsS1(t){
+  const a = ramp(t-T.s1.start-2, T.s1.end-T.s1.start-3, 4);
+  if(a<=0.002) return;
+  ctx.save();
+  ctx.globalAlpha=a;
+  ctx.strokeStyle='rgba(25,22,20,0.8)';
+  ctx.lineWidth=3.2; ctx.lineCap='round';
+  for(let i=0;i<4;i++){
+    const speed=16+hash(i*3)*9;
+    const phase=hash(i*7)*1000;
+    const x=((t*speed+phase)%(VW+300))-150;
+    const y=180+hash(i*5)*120+Math.sin(t*1.4+i)*8;
+    const flap=Math.sin(t*9+i*2)*0.35+0.5;
+    const s=15+hash(i*11)*8;
+    ctx.beginPath();
+    ctx.moveTo(x-s,y-s*flap);
+    ctx.quadraticCurveTo(x,y+s*0.3,x+s,y-s*flap);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/* ============================== wash-dissolve transition overlay ============================== */
+const TGW=140, TGH=79;
+const transCanvas=document.createElement('canvas'); transCanvas.width=TGW; transCanvas.height=TGH;
+const transCtx=transCanvas.getContext('2d');
+const transImg=transCtx.createImageData(TGW,TGH);
+function drawWashTransition(center, half, seed){
+  // cover: 0 (clear) -> 1 (fully inked) -> 0 (clear), driven by |t-center| vs half
+  return function(t){
+    const d = Math.abs(t-center)/half;
+    const cover = 1-smoothstep(0.35,1.0,d);
+    if(cover<=0.004) return;
+    const data=transImg.data;
+    const thresh = cover*1.35;
+    for(let y=0;y<TGH;y++)for(let x=0;x<TGW;x++){
+      const n = fbm(x*0.07+seed, y*0.09+seed*1.6);
+      const v = 1-smoothstep(thresh-0.16, thresh+0.16, n);
+      const idx=(y*TGW+x)*4;
+      data[idx]=14; data[idx+1]=13; data[idx+2]=16; data[idx+3]=v*235;
+    }
+    transCtx.putImageData(transImg,0,0);
+    ctx.save();
+    ctx.imageSmoothingEnabled=true;
+    ctx.drawImage(transCanvas,0,0,TGW,TGH,0,0,VW,VH);
+    ctx.restore();
+  };
+}
+const transition1 = drawWashTransition(39.5, 5.2, 3.3);
+const transition2 = drawWashTransition(73.5, 5.2, 11.7);
+
+/* ============================== Scene 2: Lotus pond ============================== */
+const LOTUS_EVENTS_RAW = [
+  {t:41.5, x:0.22, y:0.55, amt:1.1, r:13},
+  {t:44.0, x:0.42, y:0.42, amt:1.15, r:15},
+  {t:46.5, x:0.66, y:0.60, amt:1.1, r:14},
+  {t:49.0, x:0.82, y:0.38, amt:1.0, r:11},
+  {t:51.0, x:0.32, y:0.72, amt:0.95, r:10},
+];
+let lotusPtr=0, lotusSimTime=0;
+function ensureLotusAt(target){
+  if(target < lotusSimTime-1e-6){ lotusGrid.reset(); lotusSimTime=0; lotusPtr=0; }
+  let guard=0;
+  while(lotusSimTime<target-1e-6 && guard<200000){
+    guard++;
+    const dt=Math.min(INK_DT, target-lotusSimTime);
+    while(lotusPtr<LOTUS_EVENTS_RAW.length && LOTUS_EVENTS_RAW[lotusPtr].t<=lotusSimTime+dt+1e-6){
+      const e=LOTUS_EVENTS_RAW[lotusPtr++];
+      lotusGrid.addDrop(e.x, e.y, e.amt, e.r, e.r*0.8);
+      // small notch so the round ink bloom reads as a lotus-leaf silhouette
+      lotusGrid.eraseRegion(e.x+0.05, e.y-0.03, e.r*0.35, e.r*0.35, 0.9);
+    }
+    lotusGrid.step(0.15, 0.003, 0.6, 1);
+    lotusSimTime+=dt;
+  }
+}
+function drawLotusPetals(ctx,x,y,scale,rot,petalColor,centerColor){
+  ctx.save(); ctx.translate(x,y); ctx.rotate(rot); ctx.scale(scale,scale);
+  for(let ring=0; ring<2; ring++){
+    const n = ring===0?6:5;
+    const rr = ring===0? 1:0.62;
+    for(let i=0;i<n;i++){
+      const a = i/n*Math.PI*2 + (ring?Math.PI/n:0);
+      ctx.save(); ctx.rotate(a);
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.quadraticCurveTo(4.2*rr,-9*rr, 0,-18*rr);
+      ctx.quadraticCurveTo(-4.2*rr,-9*rr, 0,0);
+      ctx.fillStyle = ring===0?petalColor:`rgba(255,255,255,0.35)`;
+      ctx.globalCompositeOperation = ring===0?'source-over':'overlay';
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+  ctx.globalCompositeOperation='source-over';
+  ctx.beginPath(); ctx.arc(0,0,3.2,0,Math.PI*2); ctx.fillStyle=centerColor; ctx.fill();
+  ctx.restore();
+}
+const LOTUS_FLOWERS = [
+  {t:52, x:0.24, y:0.50, scale:1.0, rot:0.2},
+  {t:56, x:0.68, y:0.55, scale:1.15, rot:-0.3},
+  {t:60, x:0.46, y:0.38, scale:0.9, rot:0.6},
+];
+function drawScene2(t){
+  const dur = T.s2.end-T.s2.start;
+  const a = ramp(t-T.s2.start, dur, 4);
+  if(a<=0.002) return;
+  const localT = clamp(t-T.s2.start,0,dur);
+  ctx.save();
+  ctx.globalAlpha=a;
+  // water wash
+  const g = ctx.createLinearGradient(0,180,0,VH);
+  g.addColorStop(0,'rgba(150,170,165,0.20)');
+  g.addColorStop(1,'rgba(90,120,120,0.38)');
+  ctx.fillStyle=g;
+  ctx.fillRect(0,180,VW,VH-180);
+  ctx.restore();
+
+  // ripples: several expanding ring sets
+  ctx.save();
+  ctx.globalAlpha=a*0.45;
+  ctx.strokeStyle='rgba(230,240,235,0.4)';
+  ctx.lineWidth=1;
+  for(let i=0;i<6;i++){
+    const cx=200+hash(i*3)*1200, cy=260+hash(i*7)*560;
+    const period=6+hash(i*11)*3;
+    const ph=(localT+ i*1.7)%period/period;
+    const r = ph*140;
+    ctx.globalAlpha = a*0.4*(1-ph);
+    ctx.beginPath(); ctx.ellipse(cx,cy,r,r*0.32,0,0,Math.PI*2); ctx.stroke();
+  }
+  ctx.restore();
+
+  // ink-bloomed lotus leaves
+  ensureLotusAt(t);
+  ctx.save();
+  ctx.globalAlpha=a;
+  lotusGrid.renderTo(ctx,0,180,VW,VH-180, 1);
+  ctx.restore();
+  // leaf veins (a few radiating lines per bloomed leaf)
+  ctx.save();
+  ctx.globalAlpha=a*0.55;
+  ctx.strokeStyle='rgba(20,30,26,0.4)';
+  ctx.lineWidth=1.2;
+  for(const e of LOTUS_EVENTS_RAW){
+    const lt = t-e.t;
+    if(lt<1) continue;
+    const cx=e.x*VW, cy=180+e.y*(VH-180);
+    const rad=e.r*7*Math.min(1,lt/4);
+    for(let k=0;k<6;k++){
+      const ang=k/6*Math.PI*2+0.3;
+      ctx.beginPath(); ctx.moveTo(cx,cy);
+      ctx.lineTo(cx+Math.cos(ang)*rad*0.8, cy+Math.sin(ang)*rad*0.55);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  // lotus flowers blooming
+  for(const f of LOTUS_FLOWERS){
+    const lt=t-f.t;
+    if(lt<0) continue;
+    const pop = smoothstep(0,2.2,lt);
+    const cx=f.x*VW, cy=180+f.y*(VH-180);
+    ctx.save();
+    ctx.globalAlpha = a*pop;
+    drawLotusPetals(ctx, cx, cy-14, f.scale*pop*0.9+f.scale*0.1, f.rot, 'rgba(232,150,175,0.92)', 'rgba(235,200,90,0.9)');
+    ctx.restore();
+  }
+}
+
+/* ============================== Scene 3: Plum blossoms ============================== */
+function buildTrunk(){
+  const pts=[{x:760,y:900},{x:740,y:760},{x:820,y:640},{x:770,y:520},{x:860,y:410},{x:820,y:300}];
+  return pts;
+}
+const trunkPts = buildTrunk();
+const branches = [
+  {from:2, pts:[{x:820,y:640},{x:960,y:600},{x:1080,y:520},{x:1180,y:470}], t0:78},
+  {from:3, pts:[{x:770,y:520},{x:640,y:470},{x:520,y:420}], t0:84},
+  {from:4, pts:[{x:860,y:410},{x:980,y:340},{x:1060,y:260}], t0:90},
+  {from:5, pts:[{x:820,y:300},{x:730,y:230},{x:680,y:150}], t0:95},
+  {from:1, pts:[{x:740,y:760},{x:600,y:720},{x:470,y:690}], t0:80},
+];
+function drawBlossom(ctx,x,y,scale,rot){
+  ctx.save(); ctx.translate(x,y); ctx.rotate(rot); ctx.scale(scale,scale);
+  for(let i=0;i<5;i++){
+    const a=i/5*Math.PI*2;
+    ctx.save(); ctx.rotate(a);
+    ctx.beginPath(); ctx.ellipse(0,-6.5,3.6,6.2,0,0,Math.PI*2);
+    ctx.fillStyle='rgba(206,45,55,0.92)';
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.beginPath(); ctx.arc(0,0,2.1,0,Math.PI*2);
+  ctx.fillStyle='rgba(235,210,90,0.95)'; ctx.fill();
+  ctx.restore();
+}
+function drawScene3(t){
+  const dur = T.s3.end-T.s3.start;
+  const a = ramp(t-T.s3.start, dur, 4.5);
+  if(a<=0.002) return;
+  const localT = clamp(t-T.s3.start,0,dur);
+  ctx.save();
+  ctx.globalAlpha=a;
+
+  const trunkGrow = smoothstep(0,9,localT);
+  brushStrokeGrow(ctx, trunkPts, trunkGrow, {width:22,color:'rgba(35,30,28,0.88)',taper:true,jitter:4,seed:1,passes:1});
+  brushStrokeGrow(ctx, trunkPts, trunkGrow, {width:14,color:'rgba(20,17,16,0.5)',taper:true,jitter:3,seed:2});
+
+  for(const br of branches){
+    const bg = smoothstep(br.t0-T.s3.start, br.t0-T.s3.start+5, localT);
+    if(bg<=0.01) continue;
+    brushStrokeGrow(ctx, br.pts, bg, {width:9,color:'rgba(35,30,28,0.85)',taper:true,jitter:3,seed:br.from+4});
+    if(bg>0.85){
+      const tipCount = 3+ (br.from%3);
+      for(let k=0;k<tipCount;k++){
+        const along = (k+1)/(tipCount+1);
+        const idx = Math.min(br.pts.length-1, Math.floor(along*(br.pts.length-1)));
+        const p = br.pts[idx];
+        const flt = t-(br.t0+2+k*1.3);
+        if(flt<0) continue;
+        const pop = smoothstep(0,1.6,flt);
+        drawBlossom(ctx, p.x+hash(k*3+br.from)*14-7, p.y+hash(k*5+br.from)*14-7, (0.85+hash(k+br.from)*0.4)*pop, hash(k*7+br.from)*6.28);
+      }
+    }
+  }
+  ctx.restore();
+}
+
+/* ============================== intro + outro ============================== */
+function drawIntroTitle(t){
+  const a = ramp(t-0.5, 6.5, 1.6);
+  if(a<=0.002) return;
+  ctx.save();
+  ctx.globalAlpha=a;
+  ctx.textAlign='center';
+  ctx.fillStyle='rgba(35,30,25,0.85)';
+  ctx.font='54px "Noto Serif SC","STKaiti","KaiTi",Georgia,serif';
+  ctx.fillText('水 墨 畫', VW/2, VH*0.42);
+  ctx.font='15px Georgia,serif';
+  ctx.fillStyle='rgba(70,60,45,0.7)';
+  ctx.fillText('C H I N E S E   I N K - W A S H   P A I N T I N G', VW/2, VH*0.42+46);
+  ctx.restore();
+}
+function worldFadeEnd(t){ return 1 - smoothstep(T.endStart, TOTAL-2, t); }
+function drawEnding(t){
+  const a = smoothstep(T.endStart+2, TOTAL-3, t);
+  if(a<=0.002) return;
+  const cx=VW/2, cy=VH/2;
+  ctx.save();
+  ctx.globalAlpha=a;
+  const g=ctx.createRadialGradient(cx,cy,0,cx,cy,24);
+  g.addColorStop(0,'rgba(15,14,18,0.95)');
+  g.addColorStop(0.6,'rgba(15,14,18,0.7)');
+  g.addColorStop(1,'rgba(15,14,18,0)');
+  ctx.fillStyle=g;
+  ctx.beginPath(); ctx.arc(cx,cy,24,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+  const sa = smoothstep(T.endStart+4, TOTAL-1, t);
+  if(sa>0.002){
+    ctx.save();
+    ctx.globalAlpha=sa*0.9;
+    ctx.fillStyle='rgba(178,42,34,0.88)';
+    ctx.fillRect(VW-140, VH-110, 58, 58);
+    ctx.strokeStyle='rgba(255,240,225,0.85)';
+    ctx.lineWidth=2;
+    ctx.strokeRect(VW-132, VH-102, 20, 42);
+    ctx.strokeRect(VW-108, VH-102, 20, 42);
+    ctx.restore();
+  }
+}
+
+/* ============================== scene label ============================== */
+const sceneLabelEl = document.getElementById('sceneName');
+let lastLabel='';
+function updateSceneLabel(t){
+  let label='';
+  if(t<T.s1.start+3) label='';
+  else if(t>=T.s1.start && t<T.s2.start+2) label='Mountains & Sun';
+  else if(t>=T.s2.start+2 && t<T.s3.start+2) label='Lotus Pond';
+  else if(t>=T.s3.start+2 && t<TOTAL) label='Plum Blossoms';
+  if(label!==lastLabel){
+    lastLabel=label;
+    sceneLabelEl.textContent=label;
+    sceneLabelEl.style.opacity = label? '0.85':'0';
+  }
+}
+
+/* ============================== master draw ============================== */
+function draw(t){
+  beginFrame();
+  ctx.drawImage(paperCanvas,0,0,VW,VH);
+  ensureInkAt(t);
+  const wf = worldFadeEnd(t);
+  inkGrid.renderTo(ctx,0,0,VW,VH, wf);
+  drawMountains(t);
+  drawRiverS1(t);
+  drawSunS1(t);
+  drawBirdsS1(t);
+  drawScene2(t);
+  drawScene3(t);
+  drawIntroTitle(t);
+  transition1(t);
+  transition2(t);
+  drawEnding(t);
+  updateSceneLabel(t);
+  const bar=document.getElementById('progressBar');
+  bar.style.width=(clamp(t/TOTAL,0,1)*100)+'%';
+  const hint=document.getElementById('replayHint');
+  hint.style.color = t>=TOTAL-0.5 ? 'rgba(235,224,196,0.75)' : 'rgba(235,224,196,0)';
+}
+
+/* ============================== audio (optional, best-effort) ============================== */
+let actx=null, master=null;
+function initAudio(){
+  try{
+    actx = new (window.AudioContext||window.webkitAudioContext)();
+    master=actx.createGain(); master.gain.value=0.28; master.connect(actx.destination);
+    [130.8,196].forEach((f,i)=>{
+      const o=actx.createOscillator(); o.type='sine'; o.frequency.value=f;
+      const g=actx.createGain(); g.gain.value=0.04;
+      o.connect(g); g.connect(master); o.start();
+      const lfo=actx.createOscillator(); lfo.frequency.value=0.05+i*0.02;
+      const lg=actx.createGain(); lg.gain.value=0.02;
+      lfo.connect(lg); lg.connect(g.gain); lfo.start();
+    });
+  }catch(e){}
+}
+function noiseBurst(dur,freq,vol){
+  if(!actx) return;
+  try{
+    const buf=actx.createBuffer(1, Math.max(1,actx.sampleRate*dur), actx.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+    const src=actx.createBufferSource(); src.buffer=buf;
+    const filt=actx.createBiquadFilter(); filt.type='bandpass'; filt.frequency.value=freq; filt.Q.value=0.6;
+    const g=actx.createGain(); g.gain.value=0;
+    src.connect(filt); filt.connect(g); g.connect(master);
+    const now=actx.currentTime;
+    g.gain.linearRampToValueAtTime(vol, now+0.05);
+    g.gain.linearRampToValueAtTime(0, now+dur);
+    src.start(); src.stop(now+dur+0.05);
+  }catch(e){}
+}
+function bell(freq,dur,vol){
+  if(!actx) return;
+  try{
+    const o=actx.createOscillator(); o.type='sine'; o.frequency.value=freq;
+    const g=actx.createGain(); g.gain.value=0;
+    o.connect(g); g.connect(master);
+    const now=actx.currentTime;
+    g.gain.linearRampToValueAtTime(vol, now+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, now+dur);
+    o.start(now); o.stop(now+dur+0.1);
+  }catch(e){}
+}
+const audioFired=new Set();
+function fireAudioEvents(t){
+  if(!actx) return;
+  const fire=(key,fn)=>{ if(!audioFired.has(key)){ audioFired.add(key); fn(); } };
+  if(t>0.9) fire('drop', ()=>noiseBurst(0.5,900,0.18));
+  if(t>T.s2.start+1) fire('water', ()=>noiseBurst(1.2,500,0.1));
+  if(t>T.s3.start+1) fire('wind', ()=>noiseBurst(2.0,300,0.06));
+  if(t>TOTAL-6) fire('endbell', ()=>bell(330,3.2,0.15));
+}
+
+/* ============================== main loop / autotest ============================== */
+let clock=0, lastNow=null, playing=false;
+function loop(now){
+  if(lastNow==null) lastNow=now;
+  const dt=(now-lastNow)/1000;
+  lastNow=now;
+  if(!AUTOTEST){
+    clock=Math.min(TOTAL, clock+dt);
+    draw(clock);
+    fireAudioEvents(clock);
+  } else {
+    autotestTick(now);
+  }
+  requestAnimationFrame(loop);
+}
+
+const KEY_MOMENTS = [1, 6, 14, 22, 30, 39.5, 46, 54, 62, 70, 73.5, 80, 88, 96, 103, 109];
+const seekParam = new URLSearchParams(location.search).get('seek');
+const FIXED_SEEK = seekParam!==null ? parseFloat(seekParam) : null;
+let autotestFrame=0, autotestStart=null;
+function autotestTick(now){
+  if(FIXED_SEEK!==null){ draw(FIXED_SEEK); return; }
+  if(autotestStart===null) autotestStart=now;
+  const timeIdx = Math.floor((now-autotestStart)/260);
+  const frameIdx = autotestFrame;
+  autotestFrame++;
+  const idx = Math.max(timeIdx, frameIdx) % KEY_MOMENTS.length;
+  draw(KEY_MOMENTS[idx]);
+}
+
+function start(){
+  if(playing) return;
+  playing=true;
+  document.getElementById('startOverlay').style.opacity='0';
+  setTimeout(()=>{ document.getElementById('startOverlay').style.display='none'; }, 850);
+  initAudio();
+  lastNow=null;
+  requestAnimationFrame(loop);
+}
+document.getElementById('startOverlay').addEventListener('click', start);
+canvas.addEventListener('click', ()=>{
+  if(clock>=TOTAL-0.3 || AUTOTEST){ clock=0; audioFired.clear(); }
+});
+
+if(AUTOTEST){
+  document.getElementById('startOverlay').style.display='none';
+  playing=true;
+  requestAnimationFrame(loop);
+} else {
+  draw(0);
+}
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fox Lantern Adventure</title>
+<script>window.addEventListener('error',e=>{document.title='ERROR: '+e.message+' @'+e.lineno});</script>
+<style>
+:root{--amber:#ffb347;--lav:#c9a6ff;--pink:#ffb0d6;--cream:#fff4e0}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#140a24;color:var(--cream);font-family:Georgia,'Palatino Linotype',serif}
+canvas{display:block}
+#title{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:20;
+  background:radial-gradient(ellipse at 50% 30%,rgba(90,50,120,.55),rgba(10,6,20,.92) 70%),linear-gradient(180deg,#2a1740,#160a26 60%,#0c0616);
+  text-align:center;transition:opacity .8s ease;}
+#title.hide{opacity:0;pointer-events:none}
+#title h1{font-size:clamp(28px,6vw,54px);letter-spacing:.06em;color:var(--amber);text-shadow:0 0 18px rgba(255,179,71,.8),0 0 40px rgba(201,166,255,.5);margin-bottom:10px}
+#title h2{font-size:14px;letter-spacing:.3em;color:var(--lav);text-transform:uppercase;margin-bottom:34px;font-weight:normal}
+#title .panel{background:rgba(30,16,50,.55);border:1px solid rgba(255,179,71,.35);border-radius:10px;padding:18px 30px;margin-bottom:28px;box-shadow:0 0 30px rgba(0,0,0,.4)}
+#title .panel p{font-size:13px;line-height:1.9;color:#f0e2ff;letter-spacing:.02em}
+#title .panel b{color:var(--amber)}
+#begin{font-size:16px;letter-spacing:.15em;padding:13px 42px;border-radius:30px;border:1px solid var(--amber);background:linear-gradient(180deg,#ffcf85,#e8933f);color:#3a1f08;cursor:pointer;text-transform:uppercase;box-shadow:0 0 24px rgba(255,179,71,.55);transition:transform .15s}
+#begin:hover{transform:scale(1.05)}
+#hud{position:fixed;inset:0;pointer-events:none;z-index:5;text-shadow:0 1px 3px #000}
+#hints{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);font-size:12px;letter-spacing:.06em;color:#f0e2ff;background:rgba(20,10,32,.55);border:1px solid rgba(255,179,71,.3);border-radius:20px;padding:8px 22px;white-space:nowrap}
+#hints b{color:var(--amber)}
+#brand{position:absolute;left:20px;top:18px;font-size:15px;letter-spacing:.1em;color:var(--amber);opacity:.85}
+#brand small{display:block;font-size:10px;color:var(--lav);letter-spacing:.25em;margin-top:2px}
+#combo{position:absolute;left:50%;top:14%;transform:translateX(-50%) scale(.8);font-size:22px;letter-spacing:.1em;color:var(--amber);opacity:0;transition:opacity .15s,transform .15s;text-shadow:0 0 14px rgba(255,179,71,.9)}
+#combo.show{opacity:1;transform:translateX(-50%) scale(1)}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div id="title">
+  <h1>Fox Lantern Adventure</h1>
+  <h2>a dreamy little tale of embers and moonlight</h2>
+  <div class="panel">
+    <p><b>WASD</b> move &nbsp;·&nbsp; <b>Mouse Drag</b> orbit camera &nbsp;·&nbsp; <b>Space</b> jump (multi-jump!) &nbsp;·&nbsp; <b>E</b> spin lantern-swipe attack</p>
+    <p>Knock the crates, barrels &amp; toadstools flying with your spin attack. Chase fireflies through the fairytale glade.</p>
+  </div>
+  <button id="begin">Begin</button>
+</div>
+<div id="hud">
+  <div id="brand">Fox Lantern Adventure<small>a dreamy little tale</small></div>
+  <div id="combo">SWIPE!</div>
+  <div id="hints"><b>WASD</b> Move &nbsp; <b>Drag</b> Orbit &nbsp; <b>Space</b> Jump x3 &nbsp; <b>E</b> Spin Attack</div>
+</div>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+const AUTOTEST = new URLSearchParams(location.search).has('autotest');
+
+/* ---------------------------------------------------------------- utils */
+function canvasTexture(size, draw){
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const ctx = c.getContext('2d'); draw(ctx, size);
+  const tex = new THREE.CanvasTexture(c); tex.needsUpdate = true;
+  return tex;
+}
+function glowSprite(size, hex, soft){
+  return canvasTexture(size, (ctx,s)=>{
+    const g = ctx.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);
+    g.addColorStop(0, hex+'ff'); g.addColorStop(soft||0.25, hex+'cc'); g.addColorStop(1,'#00000000');
+    ctx.fillStyle = g; ctx.fillRect(0,0,s,s);
+  });
+}
+class Spring1D{
+  constructor(stiff=140,damp=16){ this.v=0; this.vel=0; this.stiff=stiff; this.damp=damp; }
+  update(target, dt){
+    const a = (target-this.v)*this.stiff - this.vel*this.damp;
+    this.vel += a*dt; this.v += this.vel*dt; return this.v;
+  }
+  kick(impulse){ this.vel += impulse; }
+}
+function lerp(a,b,t){ return a+(b-a)*t; }
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+
+/* ---------------------------------------------------------------- renderer / scene */
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const HORIZON = new THREE.Color('#ffb8d9');
+scene.fog = new THREE.FogExp2(HORIZON.getHex(), 0.021);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 400);
+
+/* sky dome with vertical gradient */
+(function buildSky(){
+  const geo = new THREE.SphereGeometry(300, 24, 16);
+  const pos = geo.attributes.position;
+  const colors = [];
+  const top = new THREE.Color('#3a2166'), mid = new THREE.Color('#ff9ecb'), bot = new THREE.Color('#ffd9a0');
+  for(let i=0;i<pos.count;i++){
+    const y = pos.getY(i)/300;
+    const c = new THREE.Color();
+    if(y>0.05) c.copy(mid).lerp(top, clamp((y-0.05)/0.95,0,1));
+    else c.copy(bot).lerp(mid, clamp((y+0.3)/0.35,0,1));
+    colors.push(c.r,c.g,c.b);
+  }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors,3));
+  const mat = new THREE.MeshBasicMaterial({vertexColors:true, side:THREE.BackSide, fog:false});
+  scene.add(new THREE.Mesh(geo, mat));
+  // moon glow
+  const moonTex = glowSprite(128, '#fff6e0', 0.15);
+  const moon = new THREE.Sprite(new THREE.SpriteMaterial({map:moonTex, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, fog:false}));
+  moon.position.set(-40, 55, -90); moon.scale.set(38,38,1);
+  scene.add(moon);
+})();
+
+/* lighting */
+const hemi = new THREE.HemisphereLight('#c9a6ff', '#3a6b4a', 0.85);
+scene.add(hemi);
+const moonLight = new THREE.DirectionalLight('#cdb8ff', 0.65);
+moonLight.position.set(-20,30,-10);
+moonLight.castShadow = true;
+moonLight.shadow.mapSize.set(512,512);
+moonLight.shadow.camera.left=-40; moonLight.shadow.camera.right=40;
+moonLight.shadow.camera.top=40; moonLight.shadow.camera.bottom=-40;
+moonLight.shadow.camera.far = 120;
+scene.add(moonLight);
+const fillLight = new THREE.DirectionalLight('#ffcf9a', 0.35);
+fillLight.position.set(15,10,20);
+scene.add(fillLight);
+
+/* ---------------------------------------------------------------- ground */
+const groundTex = canvasTexture(512, (ctx,s)=>{
+  ctx.fillStyle = '#4a8f63'; ctx.fillRect(0,0,s,s);
+  for(let i=0;i<900;i++){
+    const x=Math.random()*s, y=Math.random()*s, r=6+Math.random()*18;
+    const hue = Math.random()<0.5 ? '#5aa877' : '#3f7d57';
+    ctx.globalAlpha = 0.35+Math.random()*0.3;
+    ctx.fillStyle = hue;
+    ctx.beginPath(); ctx.arc(x,y,r,0,7); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  for(let i=0;i<70;i++){
+    const x=Math.random()*s, y=Math.random()*s;
+    ctx.fillStyle = Math.random()<0.5 ? '#ffd1ea' : '#ffe9a8';
+    ctx.beginPath(); ctx.arc(x,y,1.6+Math.random()*1.6,0,7); ctx.fill();
+  }
+});
+groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping; groundTex.repeat.set(24,24);
+groundTex.colorSpace = THREE.SRGBColorSpace;
+const ground = new THREE.Mesh(
+  new THREE.CircleGeometry(90, 64),
+  new THREE.MeshStandardMaterial({map:groundTex, roughness:0.95})
+);
+ground.rotation.x = -Math.PI/2; ground.receiveShadow = true;
+scene.add(ground);
+
+/* faint magic rings on ground near spawn */
+(function rings(){
+  for(let i=0;i<3;i++){
+    const r = new THREE.Mesh(new THREE.RingGeometry(1.6+i*0.9, 1.75+i*0.9, 48),
+      new THREE.MeshBasicMaterial({color:'#ffd58a', transparent:true, opacity:0.25-i*0.05, side:THREE.DoubleSide}));
+    r.rotation.x = -Math.PI/2; r.position.y = 0.02;
+    scene.add(r);
+  }
+})();
+
+/* ---------------------------------------------------------------- decorative trees & mushrooms (static) */
+const woodTex = canvasTexture(128, (ctx,s)=>{
+  ctx.fillStyle = '#7a5030'; ctx.fillRect(0,0,s,s);
+  for(let i=0;i<8;i++){ ctx.fillStyle='rgba(0,0,0,0.15)'; ctx.fillRect(0,i*16+2,s,3); }
+});
+function makeTree(x,z,scale,hue){
+  const g = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.32,2.2,7), new THREE.MeshStandardMaterial({color:'#5a3d28', roughness:0.9, flatShading:true}));
+  trunk.position.y=1.1; g.add(trunk);
+  const foliageMat = new THREE.MeshStandardMaterial({color:hue, roughness:0.8, flatShading:true, emissive:hue, emissiveIntensity:0.12});
+  for(let i=0;i<3;i++){
+    const f = new THREE.Mesh(new THREE.IcosahedronGeometry(1.15-i*0.22, 0), foliageMat);
+    f.position.set((Math.random()-0.5)*0.5, 2.2+i*0.85, (Math.random()-0.5)*0.5);
+    g.add(f);
+  }
+  g.position.set(x,0,z); g.scale.setScalar(scale);
+  return g;
+}
+const treeHues = ['#b98be8','#f4a0d0','#7bd8b0','#f4c06a'];
+for(let i=0;i<10;i++){
+  const a = (i/10)*Math.PI*2 + Math.random()*0.3;
+  const r = 22 + Math.random()*40;
+  scene.add(makeTree(Math.cos(a)*r, Math.sin(a)*r, 0.9+Math.random()*0.6, treeHues[i%treeHues.length]));
+}
+const spotMat = new THREE.MeshStandardMaterial({color:'#fff6e0', emissive:'#fff6e0', emissiveIntensity:0.6});
+function makeGiantMushroom(x,z,scale,hue){
+  const g = new THREE.Group();
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.5,1.6,8), new THREE.MeshStandardMaterial({color:'#f2e9d6', roughness:0.7}));
+  stem.position.y=0.8; g.add(stem);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(1.1,16,10,0,7,0,Math.PI/2), new THREE.MeshStandardMaterial({color:hue, roughness:0.6, flatShading:true, emissive:hue, emissiveIntensity:0.2}));
+  cap.position.y=1.55; g.add(cap);
+  for(let i=0;i<3;i++){
+    const spot = new THREE.Mesh(new THREE.SphereGeometry(0.11,6,6), spotMat);
+    const ang = Math.random()*Math.PI*2, rad = Math.random()*0.8;
+    spot.position.set(Math.cos(ang)*rad, 1.9+Math.random()*0.15, Math.sin(ang)*rad);
+    g.add(spot);
+  }
+  g.position.set(x,0,z); g.scale.setScalar(scale);
+  return g;
+}
+for(let i=0;i<4;i++){
+  const a = Math.random()*Math.PI*2, r = 14+Math.random()*30;
+  scene.add(makeGiantMushroom(Math.cos(a)*r, Math.sin(a)*r, 0.8+Math.random()*0.5, i%2?'#ff7a8a':'#8a6bff'));
+}
+for(let i=0;i<5;i++){
+  const a = Math.random()*Math.PI*2, r = 10+Math.random()*35;
+  const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(0.5+Math.random()*0.5,0), new THREE.MeshStandardMaterial({color:'#8a8398', roughness:0.9, flatShading:true}));
+  rock.position.set(Math.cos(a)*r, 0.25, Math.sin(a)*r);
+  rock.rotation.set(Math.random(),Math.random(),Math.random());
+  scene.add(rock);
+}
+
+/* ---------------------------------------------------------------- knockable props */
+const physObjs = [];
+function addPhysObj(mesh, halfH, mass){
+  mesh.castShadow = true; scene.add(mesh);
+  physObjs.push({mesh, vel:new THREE.Vector3(), angVel:new THREE.Vector3(), halfH, mass, hitCooldown:0});
+}
+function makeCrate(x,z){
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.85,0.85,0.85), new THREE.MeshStandardMaterial({map:woodTex, roughness:0.85}));
+  mesh.position.set(x, 0.425, z);
+  addPhysObj(mesh, 0.425, 1);
+}
+function makeBarrel(x,z){
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.42,0.95,12), new THREE.MeshStandardMaterial({color:'#8a5a34', roughness:0.85}));
+  mesh.position.set(x, 0.475, z);
+  addPhysObj(mesh, 0.475, 1.3);
+}
+function makeToadstool(x,z){
+  const g = new THREE.Group();
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.13,0.32,8), new THREE.MeshStandardMaterial({color:'#f2e9d6'}));
+  stem.position.y=0.16; g.add(stem);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.26,12,8,0,7,0,Math.PI/2), new THREE.MeshStandardMaterial({color:'#ff5f6b', emissive:'#ff5f6b', emissiveIntensity:0.15}));
+  cap.position.y=0.32; g.add(cap);
+  g.position.set(x,0.02,z);
+  addPhysObj(g, 0.32, 0.4);
+}
+// clusters, reachable near spawn for quick discovery / autotest demo
+const clusters = [
+  {x:1.2, z:0.5, items:['c','c','b']},
+  {x:-5, z:-6, items:['c','t','t','b']},
+  {x:6, z:-9, items:['c','c','t']},
+];
+clusters.forEach(cl=>{
+  cl.items.forEach((k,i)=>{
+    const ox = cl.x + (Math.random()-0.5)*1.6 + i*0.05;
+    const oz = cl.z + (Math.random()-0.5)*1.6;
+    if(k==='c') makeCrate(ox,oz);
+    else if(k==='b') makeBarrel(ox,oz);
+    else makeToadstool(ox,oz);
+  });
+});
+
+/* ---------------------------------------------------------------- fox character */
+function buildFox(){
+  const root = new THREE.Group();
+  root.position.set(0,0,0);
+
+  const furMat = new THREE.MeshStandardMaterial({color:'#e8793c', roughness:0.75, flatShading:true});
+  const creamMat = new THREE.MeshStandardMaterial({color:'#fff3e0', roughness:0.7, flatShading:true});
+  const darkMat = new THREE.MeshStandardMaterial({color:'#2a1a14', roughness:0.6});
+
+  const body = new THREE.Group();
+  root.add(body);
+
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 0.55, 6, 10), furMat);
+  torso.rotation.z = Math.PI/2; torso.position.set(0,0.5,0); torso.castShadow = true;
+  body.add(torso);
+
+  const belly = new THREE.Mesh(new THREE.SphereGeometry(0.3,10,8), creamMat);
+  belly.scale.set(1,0.75,0.9); belly.position.set(0,0.36,0.05);
+  body.add(belly);
+
+  const headGroup = new THREE.Group();
+  headGroup.position.set(0,0.78,0.5);
+  body.add(headGroup);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.28,14,10), furMat);
+  head.castShadow = true; headGroup.add(head);
+
+  const snout = new THREE.Mesh(new THREE.ConeGeometry(0.13,0.32,8), creamMat);
+  snout.rotation.x = Math.PI/2; snout.position.set(0,-0.04,0.32);
+  headGroup.add(snout);
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.045,8,8), darkMat);
+  nose.position.set(0,-0.04,0.47); headGroup.add(nose);
+
+  // big amber eyes: white sclera base + glowing amber iris + pupil + highlight, so they read as large cartoon eyes
+  const scleraGeo = new THREE.SphereGeometry(0.115,14,12);
+  const scleraMat = new THREE.MeshStandardMaterial({color:'#fffaf0', roughness:0.5});
+  const eyeGeo = new THREE.SphereGeometry(0.095,14,12);
+  const eyeMat = new THREE.MeshStandardMaterial({color:'#ffb300', emissive:'#ff9800', emissiveIntensity:0.85, roughness:0.2});
+  const pupilGeo = new THREE.SphereGeometry(0.044,10,8);
+  const eyes = [];
+  [-1,1].forEach(side=>{
+    const sclera = new THREE.Mesh(scleraGeo, scleraMat);
+    sclera.position.set(side*0.175, 0.075, 0.19);
+    sclera.scale.set(0.92,1,0.85);
+    headGroup.add(sclera);
+    const e = new THREE.Mesh(eyeGeo, eyeMat.clone());
+    e.position.set(0,0,0.045);
+    sclera.add(e);
+    const p = new THREE.Mesh(pupilGeo, darkMat);
+    p.position.set(side*0.018,0,0.08); e.add(p);
+    const hl = new THREE.Mesh(new THREE.SphereGeometry(0.024,8,8), new THREE.MeshBasicMaterial({color:'#ffffff'}));
+    hl.position.set(side*-0.02,0.035,0.095); e.add(hl);
+    eyes.push(sclera);
+  });
+  // eyebrow/lid ridge for extra expressiveness
+  [-1,1].forEach(side=>{
+    const lid = new THREE.Mesh(new THREE.SphereGeometry(0.13,10,8,0,Math.PI*2,0,Math.PI/2.4), furMat);
+    lid.position.set(side*0.175, 0.155, 0.19);
+    lid.rotation.x = Math.PI;
+    lid.scale.set(0.95,0.6,0.9);
+    headGroup.add(lid);
+  });
+
+  // tall, perked, expressive fox ears: flattened cones so they read as ears, not horns
+  const earMat = furMat, earInnerMat = new THREE.MeshStandardMaterial({color:'#ffd9c2', roughness:0.7});
+  const ears = [];
+  [-1,1].forEach(side=>{
+    const pivot = new THREE.Group();
+    pivot.position.set(side*0.25, 0.22, -0.02);
+    pivot.rotation.z = side*0.36;
+    headGroup.add(pivot);
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.15,0.5,8), earMat);
+    ear.position.y = 0.24; ear.rotation.x = -0.15; ear.scale.set(1,1,0.88); ear.castShadow = true;
+    pivot.add(ear);
+    const inner = new THREE.Mesh(new THREE.ConeGeometry(0.09,0.34,8), earInnerMat);
+    inner.position.set(0,0.22,0.05); inner.rotation.x = -0.15; inner.scale.set(1,1,0.9);
+    pivot.add(inner);
+    ears.push({pivot, sx:new Spring1D(90,11), sz:new Spring1D(90,11), side});
+  });
+
+  // legs
+  const legMat = furMat;
+  const legs = [];
+  [[-0.2,-0.28],[0.2,-0.28],[-0.2,0.32],[0.2,0.32]].forEach(([x,z],i)=>{
+    const pivot = new THREE.Group(); pivot.position.set(x,0.32,z);
+    body.add(pivot);
+    const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.07,0.24,4,6), legMat);
+    leg.position.y = -0.16; leg.castShadow = true;
+    pivot.add(leg);
+    const paw = new THREE.Mesh(new THREE.SphereGeometry(0.075,8,8), darkMat);
+    paw.position.y=-0.3; pivot.add(paw);
+    legs.push({pivot, phase:i%2===0?0:Math.PI});
+  });
+
+  // tail: chain of segments, physically animated
+  const tailMat = furMat;
+  const tailRoot = new THREE.Group();
+  tailRoot.position.set(0,0.55,-0.42);
+  body.add(tailRoot);
+  const tailSegs = [];
+  let parent = tailRoot;
+  const nSeg = 5;
+  for(let i=0;i<nSeg;i++){
+    const pivot = new THREE.Group();
+    pivot.position.set(0, i===0?0:0, i===0?0:-0.19);
+    parent.add(pivot);
+    const seg = new THREE.Mesh(new THREE.CapsuleGeometry(0.13*(1-i/nSeg*0.65),0.22,4,6), tailMat);
+    seg.rotation.x = Math.PI/2; seg.position.z = -0.13; seg.castShadow = true;
+    pivot.add(seg);
+    tailSegs.push(pivot);
+    parent = pivot;
+  }
+  const tailTip = new THREE.Mesh(new THREE.SphereGeometry(0.09,10,8), creamMat);
+  tailTip.position.z = -0.28; tailSegs[tailSegs.length-1].add(tailTip);
+  const baseSpringY = new Spring1D(60,10), baseSpringX = new Spring1D(60,12);
+
+  // lantern, held out to the side on a stick gripped near the mouth, swinging on a pendulum
+  const lanternArm = new THREE.Group();
+  lanternArm.position.set(0.5, 0.4, 0.4);
+  body.add(lanternArm);
+  const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.022,0.026,0.34,6), new THREE.MeshStandardMaterial({color:'#5a3d28', roughness:0.8}));
+  stick.position.set(-0.1,0.12,0.14); stick.rotation.z = 0.5; stick.rotation.x = -0.3;
+  lanternArm.add(stick);
+  const handle = new THREE.Mesh(new THREE.TorusGeometry(0.1,0.016,6,12), new THREE.MeshStandardMaterial({color:'#6b4a2a', metalness:0.5, roughness:0.4}));
+  handle.position.y = -0.02;
+  lanternArm.add(handle);
+  const cageMat = new THREE.MeshStandardMaterial({color:'#7a5228', metalness:0.55, roughness:0.35, emissive:'#3a1f08', emissiveIntensity:0.3});
+  const cage = new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.13,0.26,6,1,true), cageMat);
+  cage.position.y = -0.22;
+  lanternArm.add(cage);
+  const cageTop = new THREE.Mesh(new THREE.ConeGeometry(0.14,0.1,6), cageMat);
+  cageTop.position.y=-0.1; lanternArm.add(cageTop);
+  const cageBottom = new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,0.035,8), cageMat);
+  cageBottom.position.y=-0.36; lanternArm.add(cageBottom);
+  const flameGlowTex = glowSprite(64,'#ffcf7a', 0.3);
+  const flame = new THREE.Sprite(new THREE.SpriteMaterial({map:flameGlowTex, color:'#ffdca0', blending:THREE.AdditiveBlending, depthWrite:false, transparent:true}));
+  flame.position.y = -0.22; flame.scale.set(0.4,0.4,1);
+  lanternArm.add(flame);
+  const haloTex = glowSprite(128,'#ffb347',0.12);
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({map:haloTex, blending:THREE.AdditiveBlending, depthWrite:false, transparent:true, opacity:0.6}));
+  halo.position.y=-0.22; halo.scale.set(1.9,1.9,1);
+  lanternArm.add(halo);
+  const lanternLight = new THREE.PointLight('#ffb04a', 2.6, 8, 2);
+  lanternLight.position.y = -0.22;
+  lanternArm.add(lanternLight);
+  const armSpringX = new Spring1D(70,11), armSpringZ = new Spring1D(70,11);
+
+  return {
+    root, body, headGroup, eyes, ears, legs, tailSegs, tailRoot, baseSpringX, baseSpringY,
+    lanternArm, lanternLight, flame, armSpringX, armSpringZ,
+    blinkTimer: 2+Math.random()*3
+  };
+}
+const fox = buildFox();
+scene.add(fox.root);
+fox.root.position.set(0,0,2);
+
+/* ---------------------------------------------------------------- particles */
+// ambient fairy dust
+const N_DUST = 260;
+const dustGeo = new THREE.BufferGeometry();
+const dustPos = new Float32Array(N_DUST*3);
+const dustSeed = new Float32Array(N_DUST*3);
+for(let i=0;i<N_DUST;i++){
+  const a = Math.random()*Math.PI*2, r = Math.random()*40;
+  dustPos[i*3] = Math.cos(a)*r; dustPos[i*3+1] = Math.random()*7+0.2; dustPos[i*3+2] = Math.sin(a)*r;
+  dustSeed[i*3] = Math.random()*10; dustSeed[i*3+1] = 0.4+Math.random()*0.6; dustSeed[i*3+2] = Math.random()*10;
+}
+dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos,3));
+const dustTex = glowSprite(32, '#fff2c9', 0.2);
+const dustMat = new THREE.PointsMaterial({map:dustTex, size:0.22, transparent:true, opacity:0.85, depthWrite:false, blending:THREE.AdditiveBlending, sizeAttenuation:true, color:'#ffe9b0'});
+const dust = new THREE.Points(dustGeo, dustMat);
+scene.add(dust);
+
+// lantern sparks (pool)
+const N_SPARK = 70;
+const sparkGeo = new THREE.BufferGeometry();
+const sparkPos = new Float32Array(N_SPARK*3);
+const sparkVel = [];
+const sparkLife = new Float32Array(N_SPARK);
+for(let i=0;i<N_SPARK;i++){ sparkLife[i]=0; sparkVel.push(new THREE.Vector3()); }
+sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPos,3));
+const sparkTex = glowSprite(32,'#ffcf7a', 0.25);
+const sparkMat = new THREE.PointsMaterial({map:sparkTex, size:0.14, transparent:true, opacity:0.9, depthWrite:false, blending:THREE.AdditiveBlending, color:'#ffb04a'});
+const sparks = new THREE.Points(sparkGeo, sparkMat);
+scene.add(sparks);
+let sparkCursor = 0;
+function spawnSpark(pos){
+  const i = sparkCursor; sparkCursor = (sparkCursor+1)%N_SPARK;
+  sparkPos[i*3]=pos.x+(Math.random()-0.5)*0.08; sparkPos[i*3+1]=pos.y+(Math.random()-0.5)*0.08; sparkPos[i*3+2]=pos.z+(Math.random()-0.5)*0.08;
+  sparkVel[i].set((Math.random()-0.5)*0.3, 0.6+Math.random()*0.6, (Math.random()-0.5)*0.3);
+  sparkLife[i] = 0.8+Math.random()*0.5;
+}
+
+// hit burst (spin attack shockwave ring)
+const ringTex = glowSprite(64,'#ffe9a8',0.4);
+const hitRings = [];
+function spawnHitRing(pos){
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({map:ringTex, blending:THREE.AdditiveBlending, transparent:true, depthWrite:false}));
+  s.position.copy(pos); s.scale.set(0.2,0.2,1);
+  scene.add(s);
+  hitRings.push({s, t:0});
+}
+
+/* ---------------------------------------------------------------- input */
+const keys = {};
+window.addEventListener('keydown', e=>{
+  keys[e.code]=true;
+  if(['Space','KeyE','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
+  if(e.code==='Space') tryJump();
+  if(e.code==='KeyE') tryAttack();
+}, {passive:false});
+window.addEventListener('keyup', e=>{ keys[e.code]=false; });
+
+let camYaw = Math.PI, camPitch = 0.38, camDist = 5.6;
+let dragging = false, lastX=0, lastY=0;
+renderer.domElement.addEventListener('pointerdown', e=>{ dragging=true; lastX=e.clientX; lastY=e.clientY; });
+window.addEventListener('pointerup', ()=> dragging=false);
+window.addEventListener('pointermove', e=>{
+  if(!dragging) return;
+  camYaw -= (e.clientX-lastX)*0.006;
+  camPitch = clamp(camPitch - (e.clientY-lastY)*0.005, 0.08, 1.15);
+  lastX=e.clientX; lastY=e.clientY;
+});
+renderer.domElement.addEventListener('wheel', e=>{ camDist = clamp(camDist + e.deltaY*0.003, 3.5, 13); }, {passive:true});
+
+/* ---------------------------------------------------------------- movement state */
+const foxState = {
+  vel: new THREE.Vector3(),
+  yaw: 0,
+  onGround: true,
+  jumpsUsed: 0,
+  maxJumps: 3,
+  attacking: false,
+  attackT: 0,
+  attackCooldown: 0,
+  hitSet: new Set(),
+  speed: 0,
+  prevPos: new THREE.Vector3().copy(fox.root.position),
+  squash: new Spring1D(140,14),
+};
+
+function tryJump(){
+  if(AUTOTEST_LOCK) {} // no-op guard placeholder
+  if(foxState.jumpsUsed < foxState.maxJumps){
+    const power = foxState.jumpsUsed===0 ? 7.6 : (foxState.jumpsUsed===1 ? 6.6 : 5.8);
+    foxState.vel.y = power;
+    foxState.jumpsUsed++;
+    foxState.onGround = false;
+    foxState.squash.kick(-6);
+    foxState.baseKickTail = true;
+    fox.baseSpringX.kick(4.5);
+  }
+}
+let AUTOTEST_LOCK = false;
+function tryAttack(){
+  if(foxState.attacking || foxState.attackCooldown>0) return;
+  foxState.attacking = true; foxState.attackT = 0; foxState.hitSet.clear();
+  fox.baseSpringY.kick(18);
+  fox.armSpringX && fox.armSpringX.kick(6);
+  showCombo();
+}
+let comboTimer=0;
+function showCombo(){
+  const el = document.getElementById('combo');
+  el.classList.add('show'); comboTimer = 0.5;
+}
+
+/* ---------------------------------------------------------------- physics for props */
+const GRAVITY = -18;
+function updatePhysObjs(dt){
+  for(const o of physObjs){
+    o.vel.y += GRAVITY*dt;
+    o.mesh.position.addScaledVector(o.vel, dt);
+    o.mesh.rotation.x += o.angVel.x*dt;
+    o.mesh.rotation.y += o.angVel.y*dt;
+    o.mesh.rotation.z += o.angVel.z*dt;
+    if(o.mesh.position.y <= o.halfH){
+      o.mesh.position.y = o.halfH;
+      if(o.vel.y < -1) o.vel.y *= -0.28; else o.vel.y = 0;
+      o.vel.x *= 0.88; o.vel.z *= 0.88;
+      o.angVel.multiplyScalar(0.85);
+    }
+    const r = Math.hypot(o.mesh.position.x, o.mesh.position.z);
+    if(r > 85){ const k = 85/r; o.mesh.position.x*=k; o.mesh.position.z*=k; o.vel.x*=-0.4; o.vel.z*=-0.4; }
+    if(o.hitCooldown>0) o.hitCooldown -= dt;
+  }
+}
+
+/* ---------------------------------------------------------------- autotest scripted controller */
+let autoState = null;
+if(AUTOTEST){
+  autoState = { t:0, wpIdx:0, waypoints:[
+    new THREE.Vector3(1.2,0,0.5), new THREE.Vector3(-6,0,-9), new THREE.Vector3(7,0,-11),
+    new THREE.Vector3(0,0,2), new THREE.Vector3(-8,0,4), new THREE.Vector3(4,0,8)
+  ], nextJump:0.15, nextAttack:0.35 };
+}
+
+/* ---------------------------------------------------------------- fox update */
+const FORWARD = new THREE.Vector3(0,0,1);
+function updateFox(dt, moveDir){
+  // moveDir: THREE.Vector3 world-space desired horizontal direction (may be zero-length)
+  const targetSpeed = moveDir.lengthSq()>0.0001 ? 3.6 : 0;
+  const desired = moveDir.clone().multiplyScalar(targetSpeed);
+  foxState.vel.x = lerp(foxState.vel.x, desired.x, 1-Math.pow(0.0008,dt));
+  foxState.vel.z = lerp(foxState.vel.z, desired.z, 1-Math.pow(0.0008,dt));
+
+  // gravity + air-fall damping (cushioned descent) + terminal velocity clamp
+  if(!foxState.onGround){
+    foxState.vel.y += GRAVITY*dt*0.62;
+    if(foxState.vel.y < 0){
+      foxState.vel.y *= (1 - Math.min(1, 1.15*dt));
+      foxState.vel.y = Math.max(foxState.vel.y, -9.5);
+    }
+  }
+
+  const p = fox.root.position;
+  p.x += foxState.vel.x*dt;
+  p.z += foxState.vel.z*dt;
+  p.y += foxState.vel.y*dt;
+  if(p.y <= 0){
+    p.y = 0;
+    if(!foxState.onGround && foxState.vel.y < -3) foxState.squash.kick(5);
+    foxState.vel.y = 0; foxState.onGround = true; foxState.jumpsUsed = 0;
+  }
+  const rr = Math.hypot(p.x,p.z);
+  if(rr>82){ const k=82/rr; p.x*=k; p.z*=k; }
+
+  // facing
+  const horizSpeed = Math.hypot(foxState.vel.x, foxState.vel.z);
+  foxState.speed = horizSpeed;
+  let turnRate = 0;
+  if(horizSpeed > 0.15 && !foxState.attacking){
+    const targetYaw = Math.atan2(foxState.vel.x, foxState.vel.z);
+    let d = targetYaw - foxState.yaw;
+    while(d>Math.PI) d-=Math.PI*2; while(d<-Math.PI) d+=Math.PI*2;
+    turnRate = d / dt;
+    foxState.yaw += d * Math.min(1, 10*dt);
+  }
+  fox.root.rotation.y = foxState.yaw + (foxState.attacking ? foxState.attackT*Math.PI*2*2.0 : 0);
+
+  // acceleration signal (local forward/back)
+  const worldVel = new THREE.Vector3((p.x-foxState.prevPos.x)/dt, 0, (p.z-foxState.prevPos.z)/dt);
+  const fwd = new THREE.Vector3(Math.sin(foxState.yaw),0,Math.cos(foxState.yaw));
+  const fwdSpeed = worldVel.dot(fwd);
+  foxState.prevPos.copy(p);
+
+  // bob / squash
+  const squash = foxState.squash.update(0, dt);
+  fox.body.scale.set(1-squash*0.02, 1+squash*0.035, 1-squash*0.02);
+  const bob = foxState.onGround ? Math.sin(performance.now()*0.012 * (0.4+horizSpeed*0.5))*0.03*Math.min(1,horizSpeed) : 0;
+  fox.body.position.y = bob;
+
+  // ears: react to forward accel & turn
+  fox.ears.forEach(e=>{
+    const targetX = clamp(-fwdSpeed*0.06 + Math.sin(performance.now()*0.002+e.side)*0.02, -0.6, 0.6);
+    const targetZ = clamp(-turnRate*0.006*e.side, -0.16, 0.16);
+    const vx = e.sx.update(targetX, dt);
+    const vz = e.sz.update(targetZ, dt);
+    e.pivot.rotation.x = vx;
+    e.pivot.rotation.z = e.side*0.36 + vz;
+  });
+
+  // tail chain: base spring then follow-the-leader propagation
+  const tailTargetY = clamp(-turnRate*0.03, -0.9, 0.9);
+  const tailTargetX = clamp(0.35 - fwdSpeed*0.05, -0.2, 0.9) + (foxState.attacking?0.2:0);
+  const by = fox.baseSpringY.update(tailTargetY, dt);
+  const bx = fox.baseSpringX.update(tailTargetX, dt);
+  fox.tailSegs.forEach((seg,i)=>{
+    if(i===0){ seg.rotation.y = by; seg.rotation.x = bx; }
+    else{
+      const prev = fox.tailSegs[i-1];
+      const decay = 1 - i*0.08;
+      seg.rotation.y = lerp(seg.rotation.y, prev.rotation.y*0.82*decay + Math.sin(performance.now()*0.006+i)*0.05*horizSpeed, Math.min(1,10*dt));
+      seg.rotation.x = lerp(seg.rotation.x, prev.rotation.x*0.85, Math.min(1,10*dt));
+    }
+  });
+
+  // lantern pendulum
+  const armTX = clamp(fwdSpeed*0.05, -0.4,0.4);
+  const armTZ = clamp(-turnRate*0.025, -0.4,0.4);
+  fox.lanternArm.rotation.x = fox.armSpringX.update(armTX, dt);
+  fox.lanternArm.rotation.z = fox.armSpringZ.update(armTZ, dt);
+
+  // legs walk cycle
+  fox.legs.forEach(l=>{
+    const amp = Math.min(1, horizSpeed*0.5);
+    l.pivot.rotation.x = Math.sin(performance.now()*0.014 + l.phase) * 0.55 * amp;
+  });
+
+  // lantern flicker + sparks
+  fox.lanternLight.intensity = 2.0 + Math.sin(performance.now()*0.02)*0.35 + Math.random()*0.25;
+  fox.flame.material.rotation += dt*0.5;
+  if(Math.random()<0.6){
+    const wp = new THREE.Vector3(); fox.flame.getWorldPosition(wp);
+    spawnSpark(wp);
+  }
+
+  // blink
+  fox.blinkTimer -= dt;
+  if(fox.blinkTimer<=0){
+    fox.eyes.forEach(e=> e.scale.y = 0.12);
+    setTimeout(()=>{ fox.eyes.forEach(e=> e.scale.y = 1); }, 110);
+    fox.blinkTimer = 2.5+Math.random()*3.5;
+  }
+
+  // attack lifecycle
+  if(foxState.attacking){
+    foxState.attackT += dt/0.5;
+    if(foxState.attackT>=0.15 && foxState.attackT<=0.85){
+      const worldPos = new THREE.Vector3(); fox.headGroup.getWorldPosition(worldPos);
+      worldPos.y = 0.3;
+      for(const o of physObjs){
+        if(foxState.hitSet.has(o)) continue;
+        const d = o.mesh.position.distanceTo(new THREE.Vector3(p.x,o.mesh.position.y,p.z));
+        if(d < 2.1){
+          foxState.hitSet.add(o);
+          const dir = new THREE.Vector3(o.mesh.position.x-p.x,0,o.mesh.position.z-p.z).normalize();
+          if(dir.lengthSq()<0.01) dir.set(Math.sin(foxState.yaw),0,Math.cos(foxState.yaw));
+          o.vel.copy(dir.multiplyScalar(7+Math.random()*2));
+          o.vel.y = 5+Math.random()*2;
+          o.angVel.set((Math.random()-0.5)*14,(Math.random()-0.5)*14,(Math.random()-0.5)*14);
+          spawnHitRing(o.mesh.position.clone().add(new THREE.Vector3(0,0.4,0)));
+          camShake = 0.18;
+        }
+      }
+    }
+    if(foxState.attackT>=1){ foxState.attacking=false; foxState.attackCooldown=0.25; }
+  } else if(foxState.attackCooldown>0){ foxState.attackCooldown -= dt; }
+}
+
+/* ---------------------------------------------------------------- camera */
+let camShake = 0;
+function updateCamera(dt){
+  const target = fox.root.position.clone().add(new THREE.Vector3(0,1.1,0));
+  const offset = new THREE.Vector3(
+    Math.sin(camYaw)*Math.cos(camPitch),
+    Math.sin(camPitch),
+    Math.cos(camYaw)*Math.cos(camPitch)
+  ).multiplyScalar(camDist);
+  const desiredPos = target.clone().add(offset);
+  camera.position.lerp(desiredPos, Math.min(1, 6*dt));
+  if(camShake>0){
+    camShake -= dt;
+    camera.position.x += (Math.random()-0.5)*0.06*Math.max(0,camShake/0.18);
+    camera.position.y += (Math.random()-0.5)*0.06*Math.max(0,camShake/0.18);
+  }
+  camera.lookAt(target);
+}
+
+/* ---------------------------------------------------------------- particle updates */
+function updateParticles(dt){
+  const t = performance.now()*0.001;
+  const arr = dustGeo.attributes.position.array;
+  for(let i=0;i<N_DUST;i++){
+    arr[i*3+1] += Math.sin(t*dustSeed[i*3+1]+dustSeed[i*3])*0.002 + 0.0035;
+    if(arr[i*3+1] > 8) arr[i*3+1] = 0.1;
+  }
+  dustGeo.attributes.position.needsUpdate = true;
+
+  for(let i=0;i<N_SPARK;i++){
+    if(sparkLife[i] <= 0) continue;
+    sparkLife[i] -= dt;
+    sparkPos[i*3] += sparkVel[i].x*dt;
+    sparkPos[i*3+1] += sparkVel[i].y*dt;
+    sparkPos[i*3+2] += sparkVel[i].z*dt;
+    sparkVel[i].y -= dt*0.4;
+    if(sparkLife[i] <= 0){ sparkPos[i*3+1] = -100; }
+  }
+  sparkGeo.attributes.position.needsUpdate = true;
+
+  for(let i=hitRings.length-1;i>=0;i--){
+    const r = hitRings[i]; r.t += dt*2.6;
+    r.s.scale.setScalar(0.2 + r.t*2.2);
+    r.s.material.opacity = Math.max(0, 1-r.t);
+    if(r.t>=1){ scene.remove(r.s); hitRings.splice(i,1); }
+  }
+}
+
+/* ---------------------------------------------------------------- main loop */
+const clock = new THREE.Clock();
+function frame(){
+  const dt = 1/60; // fixed, numerically-stable timestep per simulation substep
+
+  function step(){
+    let moveDir = new THREE.Vector3();
+    if(AUTOTEST){
+      autoState.t += dt;
+      const wp = autoState.waypoints[autoState.wpIdx];
+      const to = new THREE.Vector3(wp.x - fox.root.position.x, 0, wp.z - fox.root.position.z);
+      if(to.length() < 1.2){ autoState.wpIdx = (autoState.wpIdx+1) % autoState.waypoints.length; }
+      else moveDir = to.normalize();
+      camYaw += dt*0.08;
+      autoState.nextJump -= dt; autoState.nextAttack -= dt;
+      if(autoState.nextJump<=0){ tryJump(); autoState.nextJump = 1.6+Math.random()*1.2; }
+      if(autoState.nextAttack<=0){ tryAttack(); autoState.nextAttack = 2.2+Math.random()*1.4; }
+    } else if(gameStarted){
+      const camF = new THREE.Vector3(Math.sin(camYaw),0,Math.cos(camYaw));
+      const camR = new THREE.Vector3(camF.z,0,-camF.x);
+      let ix=0, iz=0;
+      if(keys['KeyW']||keys['ArrowUp']) iz+=1;
+      if(keys['KeyS']||keys['ArrowDown']) iz-=1;
+      if(keys['KeyD']||keys['ArrowRight']) ix+=1;
+      if(keys['KeyA']||keys['ArrowLeft']) ix-=1;
+      if(ix||iz){
+        moveDir.addScaledVector(camF, iz).addScaledVector(camR, ix);
+        if(moveDir.lengthSq()>0) moveDir.normalize();
+      }
+    }
+
+    if(gameStarted || AUTOTEST){
+      updateFox(dt, moveDir);
+      updatePhysObjs(dt);
+      updateParticles(dt);
+    }
+    updateCamera(dt);
+
+    if(comboTimer>0){ comboTimer-=dt; if(comboTimer<=0) document.getElementById('combo').classList.remove('show'); }
+  }
+
+  // Headless/virtual-time capture environments may deliver very few actual
+  // rAF callbacks regardless of elapsed wall/virtual time. To keep the
+  // ?autotest demo (movement + jump + attack) visible even in that case,
+  // run several fixed, stable substeps per rendered frame during autotest
+  // so the demo reliably progresses; normal play still steps once per frame.
+  if(AUTOTEST){
+    for(let i=0;i<50;i++) step();
+  } else {
+    step();
+  }
+
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+/* ---------------------------------------------------------------- start / resize */
+let gameStarted = false;
+function beginGame(){
+  gameStarted = true;
+  document.getElementById('title').classList.add('hide');
+}
+document.getElementById('begin').addEventListener('click', beginGame);
+window.addEventListener('keydown', e=>{ if(!gameStarted && !AUTOTEST && e.code==='Enter') beginGame(); });
+
+if(AUTOTEST){
+  const titleEl = document.getElementById('title');
+  titleEl.style.transition = 'none';
+  titleEl.classList.add('hide');
+  titleEl.style.display = 'none';
+  gameStarted = true;
+}
+
+window.addEventListener('resize', ()=>{
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+document.title = 'Fox Lantern Adventure';
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

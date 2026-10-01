@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Syrup Conveyor Belt</title>
+<style>
+  html,body{margin:0;height:100%;background:#080a0c;overflow:hidden;font-family:Segoe UI,Arial,sans-serif;color:#eef3f6}
+  canvas{display:block}
+  #start{position:fixed;inset:0;background:radial-gradient(ellipse at center,#132029 0%,#080a0c 75%);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:50;cursor:pointer}
+  #start h1{font-size:2.4em;margin:0 0 .2em;color:#ffd54a;text-shadow:0 0 20px #a67c1c}
+  #start p{opacity:.85;max-width:34em;text-align:center;line-height:1.5}
+  #start .hint{margin-top:2em;padding:.7em 1.6em;border:1px solid #ffd54a88;border-radius:2em;font-size:.9em;letter-spacing:.05em}
+  #ui{position:fixed;top:10px;left:10px;width:255px;background:rgba(10,16,20,.84);border:1px solid #2b4a58;border-radius:10px;padding:12px 14px;font-size:12px;backdrop-filter:blur(4px);z-index:20;max-height:96vh;overflow-y:auto}
+  #ui h2{margin:0 0 8px;font-size:14px;color:#ffd54a;letter-spacing:.03em}
+  #ui .row{margin:7px 0}
+  #ui label{display:flex;justify-content:space-between;margin-bottom:2px;opacity:.9}
+  #ui .val{color:#7ed6ff;font-variant-numeric:tabular-nums}
+  #ui input[type=range]{width:100%;accent-color:#3aa7d6}
+  #ui .cams{display:flex;gap:5px;flex-wrap:wrap;margin-top:4px}
+  #ui button{flex:1;background:#132733;border:1px solid #2b4a58;color:#eef3f6;border-radius:6px;padding:5px 2px;font-size:11px;cursor:pointer}
+  #ui button:hover{background:#1c3846}
+  #ui hr{border:none;border-top:1px solid #2b4a58;margin:10px 0}
+  #regime{position:fixed;top:10px;right:10px;width:230px;background:rgba(10,16,20,.84);border:1px solid #2b4a58;border-radius:10px;padding:10px 12px;z-index:20;font-size:12px}
+  #regime .badge{font-size:15px;font-weight:700;padding:6px 8px;border-radius:6px;text-align:center;margin-bottom:6px;letter-spacing:.02em}
+  #regime .metrics div{display:flex;justify-content:space-between;opacity:.85;padding:1px 0}
+  #regime canvas{margin-top:6px;border-radius:6px;background:#0a1216}
+  #beltind{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);z-index:20;font-size:12px;background:rgba(10,16,20,.7);border:1px solid #2b4a58;border-radius:8px;padding:5px 14px;display:flex;align-items:center;gap:8px}
+  #beltarrow{display:inline-block;transition:transform .2s}
+  #fps{position:fixed;bottom:8px;left:10px;font-size:11px;opacity:.55;z-index:20}
+  #hint{position:fixed;bottom:8px;right:10px;font-size:11px;opacity:.55;z-index:20;text-align:right}
+</style>
+</head>
+<body>
+<div id="start">
+  <h1>Syrup Conveyor Belt</h1>
+  <p>A thin stream of golden syrup falls onto a moving conveyor belt. At low belt speed the stream
+  coils like a stacked rope; speed it up and the pattern unwinds through meandering and figure-eight
+  ("W") patterns into a straight deposited line &mdash; the classic fluid-mechanical-sewing-machine
+  transition (Chiu-Webster &amp; Lister, 2006). Adjust belt speed, drop height, nozzle and flow below.</p>
+  <div class="hint">click to start the belt</div>
+</div>
+<div id="ui">
+  <h2>Belt &amp; Pour Controls</h2>
+  <div class="row"><label>Belt Speed <span class="val" id="vbeltV"></span></label>
+    <input id="beltV" type="range" min="0" max="0.5" step="0.002" value="0"></div>
+  <div class="row"><label>Drop Height <span class="val" id="vH"></span></label>
+    <input id="H" type="range" min="0.02" max="0.24" step="0.001" value="0.07"></div>
+  <div class="row"><label>Nozzle Radius <span class="val" id="va0"></span></label>
+    <input id="a0" type="range" min="0.0007" max="0.0032" step="0.00005" value="0.0018"></div>
+  <div class="row"><label>Flow Velocity <span class="val" id="vU0"></span></label>
+    <input id="U0" type="range" min="0.004" max="0.09" step="0.001" value="0.02"></div>
+  <div class="row"><label>Volume Flow Rate <span class="val" id="vQ"></span></label></div>
+  <hr>
+  <div class="row"><label>Dynamic Viscosity &mu; <span class="val" id="vmu"></span></label>
+    <input id="mu" type="range" min="0.15" max="1.9" step="0.005" value="1.08"></div>
+  <div class="row"><label>Surface Tension &gamma; <span class="val" id="vgam"></span></label>
+    <input id="gamma" type="range" min="0.02" max="0.15" step="0.001" value="0.07"></div>
+  <div class="row"><label>Density &rho; <span class="val" id="vrho"></span></label>
+    <input id="rho" type="range" min="900" max="1500" step="5" value="1430"></div>
+  <hr>
+  <h2>Camera</h2>
+  <div class="cams">
+    <button data-cam="front">Front</button><button data-cam="top">Top</button>
+    <button data-cam="side">Side</button><button data-cam="close">Close</button><button data-cam="reset">Reset</button>
+  </div>
+  <hr>
+  <button id="restart" style="width:100%">Restart Pour</button>
+</div>
+<div id="regime">
+  <div class="badge" id="badge">&mdash;</div>
+  <div class="metrics">
+    <div><span>Coil radius R</span><span class="val" id="mR"></span></div>
+    <div><span>Coil freq &omega;</span><span class="val" id="mOm"></span></div>
+    <div><span>Coil tang. speed</span><span class="val" id="mTs"></span></div>
+    <div><span>Belt / tang. ratio V*</span><span class="val" id="mVr"></span></div>
+    <div><span>Thread radius a₁</span><span class="val" id="ma1"></span></div>
+  </div>
+  <canvas id="plot" width="206" height="130"></canvas>
+</div>
+<div id="beltind">Belt speed: <span id="beltNum">0.0 cm/s</span> <span id="beltarrow">&#9654;&#9654;</span></div>
+<div id="fps"></div>
+<div id="hint">drag: orbit &middot; scroll: zoom &middot; right-drag: pan</div>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+"three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+<script>
+window.addEventListener('error',e=>{document.title='ERROR: '+e.message+' @'+e.lineno});
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// =====================================================================================
+// Discrete viscous thread core (shared design with honey-coiling.html), after the
+// slender viscous-thread / "fluid mechanical sewing machine" theory of Ribe (2004) and
+// Chiu-Webster & Lister (2006), discretised in the style of Bergou et al. (2010):
+//  * AXIAL: Trouton (extensional) viscosity vs. gravity sets a steady stretching profile
+//    u(s) (solved once per parameter change by shooting); rest length per material
+//    segment is read off that profile by age, volume conserved -> thread visibly thins.
+//  * LATERAL: inertia + gravity + viscous bending (M = 3 mu I dkappa/dt) + viscous
+//    twisting, solved with implicit angular impulses (unconditionally stable); exact
+//    tridiagonal axial-inextensibility solve every sub-step, so compression at touchdown
+//    can only relieve itself by buckling sideways.
+//  * BELT: touched-down nodes adhere and are advected at the belt velocity; the deposited
+//    height-field is advected the same way (its window is re-centred on the nozzle by
+//    shifting columns, so the nozzle-relative pattern -- coil / meander / figure-eight /
+//    straight line -- is what the camera actually sees, exactly like a real conveyor).
+//    The pattern is the free output of these balances for the given belt speed / height /
+//    flow -- nothing about the pattern shape is scripted.
+// =====================================================================================
+class ThreadSim {
+  constructor(opts) {
+    this.p = Object.assign({ mu: 12, rho: 1430, gamma: 0.07, g: 9.81, H: 0.07, a0: 0.0018, U0: 0.02,
+      beltV: 0, hf: { nx: 70, ny: 190, x0: -0.045, y0: -0.14, dx: 0.09 / 70 } }, opts);
+    const C = this.cap = 1000;
+    this.x = new Float64Array(C); this.y = new Float64Array(C); this.z = new Float64Array(C);
+    this.vx = new Float64Array(C); this.vy = new Float64Array(C); this.vz = new Float64Array(C);
+    this.fl = new Uint8Array(C);
+    this.sv = new Float64Array(C);
+    this.inv = new Float64Array(C); this.rad = new Float64Array(C); this.segL = new Float64Array(C);
+    this.ex = new Float64Array(C); this.ey = new Float64Array(C); this.ez = new Float64Array(C);
+    this.l0 = new Float64Array(C); this.tau = new Float64Array(C); this.mst = new Float64Array(C); this.ten = new Float64Array(C);
+    this.tA = new Float64Array(C); this.tB = new Float64Array(C); this.tC = new Float64Array(C); this.tD = new Float64Array(C);
+    this._rl = new Float64Array(C); this._rd = new Float64Array(C);
+    const DC = this.dcap = 2600;
+    this.dx_ = new Float32Array(DC); this.dy_ = new Float32Array(DC); this.dz_ = new Float32Array(DC);
+    this.dr_ = new Float32Array(DC); this.dt_ = new Float32Array(DC); this.dn = 0;
+    this.contacts = [];
+    this.hfOff = 0;
+    this.reset();
+  }
+  derived() {
+    const p = this.p;
+    p.nu = p.mu / p.rho;
+    p.Q = Math.PI * p.a0 * p.a0 * p.U0;
+    const Uff = Math.sqrt(p.U0 * p.U0 + 2 * p.g * p.H);
+    const Rest = Math.min(p.H * 0.35, Math.pow(p.nu * p.Q / p.g, 0.25));
+    const a1e = Math.sqrt(p.Q / (Math.PI * Uff));
+    this.hMin = Math.min(Math.max(Rest * 0.22, 3 * a1e, 0.00045), 0.0045);
+    this.hTop = Math.min(Math.max(this.hMin * 5, p.a0 * 1.2), p.H / 12);
+    this.clampLen = Math.max(this.hTop * 1.2, p.a0 * 2);
+    this.dtMax = Math.min(2.2e-4, 0.3 * this.hMin / Uff);
+    this.Uff = Uff;
+  }
+  reset() {
+    this.derived();
+    const p = this.p;
+    this.t = 0; this.n = 0; this.dn = 0; this.contacts.length = 0; this.hfOff = 0;
+    const hf = p.hf; this.hf = new Float32Array(hf.nx * hf.ny); this.hfTmp = new Float32Array(hf.nx * hf.ny);
+    this.zLow = 0;
+    this.steadyProfile(p.H);
+    const zs = []; let z = p.H;
+    while (z > this.hMin * 1.5) { zs.push(z); z -= this.hTarget(z); }
+    zs.push(this.hMin * 1.2); zs.reverse();
+    const k = zs.length;
+    for (let i = 0; i < k; i++) {
+      const u = this.uAtS(p.H - zs[i]);
+      this.push(i, (Math.random() - 0.5) * 1e-5, (Math.random() - 0.5) * 1e-5, zs[i], 0, 0, -u, (p.H - zs[i]) < this.clampLen ? 1 : 0);
+    }
+    this.n = k;
+    for (let i = 0; i < k - 1; i++) {
+      const sm = p.H - 0.5 * (zs[i] + zs[i + 1]), u = this.uAtS(sm), L = zs[i + 1] - zs[i];
+      this.sv[i] = p.Q / u * L; this.l0[i] = L * p.U0 / u; this.tau[i] = this.tauAtS(sm); this.mst[i] = 1;
+    }
+    this.stats = { U1: p.U0, a1: p.a0, R: 0, omega: 0, n: 0, transSpeed: 0, Vr: 0 };
+  }
+  push(i, x, y, z, vx, vy, vz, f) { this.x[i] = x; this.y[i] = y; this.z[i] = z; this.vx[i] = vx; this.vy[i] = vy; this.vz[i] = vz; this.fl[i] = f; }
+  hfIndexF(x, y) { const h = this.p.hf; return [(x - h.x0 - this.hfOff) / h.dx - 0.5, (y - h.y0) / h.dx - 0.5]; }
+  ground(x, y) {
+    const h = this.p.hf; let [gx, gy] = this.hfIndexF(x, y);
+    if (gx < 0 || gy < 0 || gx >= h.nx - 1 || gy >= h.ny - 1) return 0;
+    const i = gx | 0, j = gy | 0, fx = gx - i, fy = gy - j, d = this.hf, k = j * h.nx + i;
+    return (d[k] * (1 - fx) + d[k + 1] * fx) * (1 - fy) + (d[k + h.nx] * (1 - fx) + d[k + h.nx + 1] * fx) * fy;
+  }
+  depositVol(x, y, vol) {
+    const h = this.p.hf; let [gx, gy] = this.hfIndexF(x, y);
+    if (gx < 0 || gy < 0 || gx >= h.nx - 1 || gy >= h.ny - 1) return;
+    const i = gx | 0, j = gy | 0, fx = gx - i, fy = gy - j, d = this.hf, k = j * h.nx + i, hh = vol / (h.dx * h.dx);
+    d[k] += hh * (1 - fx) * (1 - fy); d[k + 1] += hh * fx * (1 - fy); d[k + h.nx] += hh * (1 - fx) * fy; d[k + h.nx + 1] += hh * fx * fy;
+  }
+  hTarget(z) { const s = Math.min(Math.max((z - this.zLow) / (this.p.H * 0.55), 0), 1); return this.hMin + (this.hTop - this.hMin) * s * s; }
+  updateGeom() {
+    const n = this.n, p = this.p, amax = p.a0 * 2.5;
+    for (let i = 0; i < n - 1; i++) {
+      const dx = this.x[i + 1] - this.x[i], dy = this.y[i + 1] - this.y[i], dz = this.z[i + 1] - this.z[i];
+      const L = Math.sqrt(dx * dx + dy * dy + dz * dz) + 1e-12;
+      this.segL[i] = L; this.ex[i] = dx / L; this.ey[i] = dy / L; this.ez[i] = dz / L;
+    }
+    for (let i = 0; i < n; i++) {
+      let m = 0, r = 0, c = 0;
+      if (i > 0) { m += 0.5 * this.sv[i - 1]; r += Math.sqrt(this.sv[i - 1] / (Math.PI * this.segL[i - 1])); c++; }
+      if (i < n - 1) { m += 0.5 * this.sv[i]; r += Math.sqrt(this.sv[i] / (Math.PI * this.segL[i])); c++; }
+      this.rad[i] = Math.min(r / Math.max(c, 1), amax);
+      this.inv[i] = this.fl[i] ? 0 : 1 / (p.rho * Math.max(m, 1e-15));
+    }
+  }
+  steadyProfile(H) {
+    const p = this.p, nu = p.nu, g = p.g, N = 500, h = H / N;
+    const cs = p.gamma / (2 * p.rho) * Math.sqrt(Math.PI / p.Q);
+    const f = (w, q) => (Math.exp(w) * q - g * Math.exp(-w) + cs * Math.exp(-w / 2) * q) / (3 * nu);
+    const run = (k, U, Qd) => {
+      let w = Math.log(p.U0), q = k;
+      if (U) { U[0] = p.U0; Qd[0] = q; }
+      for (let i = 0; i < N; i++) {
+        const k1w = q, k1q = f(w, q);
+        const k2w = q + 0.5 * h * k1q, k2q = f(w + 0.5 * h * k1w, q + 0.5 * h * k1q);
+        const k3w = q + 0.5 * h * k2q, k3q = f(w + 0.5 * h * k2w, q + 0.5 * h * k2q);
+        const k4w = q + h * k3q, k4q = f(w + h * k3w, q + h * k3q);
+        w += h / 6 * (k1w + 2 * k2w + 2 * k3w + k4w); q += h / 6 * (k1q + 2 * k2q + 2 * k3q + k4q);
+        if (q < 0) return -1;
+        if (!isFinite(w) || Math.exp(w) > 1.05 * Math.sqrt(p.U0 * p.U0 + 2 * g * (i + 1) * h) + 0.02) return 1;
+        if (U) { U[i + 1] = Math.exp(w); Qd[i + 1] = q; }
+      }
+      return q * H > 0.05 ? 1 : 0;
+    };
+    let lo = 0, hi = 1e5;
+    for (let it = 0; it < 70; it++) { const mid = Math.sqrt((lo + 1e-9) * hi); const r = run(mid); if (r < 0) lo = mid; else if (r > 0) hi = mid; else { lo = mid; break; } }
+    const U = new Float64Array(N + 1).fill(p.U0), Qd = new Float64Array(N + 1), T = new Float64Array(N + 1);
+    run(lo, U, Qd);
+    for (let i = 1; i <= N; i++) if (!(U[i] >= U[i - 1])) { U[i] = U[i - 1]; Qd[i] = 0; }
+    for (let i = 1; i <= N; i++) T[i] = T[i - 1] + h * 2 / (U[i] + U[i - 1]);
+    this.prU = U; this.prT = T; this.prH = h; this.prNn = N;
+  }
+  uAtS(sd) { const N = this.prNn, x = Math.min(Math.max(sd / this.prH, 0), N - 1e-6), i = x | 0, f = x - i; return this.prU[i] * (1 - f) + this.prU[i + 1] * f; }
+  tauAtS(sd) { const N = this.prNn, x = Math.min(Math.max(sd / this.prH, 0), N - 1e-6), i = x | 0, f = x - i; return this.prT[i] * (1 - f) + this.prT[i + 1] * f; }
+  idxAtTau(t) {
+    const T = this.prT, N = this.prNn;
+    if (t >= T[N]) return N;
+    let lo = 0, hi = N;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (T[m] <= t) lo = m; else hi = m; }
+    return lo + (t - T[lo]) / (T[hi] - T[lo] + 1e-15);
+  }
+  substep(dt) {
+    const p = this.p, n = this.n, N = this.prNn;
+    this.updateGeom();
+    const restL = this._rl, restD = this._rd;
+    for (let i = 0; i < n - 1; i++) {
+      this.tau[i] += dt;
+      const x = this.idxAtTau(this.tau[i]);
+      let u, du;
+      if (x >= N) { u = this.prU[N]; du = 0; }
+      else { const k = x | 0, f = x - k; u = this.prU[k] * (1 - f) + this.prU[k + 1] * f; du = u * (this.prU[k + 1] - this.prU[k]) / this.prH; }
+      const c = this.l0[i] * this.mst[i] / p.U0;
+      restL[i] = c * u; restD[i] = c * du;
+    }
+    for (let i = 0; i < n; i++) if (!this.fl[i]) this.vz[i] -= p.g * dt;
+    for (let it = 0; it < 4; it++) {
+      const dir = it & 1;
+      for (let q = 1; q < n - 1; q++) {
+        const j = dir ? n - 1 - q : q;
+        const a = j - 1, b = j + 1;
+        const wa = this.inv[a], wj = this.inv[j], wb = this.inv[b];
+        if (wa + wj + wb <= 0) continue;
+        const px = this.x[a] - this.x[j], py = this.y[a] - this.y[j], pz = this.z[a] - this.z[j];
+        const qx = this.x[b] - this.x[j], qy = this.y[b] - this.y[j], qz = this.z[b] - this.z[j];
+        const lp = Math.sqrt(px * px + py * py + pz * pz) + 1e-12, lq = Math.sqrt(qx * qx + qy * qy + qz * qz) + 1e-12;
+        const cphi = Math.max(-1, Math.min(1, (px * qx + py * qy + pz * qz) / (lp * lq)));
+        const sphi = Math.sqrt(1 - cphi * cphi);
+        const r = this.rad[j], l = 0.5 * (lp + lq);
+        const B = 3 * p.mu * Math.PI * r * r * r * r / 4;
+        if (sphi < 0.03) {
+          const wsum = wj + 0.25 * (wa + wb); if (wsum <= 0) continue;
+          let tx = qx - px, ty = qy - py, tz = qz - pz;
+          const tl = Math.sqrt(tx * tx + ty * ty + tz * tz) + 1e-12; tx /= tl; ty /= tl; tz /= tl;
+          let ux = this.vx[j] - 0.5 * (this.vx[a] + this.vx[b]), uy = this.vy[j] - 0.5 * (this.vy[a] + this.vy[b]), uz = this.vz[j] - 0.5 * (this.vz[a] + this.vz[b]);
+          const d = ux * tx + uy * ty + uz * tz; ux -= d * tx; uy -= d * ty; uz -= d * tz;
+          const c = 4 * B / (l * l * l), k = c * dt / (1 + c * dt * wsum);
+          const Jx = k * ux, Jy = k * uy, Jz = k * uz;
+          this.vx[j] -= Jx * wj; this.vy[j] -= Jy * wj; this.vz[j] -= Jz * wj;
+          this.vx[a] += 0.5 * Jx * wa; this.vy[a] += 0.5 * Jy * wa; this.vz[a] += 0.5 * Jz * wa;
+          this.vx[b] += 0.5 * Jx * wb; this.vy[b] += 0.5 * Jy * wb; this.vz[b] += 0.5 * Jz * wb;
+          continue;
+        }
+        const phx = px / lp, phy = py / lp, phz = pz / lp, qhx = qx / lq, qhy = qy / lq, qhz = qz / lq;
+        const ga_x = -(qhx - cphi * phx) / (lp * sphi), ga_y = -(qhy - cphi * phy) / (lp * sphi), ga_z = -(qhz - cphi * phz) / (lp * sphi);
+        const gb_x = -(phx - cphi * qhx) / (lq * sphi), gb_y = -(phy - cphi * qhy) / (lq * sphi), gb_z = -(phz - cphi * qhz) / (lq * sphi);
+        const gj_x = -ga_x - gb_x, gj_y = -ga_y - gb_y, gj_z = -ga_z - gb_z;
+        const rate = ga_x * this.vx[a] + ga_y * this.vy[a] + ga_z * this.vz[a] + gb_x * this.vx[b] + gb_y * this.vy[b] + gb_z * this.vz[b] + gj_x * this.vx[j] + gj_y * this.vy[j] + gj_z * this.vz[j];
+        const W = wa * (ga_x * ga_x + ga_y * ga_y + ga_z * ga_z) + wb * (gb_x * gb_x + gb_y * gb_y + gb_z * gb_z) + wj * (gj_x * gj_x + gj_y * gj_y + gj_z * gj_z);
+        const c = B / l, J = c * dt * rate / (1 + c * dt * W);
+        this.vx[a] -= J * wa * ga_x; this.vy[a] -= J * wa * ga_y; this.vz[a] -= J * wa * ga_z;
+        this.vx[b] -= J * wb * gb_x; this.vy[b] -= J * wb * gb_y; this.vz[b] -= J * wb * gb_z;
+        this.vx[j] -= J * wj * gj_x; this.vy[j] -= J * wj * gj_y; this.vz[j] -= J * wj * gj_z;
+      }
+    }
+    for (let j = 1; j < n - 2; j++) {
+      const i1 = j - 1, i2 = j, i3 = j + 1, i4 = j + 2;
+      const w1 = this.inv[i1], w2 = this.inv[i2], w3 = this.inv[i3], w4 = this.inv[i4];
+      if (w1 + w2 + w3 + w4 <= 0) continue;
+      const Fx = this.x[i1] - this.x[i2], Fy = this.y[i1] - this.y[i2], Fz = this.z[i1] - this.z[i2];
+      const Gx = this.x[i2] - this.x[i3], Gy = this.y[i2] - this.y[i3], Gz = this.z[i2] - this.z[i3];
+      const Hx = this.x[i4] - this.x[i3], Hy = this.y[i4] - this.y[i3], Hz = this.z[i4] - this.z[i3];
+      const Ax = Fy * Gz - Fz * Gy, Ay = Fz * Gx - Fx * Gz, Az = Fx * Gy - Fy * Gx;
+      const Bx = Hy * Gz - Hz * Gy, By = Hz * Gx - Hx * Gz, Bz = Hx * Gy - Hy * Gx;
+      const A2 = Ax * Ax + Ay * Ay + Az * Az, B2 = Bx * Bx + By * By + Bz * Bz;
+      const G2 = Gx * Gx + Gy * Gy + Gz * Gz, Gl = Math.sqrt(G2);
+      const F2 = Fx * Fx + Fy * Fy + Fz * Fz, H2 = Hx * Hx + Hy * Hy + Hz * Hz;
+      const s1 = A2 / (F2 * G2 + 1e-30), s2 = B2 / (H2 * G2 + 1e-30);
+      if (s1 < 1e-8 || s2 < 1e-8) continue;
+      const FG = (Fx * Gx + Fy * Gy + Fz * Gz) / (A2 * Gl), HG = (Hx * Gx + Hy * Gy + Hz * Gz) / (B2 * Gl);
+      const ca = Gl / A2, cb = Gl / B2;
+      const g1x = -ca * Ax, g1y = -ca * Ay, g1z = -ca * Az;
+      const g4x = cb * Bx, g4y = cb * By, g4z = cb * Bz;
+      const g2x = ca * Ax + FG * Ax - HG * Bx, g2y = ca * Ay + FG * Ay - HG * By, g2z = ca * Az + FG * Az - HG * Bz;
+      const g3x = -g1x - g2x - g4x, g3y = -g1y - g2y - g4y, g3z = -g1z - g2z - g4z;
+      const rate = g1x * this.vx[i1] + g1y * this.vy[i1] + g1z * this.vz[i1] + g2x * this.vx[i2] + g2y * this.vy[i2] + g2z * this.vz[i2]
+        + g3x * this.vx[i3] + g3y * this.vy[i3] + g3z * this.vz[i3] + g4x * this.vx[i4] + g4y * this.vy[i4] + g4z * this.vz[i4];
+      const W = w1 * (g1x * g1x + g1y * g1y + g1z * g1z) + w2 * (g2x * g2x + g2y * g2y + g2z * g2z) + w3 * (g3x * g3x + g3y * g3y + g3z * g3z) + w4 * (g4x * g4x + g4y * g4y + g4z * g4z);
+      const r = 0.5 * (this.rad[i2] + this.rad[i3]);
+      const c = p.mu * Math.PI * r * r * r * r / 2 / Gl * (s1 * s2 / (s1 + s2));
+      const J = c * dt * rate / (1 + c * dt * W);
+      this.vx[i1] -= J * w1 * g1x; this.vy[i1] -= J * w1 * g1y; this.vz[i1] -= J * w1 * g1z;
+      this.vx[i2] -= J * w2 * g2x; this.vy[i2] -= J * w2 * g2y; this.vz[i2] -= J * w2 * g2z;
+      this.vx[i3] -= J * w3 * g3x; this.vy[i3] -= J * w3 * g3y; this.vz[i3] -= J * w3 * g3z;
+      this.vx[i4] -= J * w4 * g4x; this.vy[i4] -= J * w4 * g4y; this.vz[i4] -= J * w4 * g4z;
+    }
+    const m = n - 1, A = this.tA, Bd = this.tB, Cc = this.tC, D = this.tD;
+    for (let i = 0; i < m; i++) {
+      const wi = this.inv[i], wj = this.inv[i + 1];
+      const w = (this.vx[i + 1] - this.vx[i]) * this.ex[i] + (this.vy[i + 1] - this.vy[i]) * this.ey[i] + (this.vz[i + 1] - this.vz[i]) * this.ez[i];
+      const target = restD[i] + 0.25 * (restL[i] - this.segL[i]) / dt;
+      if (wi + wj <= 0) { Bd[i] = 1; A[i] = 0; Cc[i] = 0; D[i] = 0; continue; }
+      Bd[i] = wi + wj; D[i] = w - target;
+      A[i] = i > 0 ? -wi * (this.ex[i - 1] * this.ex[i] + this.ey[i - 1] * this.ey[i] + this.ez[i - 1] * this.ez[i]) : 0;
+      Cc[i] = i < m - 1 ? -wj * (this.ex[i + 1] * this.ex[i] + this.ey[i + 1] * this.ey[i] + this.ez[i + 1] * this.ez[i]) : 0;
+    }
+    for (let i = 1; i < m; i++) { const f = A[i] / Bd[i - 1]; Bd[i] -= f * Cc[i - 1]; D[i] -= f * D[i - 1]; }
+    D[m - 1] /= Bd[m - 1];
+    for (let i = m - 2; i >= 0; i--) D[i] = (D[i] - Cc[i] * D[i + 1]) / Bd[i];
+    for (let i = 0; i < m; i++) {
+      const J = D[i], wi = this.inv[i], wj = this.inv[i + 1];
+      this.ten[i] = J / dt;
+      this.vx[i] += J * wi * this.ex[i]; this.vy[i] += J * wi * this.ey[i]; this.vz[i] += J * wi * this.ez[i];
+      this.vx[i + 1] -= J * wj * this.ex[i]; this.vy[i + 1] -= J * wj * this.ey[i]; this.vz[i + 1] -= J * wj * this.ez[i];
+    }
+    const vcap = 30 * this.Uff, vcap2 = vcap * vcap;
+    for (let i = 0; i < n; i++) {
+      const v2 = this.vx[i] * this.vx[i] + this.vy[i] * this.vy[i] + this.vz[i] * this.vz[i];
+      if (v2 > vcap2) { const s = vcap / Math.sqrt(v2); this.vx[i] *= s; this.vy[i] *= s; this.vz[i] *= s; }
+    }
+    const V = p.beltV || 0;
+    for (let i = 0; i < n; i++) {
+      const f = this.fl[i];
+      if (f === 1) { this.x[i] = 0; this.y[i] = 0; this.vx[i] = 0; this.vy[i] = 0; this.vz[i] = -p.U0; this.z[i] -= p.U0 * dt; if (this.z[i] < p.H - this.clampLen) this.fl[i] = 0; continue; }
+      if (f === 2) { this.vx[i] = V; this.vy[i] = 0; this.vz[i] = 0; this.x[i] += V * dt; continue; }
+      this.x[i] += this.vx[i] * dt; this.y[i] += this.vy[i] * dt; this.z[i] += this.vz[i] * dt;
+      const gz = this.ground(this.x[i], this.y[i]) + this.rad[i] * 0.9;
+      if (this.z[i] < gz) {
+        this.z[i] = gz; this.fl[i] = 2; this.vx[i] = V; this.vy[i] = 0; this.vz[i] = 0;
+        this.x[i] += (Math.random() - 0.5) * 2e-6; this.y[i] += (Math.random() - 0.5) * 2e-6;
+        this.contacts.push(this.t, this.x[i], this.y[i]);
+      }
+    }
+    this.t += dt;
+    this.topology();
+    if (!isFinite(this.z[this.n - 1]) || !isFinite(this.x[0])) this.reset();
+  }
+  topology() {
+    const p = this.p;
+    let top = this.n - 1;
+    if (this.z[top] <= p.H - this.hTop && this.n < this.cap - 2) {
+      const i = this.n;
+      this.push(i, 0, 0, this.z[top] + this.hTop, 0, 0, -p.U0, 1);
+      this.sv[i - 1] = Math.PI * p.a0 * p.a0 * this.hTop; this.l0[i - 1] = this.hTop; this.tau[i - 1] = 0.5 * this.hTop / p.U0; this.mst[i - 1] = 1; this.n++;
+    }
+    this.zLow = this.ground(0, 0);
+    const crowded = this.n > this.cap - 60;
+    for (let i = this.n - 2; i >= 0; i--) {
+      if (this.n >= this.cap - 2) break;
+      if (this.fl[i] === 2 || this.fl[i + 1] === 2) continue;
+      const dx = this.x[i + 1] - this.x[i], dy = this.y[i + 1] - this.y[i], dz = this.z[i + 1] - this.z[i];
+      const L = Math.sqrt(dx * dx + dy * dy + dz * dz), zm = 0.5 * (this.z[i] + this.z[i + 1]);
+      if (L > this.hTarget(zm) * (crowded ? 1.6 : 1)) this.split(i);
+    }
+    const K = crowded ? 1 : 3;
+    let cnt = 0, cut = -1;
+    for (let i = this.n - 1; i >= 0; i--) { if (this.fl[i] === 2) { cnt++; if (cnt === K + 1) { cut = i; break; } } }
+    if (cut >= 0) {
+      const rem = cut + 1;
+      for (let i = 0; i < rem; i++) this.deposit(i);
+      this.shift(rem);
+    }
+  }
+  split(i) {
+    const n = this.n;
+    for (const a of [this.x, this.y, this.z, this.vx, this.vy, this.vz, this.fl]) a.copyWithin(i + 2, i + 1, n);
+    for (const a of [this.sv, this.l0, this.tau, this.mst]) a.copyWithin(i + 2, i + 1, n - 1);
+    const j = i + 1, k = i + 2;
+    this.x[j] = 0.5 * (this.x[i] + this.x[k]); this.y[j] = 0.5 * (this.y[i] + this.y[k]); this.z[j] = 0.5 * (this.z[i] + this.z[k]);
+    this.vx[j] = 0.5 * (this.vx[i] + this.vx[k]); this.vy[j] = 0.5 * (this.vy[i] + this.vy[k]); this.vz[j] = 0.5 * (this.vz[i] + this.vz[k]);
+    this.fl[j] = (this.fl[i] === 1 && this.fl[k] === 1) ? 1 : 0;
+    const v = this.sv[i] * 0.5; this.sv[i] = v; this.sv[j] = v;
+    this.l0[i] *= 0.5; this.l0[j] = this.l0[i]; this.tau[j] = this.tau[i]; this.mst[j] = this.mst[i];
+    this.n++;
+  }
+  shift(r) {
+    const n = this.n;
+    for (const a of [this.x, this.y, this.z, this.vx, this.vy, this.vz, this.fl]) a.copyWithin(0, r, n);
+    for (const a of [this.sv, this.l0, this.tau, this.mst]) a.copyWithin(0, r, n - 1);
+    this.n -= r;
+  }
+  deposit(i) {
+    if (this.dn >= this.dcap) {
+      const r = 400;
+      for (const a of [this.dx_, this.dy_, this.dz_, this.dr_, this.dt_]) a.copyWithin(0, r, this.dn);
+      this.dn -= r;
+    }
+    const k = this.dn++;
+    this.dx_[k] = this.x[i]; this.dy_[k] = this.y[i]; this.dz_[k] = this.z[i]; this.dr_[k] = Math.max(this.rad[i], 1e-5); this.dt_[k] = this.t;
+    this.depositVol(this.x[i], this.y[i], this.sv[i]);
+  }
+  // viscous gravity-current spreading (h_t = div(rho g h^3/3mu grad h)) + belt advection:
+  // the height-field window is re-centred on the nozzle every full cell by shifting columns,
+  // and every deposited-trace point (and the sticky "contacts" history) is carried along too.
+  fieldStep(dtF) {
+    const p = this.p, h = p.hf, nx = h.nx, ny = h.ny, d = this.hf, T = this.hfTmp;
+    const V = p.beltV || 0;
+    if (V !== 0) {
+      this.hfOff += V * dtF;
+      while (this.hfOff >= h.dx) {
+        for (let j = 0; j < ny; j++) { const r = j * nx; d.copyWithin(r + 1, r, r + nx - 1); d[r] = 0; }
+        this.hfOff -= h.dx;
+      }
+      for (let k = 0; k < this.dn; k++) this.dx_[k] += V * dtF;
+      for (let k = 0; k < this.contacts.length; k += 3) this.contacts[k + 1] += V * dtF;
+      let c = 0; const xmax = h.x0 + nx * h.dx;
+      while (c < this.dn && this.dx_[c] > xmax) c++;
+      if (c > 0) { for (const a of [this.dx_, this.dy_, this.dz_, this.dr_, this.dt_]) a.copyWithin(0, c, this.dn); this.dn -= c; }
+    }
+    let hmax = 0; for (let k = 0; k < d.length; k++) if (d[k] > hmax) hmax = d[k];
+    const Dmax = p.rho * p.g * hmax * hmax * hmax / (3 * p.mu) + 1e-12;
+    let steps = Math.ceil(dtF * Dmax / (0.2 * h.dx * h.dx)); steps = Math.min(Math.max(steps, 1), 6);
+    const dt = Math.min(dtF / steps, 0.2 * h.dx * h.dx / Dmax), kf = p.rho * p.g / (3 * p.mu) * dt / (h.dx * h.dx);
+    for (let s = 0; s < steps; s++) {
+      T.set(d);
+      for (let j = 1; j < ny - 1; j++) for (let i = 1; i < nx - 1; i++) {
+        const k = j * nx + i, c = T[k];
+        const fl = (c, o) => { const m = 0.5 * (c + o); return m * m * m * (o - c); };
+        d[k] = c + kf * (fl(c, T[k - 1]) + fl(c, T[k + 1]) + fl(c, T[k - nx]) + fl(c, T[k + nx]));
+      }
+    }
+    for (let k = 0; k < this.dn; k++) {
+      const g = this.ground(this.dx_[k], this.dy_[k]);
+      const zt = Math.max(this.dr_[k] * 0.6, g - this.dr_[k] * 0.4);
+      if (zt < this.dz_[k]) this.dz_[k] += (zt - this.dz_[k]) * Math.min(1, dtF * 6);
+    }
+  }
+  advance(simDt, maxSteps) {
+    const dt = this.dtMax; let steps = Math.min(Math.ceil(simDt / dt), maxSteps || 400);
+    for (let s = 0; s < steps; s++) this.substep(dt);
+    this.fieldStep(steps * dt);
+    this.diagnose();
+    return steps;
+  }
+  // dynamics diagnostics, analysed in the belt-co-moving frame (subtracting how far each
+  // contact point has since been carried by the belt) so R/omega describe the actual coil
+  // shape rather than its bulk drift.
+  diagnose() {
+    const p = this.p, c = this.contacts;
+    const win = 0.3;
+    let s = 0; while (s < c.length && c[s] < this.t - win) s += 3;
+    if (s > 0) c.splice(0, s);
+    const st = this.stats;
+    const g0 = this.ground(0, 0);
+    const zc = g0 + Math.max(3 * (st.R || this.hMin * 4), 0.08 * p.H);
+    let best = -1, bd = 1e9;
+    for (let i = 0; i < this.n; i++) if (this.fl[i] === 0) { const d = Math.abs(this.z[i] - zc); if (d < bd) { bd = d; best = i; } }
+    if (best >= 0) {
+      const u = Math.max(Math.hypot(this.vx[best], this.vy[best], this.vz[best]), p.U0);
+      st.U1 += (u - st.U1) * 0.15; st.a1 = Math.sqrt(p.Q / (Math.PI * st.U1));
+    }
+    const V = p.beltV || 0, N = c.length / 3;
+    if (N > 8) {
+      let mx = 0, my = 0;
+      for (let k = 0; k < N; k++) { mx += c[3 * k + 1] - V * (this.t - c[3 * k]); my += c[3 * k + 2]; }
+      mx /= N; my /= N;
+      let R = 0; for (let k = 0; k < N; k++) R += Math.hypot(c[3 * k + 1] - V * (this.t - c[3 * k]) - mx, c[3 * k + 2] - my);
+      R /= N; st.R += (R - st.R) * 0.15;
+      let ang = 0, prev = null;
+      for (let k = 0; k < N; k++) {
+        const a = Math.atan2(c[3 * k + 2] - my, c[3 * k + 1] - V * (this.t - c[3 * k]) - mx);
+        if (prev !== null) { let d = a - prev; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; ang += d; }
+        prev = a;
+      }
+      const T = c[c.length - 3] - c[0];
+      if (T > 0) { const om = Math.abs(ang) / T; st.omega += (om - st.omega) * 0.15; }
+    } else { st.R *= 0.9; }
+    st.n = this.n;
+    // Chiu-Webster & Lister (2006): the coiling pattern seen on a moving belt is set by the
+    // ratio of belt speed to the coil's own unforced tangential (touch-down) speed R*omega --
+    // V* << 1 -> coiling, V* ~ O(1) -> meandering / figure-eight, V* >> 1 -> straight line.
+    st.transSpeed = st.R * st.omega;
+    st.Vr = st.transSpeed > 1e-5 ? V / st.transSpeed : (V > 1e-4 ? 99 : 0);
+  }
+}
+
+// ---------------------------------------------------------------------------- rendering
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x080a0c);
+scene.fog = new THREE.FogExp2(0x080a0c, 2.6);
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.001, 10);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.minDistance = 0.03; controls.maxDistance = 1.4;
+
+const hemi = new THREE.HemisphereLight(0xdcefff, 0x0c1418, 1.0);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffe9b0, 1.9);
+sun.position.set(0.45, 0.9, 0.4);
+scene.add(sun);
+const glow = new THREE.PointLight(0xffc36a, 0.55, 0.6, 2);
+scene.add(glow);
+
+function camPreset(name, target) {
+  if (name === 'front') camera.position.set(0, target.y * 1.1 + 0.02, 0.26);
+  else if (name === 'top') camera.position.set(0.001, 0.34, 0.001);
+  else if (name === 'side') camera.position.set(0.26, target.y * 1.1 + 0.02, 0);
+  else if (name === 'close') camera.position.set(0.045, 0.04, 0.06);
+  else camera.position.set(0.02, 0.13, 0.24);
+  controls.target.copy(target); controls.update();
+}
+
+const syrupUniforms = {
+  uLightDir: { value: new THREE.Vector3(0.45, 0.9, 0.4).normalize() },
+  uLightColor: { value: new THREE.Color(0xffe9b0) },
+  uBase: { value: new THREE.Color(0xa8690a) },
+  uDeep: { value: new THREE.Color(0x361a02) },
+  uCamPos: { value: camera.position }
+};
+function syrupMaterial() {
+  return new THREE.ShaderMaterial({
+    uniforms: THREE.UniformsUtils.clone(syrupUniforms),
+    vertexShader: `
+      varying vec3 vN; varying vec3 vWP;
+      void main(){
+        vN = normalize(normalMatrix*normal);
+        vec4 wp = modelMatrix*vec4(position,1.0);
+        vWP = wp.xyz;
+        gl_Position = projectionMatrix*viewMatrix*wp;
+      }`,
+    fragmentShader: `
+      uniform vec3 uLightDir, uLightColor, uBase, uDeep, uCamPos;
+      varying vec3 vN; varying vec3 vWP;
+      void main(){
+        vec3 N = normalize(vN);
+        vec3 V = normalize(uCamPos - vWP);
+        if(dot(N,V)<0.0) N=-N;
+        vec3 L = normalize(uLightDir);
+        float diff = max(dot(N,L),0.0);
+        vec3 H = normalize(L+V);
+        float spec = pow(max(dot(N,H),0.0), 110.0)*1.6;
+        float fres = pow(1.0-max(dot(N,V),0.0), 3.0);
+        float back = pow(max(dot(-N,L),0.0),1.4);
+        vec3 sky = mix(vec3(0.02,0.03,0.04), vec3(0.95,0.92,0.8), smoothstep(-0.2,0.9,N.y));
+        vec3 col = mix(uDeep, uBase, 0.4+0.6*diff);
+        col += back*vec3(1.0,0.62,0.15)*0.5;
+        col = mix(col, sky, 0.16+0.14*fres);
+        col += uLightColor*spec;
+        col += fres*vec3(1.0,0.85,0.45)*0.55;
+        gl_FragColor = vec4(col, 1.0);
+      }`
+  });
+}
+
+const RINGS = 8, MAXPTS = 620;
+function makeTubeGeo() {
+  const idx = [];
+  for (let i = 0; i < MAXPTS - 1; i++) for (let r = 0; r < RINGS; r++) {
+    const r2 = (r + 1) % RINGS, a = i * RINGS + r, b = i * RINGS + r2, c = (i + 1) * RINGS + r, d = (i + 1) * RINGS + r2;
+    idx.push(a, c, b, b, c, d);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MAXPTS * RINGS * 3), 3).setUsage(THREE.DynamicDrawUsage));
+  geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(MAXPTS * RINGS * 3), 3).setUsage(THREE.DynamicDrawUsage));
+  geo.setIndex(idx);
+  geo.setDrawRange(0, 0);
+  return geo;
+}
+const tubeGeo = makeTubeGeo();
+const tubeMesh = new THREE.Mesh(tubeGeo, syrupMaterial());
+tubeMesh.frustumCulled = false;
+scene.add(tubeMesh);
+const tmpPts = new Float32Array(MAXPTS * 3), tmpRad = new Float32Array(MAXPTS);
+function updateTube(count) {
+  if (count > MAXPTS) count = MAXPTS;
+  const pos = tubeGeo.attributes.position.array, nor = tubeGeo.attributes.normal.array;
+  if (count < 2) { tubeGeo.setDrawRange(0, 0); return; }
+  let nx = 1, ny = 0, nz = 0, first = true;
+  for (let i = 0; i < count; i++) {
+    const i0 = Math.max(i - 1, 0), i1 = Math.min(i + 1, count - 1);
+    let dx = tmpPts[i1 * 3] - tmpPts[i0 * 3], dy = tmpPts[i1 * 3 + 1] - tmpPts[i0 * 3 + 1], dz = tmpPts[i1 * 3 + 2] - tmpPts[i0 * 3 + 2];
+    let l = Math.hypot(dx, dy, dz) || 1; dx /= l; dy /= l; dz /= l;
+    if (first) { if (Math.abs(dx) < 0.9) { nx = 1; ny = 0; nz = 0; } else { nx = 0; ny = 1; nz = 0; } first = false; }
+    const d = nx * dx + ny * dy + nz * dz; nx -= d * dx; ny -= d * dy; nz -= d * dz;
+    let nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
+    const bx = dy * nz - dz * ny, by = dz * nx - dx * nz, bz = dx * ny - dy * nx;
+    const r = tmpRad[i];
+    for (let k = 0; k < RINGS; k++) {
+      const th = k / RINGS * Math.PI * 2, ct = Math.cos(th), st = Math.sin(th);
+      const cx = ct * nx + st * bx, cy = ct * ny + st * by, cz = ct * nz + st * bz;
+      const vi = (i * RINGS + k) * 3;
+      pos[vi] = tmpPts[i * 3] + cx * r; pos[vi + 1] = tmpPts[i * 3 + 1] + cy * r; pos[vi + 2] = tmpPts[i * 3 + 2] + cz * r;
+      nor[vi] = cx; nor[vi + 1] = cy; nor[vi + 2] = cz;
+    }
+  }
+  tubeGeo.attributes.position.needsUpdate = true;
+  tubeGeo.attributes.normal.needsUpdate = true;
+  tubeGeo.setDrawRange(0, (count - 1) * RINGS * 6);
+  tubeGeo.computeBoundingSphere();
+}
+
+// -- deposited syrup layer on the belt: height-field plane
+const hfCfg = { nx: 70, ny: 190, x0: -0.045, y0: -0.14, dx: 0.09 / 70 };
+const pw = hfCfg.nx, ph = hfCfg.ny;
+const puddleGeo = new THREE.PlaneGeometry(hfCfg.dx * (pw - 1), hfCfg.dx * (ph - 1), pw - 1, ph - 1);
+puddleGeo.rotateX(-Math.PI / 2);
+const puddleMat = syrupMaterial();
+puddleMat.uniforms.uBase.value = new THREE.Color(0xb87c14);
+puddleMat.transparent = true;
+const puddleMesh = new THREE.Mesh(puddleGeo, puddleMat);
+puddleMesh.frustumCulled = false;
+puddleMesh.position.y = 0.0015; // sit just above the belt surface
+scene.add(puddleMesh);
+
+// -- conveyor belt: a long moving plane with a procedural scrolling stripe texture
+const beltCanvas = document.createElement('canvas'); beltCanvas.width = 64; beltCanvas.height = 256;
+const bctx = beltCanvas.getContext('2d');
+function drawBeltTexture() {
+  bctx.fillStyle = '#2b2f33'; bctx.fillRect(0, 0, 64, 256);
+  bctx.fillStyle = '#1c1f22';
+  for (let y = 0; y < 256; y += 16) bctx.fillRect(0, y, 64, 8);
+  bctx.strokeStyle = '#3a3f44'; bctx.lineWidth = 2;
+  bctx.strokeRect(1, 0, 62, 256);
+}
+drawBeltTexture();
+const beltTex = new THREE.CanvasTexture(beltCanvas);
+beltTex.wrapS = THREE.RepeatWrapping; beltTex.wrapT = THREE.RepeatWrapping;
+beltTex.repeat.set(1, 30);
+const beltLen = 1.0, beltWid = hfCfg.dx * pw * 1.15;
+const beltGeo = new THREE.PlaneGeometry(beltWid, beltLen, 1, 1);
+beltGeo.rotateX(-Math.PI / 2);
+const beltMat = new THREE.MeshStandardMaterial({ map: beltTex, roughness: 0.85, metalness: 0.15 });
+const beltMesh = new THREE.Mesh(beltGeo, beltMat);
+scene.add(beltMesh);
+// side rollers for visual context
+const rollerMat = new THREE.MeshStandardMaterial({ color: 0x555b60, metalness: 0.6, roughness: 0.4 });
+const rollerGeo = new THREE.CylinderGeometry(0.012, 0.012, beltWid + 0.01, 20);
+const rollerA = new THREE.Mesh(rollerGeo, rollerMat); rollerA.rotation.x = Math.PI / 2; rollerA.rotation.z = Math.PI / 2;
+rollerA.position.set(0, -0.012, beltLen / 2); scene.add(rollerA);
+const rollerB = rollerA.clone(); rollerB.position.z = -beltLen / 2; scene.add(rollerB);
+
+function updatePuddle() {
+  const pos = puddleGeo.attributes.position.array;
+  for (let j = 0; j < ph; j++) for (let i = 0; i < pw; i++) {
+    const k = j * pw + i, h = sim.hf[k] || 0;
+    pos[k * 3 + 1] = h;
+  }
+  puddleGeo.attributes.position.needsUpdate = true;
+  puddleGeo.computeVertexNormals();
+}
+
+const nozzleMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.004, 0.011, 20, 1, true),
+  new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.8, roughness: 0.35, side: THREE.DoubleSide }));
+scene.add(nozzleMesh);
+
+// ---------------------------------------------------------------------------- simulation + UI
+const sim = new ThreadSim({});
+function syncNozzle() { nozzleMesh.position.set(0, sim.p.H + 0.005, 0); }
+syncNozzle();
+camPreset('reset', new THREE.Vector3(0, sim.p.H * 0.35, 0));
+
+function muFromSlider(v) { return Math.pow(10, v); }
+const ids = ['beltV', 'H', 'a0', 'U0', 'mu', 'gamma', 'rho'];
+function applyParams() {
+  sim.p.beltV = +document.getElementById('beltV').value;
+  sim.p.H = +document.getElementById('H').value;
+  sim.p.a0 = +document.getElementById('a0').value;
+  sim.p.U0 = +document.getElementById('U0').value;
+  sim.p.mu = muFromSlider(+document.getElementById('mu').value);
+  sim.p.gamma = +document.getElementById('gamma').value;
+  sim.p.rho = +document.getElementById('rho').value;
+  sim.derived();
+  sim.steadyProfile(sim.p.H);
+  document.getElementById('vbeltV').textContent = (sim.p.beltV * 100).toFixed(1) + ' cm/s';
+  document.getElementById('vH').textContent = (sim.p.H * 100).toFixed(1) + ' cm';
+  document.getElementById('va0').textContent = (sim.p.a0 * 1000).toFixed(2) + ' mm';
+  document.getElementById('vU0').textContent = (sim.p.U0 * 100).toFixed(1) + ' cm/s';
+  document.getElementById('vmu').textContent = sim.p.mu.toFixed(1) + ' Pa·s';
+  document.getElementById('vgam').textContent = sim.p.gamma.toFixed(3) + ' N/m';
+  document.getElementById('vrho').textContent = Math.round(sim.p.rho) + ' kg/m³';
+  document.getElementById('vQ').textContent = (sim.p.Q * 1e9).toFixed(1) + ' mm³/s';
+  document.getElementById('beltNum').textContent = (sim.p.beltV * 100).toFixed(1) + ' cm/s';
+  document.getElementById('beltarrow').style.opacity = sim.p.beltV > 0.001 ? 1 : 0.25;
+  syncNozzle();
+}
+ids.forEach(id => document.getElementById(id).addEventListener('input', applyParams));
+applyParams();
+document.getElementById('restart').addEventListener('click', () => sim.reset());
+document.querySelectorAll('#ui button[data-cam]').forEach(b => b.addEventListener('click', () => camPreset(b.dataset.cam, new THREE.Vector3(0, sim.p.H * 0.35, 0))));
+
+// regime classification: Chiu-Webster & Lister map, driven by V* = beltSpeed / (R*omega)
+function classify(st) {
+  if (st.R < sim.hMin * 1.4 || st.omega < 1) return { name: 'Establishing…', col: '#8a9aa6' };
+  const Vr = st.Vr;
+  if (Vr < 0.45) return { name: 'Coiling', col: '#5bd68a' };
+  if (Vr < 1.05) return { name: 'Meandering', col: '#57b8e6' };
+  if (Vr < 2.1) return { name: 'Figure-Eight', col: '#c97bd6' };
+  return { name: 'Straight Line', col: '#ffb347' };
+}
+const plotCv = document.getElementById('plot'), pctx = plotCv.getContext('2d');
+const vrHist = [];
+function drawPlot(st) {
+  vrHist.push(Math.min(st.Vr, 3.2)); if (vrHist.length > 200) vrHist.shift();
+  const W = plotCv.width, H = plotCv.height; pctx.clearRect(0, 0, W, H);
+  const bands = [[0, 0.45, '#123d2a', 'Coil'], [0.45, 1.05, '#123246', 'Meander'], [1.05, 2.1, '#33203f', 'Fig-8'], [2.1, 3.2, '#4a3312', 'Straight']];
+  const y = v => H - (v / 3.2) * H;
+  bands.forEach(([a, b, col]) => { pctx.fillStyle = col; pctx.fillRect(0, y(b), W, y(a) - y(b)); });
+  pctx.strokeStyle = '#89a0ad'; pctx.font = '9px sans-serif'; pctx.fillStyle = '#89a0ad';
+  pctx.fillText('Straight', 3, y(2.65) + 3); pctx.fillText('Fig-8', 3, y(1.55) + 3);
+  pctx.fillText('Meander', 3, y(0.75) + 3); pctx.fillText('Coil', 3, y(0.22) + 3);
+  pctx.beginPath(); pctx.strokeStyle = '#7ed6ff'; pctx.lineWidth = 1.5;
+  for (let i = 0; i < vrHist.length; i++) { const px = i / 200 * W, py = y(vrHist[i]); if (i === 0) pctx.moveTo(px, py); else pctx.lineTo(px, py); }
+  pctx.stroke();
+  const cx = (vrHist.length - 1) / 200 * W;
+  pctx.fillStyle = classify(st).col; pctx.beginPath(); pctx.arc(cx, y(vrHist[vrHist.length - 1]), 3.5, 0, 7); pctx.fill();
+}
+function updateRegimeUI() {
+  const st = sim.stats, r = classify(st);
+  const badge = document.getElementById('badge');
+  badge.textContent = r.name; badge.style.background = r.col + '33'; badge.style.color = r.col; badge.style.border = '1px solid ' + r.col;
+  document.getElementById('mR').textContent = (st.R * 1000).toFixed(2) + ' mm';
+  document.getElementById('mOm').textContent = (st.omega / (2 * Math.PI)).toFixed(1) + ' Hz';
+  document.getElementById('mTs').textContent = (st.transSpeed * 100).toFixed(1) + ' cm/s';
+  document.getElementById('mVr').textContent = st.Vr.toFixed(2);
+  document.getElementById('ma1').textContent = (st.a1 * 1000).toFixed(2) + ' mm';
+  drawPlot(st);
+}
+
+let running = false;
+document.getElementById('start').addEventListener('click', beginPour);
+function beginPour() { document.getElementById('start').style.display = 'none'; running = true; }
+const qp = new URLSearchParams(location.search);
+if (qp.has('autotest')) {
+  beginPour();
+  if (qp.get('beltV')) { document.getElementById('beltV').value = qp.get('beltV'); applyParams(); }
+  let warm = parseFloat(qp.get('warm') || '2.2');
+  while (warm > 0) { sim.advance(1 / 60, 60); warm -= 1 / 60; }
+  const camQ = qp.get('cam');
+  if (camQ) camPreset(camQ, new THREE.Vector3(0, sim.p.H * 0.35, 0));
+  updateRegimeUI();
+}
+
+let frames = 0, fpsT = performance.now();
+document.title = 'Syrup Conveyor Belt';
+function animate() {
+  requestAnimationFrame(animate);
+  if (running) sim.advance(1 / 60, 55);
+  const n = sim.n;
+  for (let i = 0; i < n; i++) { tmpPts[i * 3] = sim.x[i]; tmpPts[i * 3 + 1] = sim.z[i]; tmpPts[i * 3 + 2] = sim.y[i]; tmpRad[i] = sim.rad[i]; }
+  updateTube(n);
+  updatePuddle();
+  beltTex.offset.y = -(sim.t * sim.p.beltV) / (beltLen / 30) % 1;
+  glow.position.set(0, sim.p.H * 0.6, 0);
+  if (running) updateRegimeUI();
+  controls.update();
+  renderer.render(scene, camera);
+  frames++; const now = performance.now();
+  if (now - fpsT > 500) { document.getElementById('fps').textContent = (frames * 1000 / (now - fpsT)).toFixed(0) + ' fps  |  nodes: ' + n + '  |  deposited: ' + sim.dn; frames = 0; fpsT = now; }
+}
+animate();
+
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+</script>
+</body>
+</html>

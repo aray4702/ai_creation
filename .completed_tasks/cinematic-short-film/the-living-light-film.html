@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Living Light — A Pure-Code Cinematic Short Film</title>
+<style>
+  html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:Georgia,'Times New Roman',serif;}
+  #c{position:fixed;inset:0;width:100%;height:100%;display:block;}
+  .bar{position:fixed;left:0;right:0;height:8vh;background:#000;z-index:20;}
+  #barT{top:0;} #barB{bottom:0;}
+  #vig{position:fixed;inset:0;pointer-events:none;z-index:15;
+    background:radial-gradient(ellipse at center,transparent 52%,rgba(0,0,0,.58) 100%);}
+  #fade{position:fixed;inset:0;background:#000;opacity:1;z-index:30;pointer-events:none;}
+  #cap{position:fixed;left:0;right:0;bottom:13vh;text-align:center;z-index:40;pointer-events:none;
+    color:#e8dcc0;font-size:clamp(17px,2.8vw,32px);letter-spacing:.4em;text-transform:uppercase;opacity:0;
+    text-shadow:0 2px 12px rgba(0,0,0,.9);}
+  .ov{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;
+    z-index:40;pointer-events:none;text-align:center;color:#f2e9d8;opacity:0;padding:0 6vw;}
+  #filmTitle h1{font-size:clamp(38px,8vw,104px);letter-spacing:.28em;margin:0 0 2vh 0;font-weight:normal;
+    text-shadow:0 4px 30px rgba(0,0,0,.9);}
+  #filmTitle p{font-size:clamp(13px,1.8vw,20px);letter-spacing:.3em;color:#b9ac8d;margin:.6em 0;}
+  #endcard h1{font-size:clamp(30px,6vw,72px);letter-spacing:.5em;font-weight:normal;margin:0;
+    text-shadow:0 4px 30px rgba(0,0,0,.9);}
+  #credits{font-size:clamp(13px,1.9vw,21px);letter-spacing:.22em;line-height:2.1;color:#d9cba6;}
+  #credits .big{font-size:clamp(20px,3.4vw,40px);letter-spacing:.3em;color:#f2e9d8;}
+  #start{position:fixed;inset:0;z-index:50;background:#04050a;display:flex;align-items:center;
+    justify-content:center;flex-direction:column;cursor:pointer;color:#e8dcc0;text-align:center;padding:0 8vw;}
+  #start h1{font-size:clamp(34px,7vw,88px);letter-spacing:.3em;font-weight:normal;margin:0 0 1.5vh 0;}
+  #start p{font-size:clamp(12px,1.7vw,18px);letter-spacing:.28em;color:#9d9176;margin:.5em 0;}
+  #start .go{margin-top:5vh;font-size:clamp(15px,2.2vw,24px);letter-spacing:.4em;color:#f2e9d8;
+    border:1px solid #6b5f45;padding:1.4vh 4vw;animation:pulse 2.4s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:.55}50%{opacity:1}}
+  #err{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
+    color:#e8dcc0;background:#000;padding:4vw;text-align:center;font-size:18px;letter-spacing:.1em;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="vig"></div>
+<div class="bar" id="barT"></div>
+<div class="bar" id="barB"></div>
+<div id="fade"></div>
+<div id="cap"></div>
+<div class="ov" id="filmTitle"><h1>THE LIVING LIGHT</h1><p>A STORY TOLD IN PURE CODE</p></div>
+<div class="ov" id="endcard"><h1>THE END</h1></div>
+<div class="ov" id="credits"></div>
+<div id="start">
+  <h1>THE LIVING LIGHT</h1>
+  <p>A PURE-CODE CINEMATIC SHORT FILM</p>
+  <p>PROCEDURAL VISUALS &middot; SYNTHESIZED SCORE &middot; NO VIDEO FILES</p>
+  <div class="go">CLICK TO BEGIN</div>
+  <p style="margin-top:4vh;font-size:12px;">HEADPHONES RECOMMENDED &middot; ~3 MINUTES</p>
+</div>
+<div id="err"><div>This film needs the Three.js CDN to render its procedural world.<br><br>Please check your connection and reload.</div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+
+'use strict';
+/* =====================================================================
+   HER REFLECTION — a pure-code cinematic short film
+   Film by David Xu.
+   All visuals: procedural real-time 3D (Three.js). No video files, no
+   pre-rendered assets, no binary/base64 media.
+   All audio: synthesized live with the Web Audio API. No samples.
+   ===================================================================== */
+
+// ---------------------------------------------------------------- audio
+let AC=null, mus=null, verb=null, _nb=null;
+const n2f = m => 440*Math.pow(2,(m-69)/12);
+
+function initAudio(){
+  AC = new (window.AudioContext||window.webkitAudioContext)();
+  const comp = AC.createDynamicsCompressor();
+  comp.threshold.value=-14; comp.ratio.value=6;
+  comp.connect(AC.destination);
+  mus = AC.createGain(); mus.gain.value=0.9; mus.connect(comp);
+  // generated impulse reverb (no samples: synthesized noise decay)
+  const len = Math.floor(AC.sampleRate*2.6);
+  const ir = AC.createBuffer(2,len,AC.sampleRate);
+  for(let ch=0;ch<2;ch++){ const d=ir.getChannelData(ch);
+    for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.6); }
+  verb = AC.createConvolver(); verb.buffer=ir;
+  const vg=AC.createGain(); vg.gain.value=0.55; verb.connect(vg); vg.connect(mus);
+}
+function noiseBuf(){ if(_nb) return _nb;
+  const b=AC.createBuffer(1,AC.sampleRate*2,AC.sampleRate), d=b.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1; _nb=b; return b; }
+function sendVerb(node,amt){ const s=AC.createGain(); s.gain.value=amt;
+  node.connect(s); s.connect(verb); }
+function osc(type,f){ const o=AC.createOscillator(); o.type=type; o.frequency.value=f; return o; }
+
+// string section pad: detuned saw stack through lowpass (additive-ish)
+function pad(t,mids,dur,vel,cut,atk){
+  vel=vel||0.4; cut=cut||1200; atk=atk||1.5;
+  mids.forEach(m=>{ const f=n2f(m);
+    const g=AC.createGain(); g.connect(mus); sendVerb(g,0.5);
+    const fl=AC.createBiquadFilter(); fl.type='lowpass'; fl.frequency.value=cut; fl.connect(g);
+    [-6,6].forEach(c=>{ const o=osc('sawtooth',f); o.detune.value=c;
+      o.connect(fl); o.start(t); o.stop(t+dur+1.2); });
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.linearRampToValueAtTime(vel*0.22,t+atk);
+    g.gain.setValueAtTime(vel*0.22,t+Math.max(atk,dur-0.8));
+    g.gain.linearRampToValueAtTime(0.0001,t+dur+1.0);
+  });
+}
+// flute: sine + soft octave, breath vibrato
+function flute(t,m,dur,vel){
+  vel=vel||0.5; const f=n2f(m);
+  const g=AC.createGain(); g.connect(mus); sendVerb(g,0.45);
+  const o=osc('sine',f), o2=osc('sine',f*2);
+  const g2=AC.createGain(); g2.gain.value=0.14; o2.connect(g2); g2.connect(g);
+  const lfo=osc('sine',5.4), lg=AC.createGain(); lg.gain.value=f*0.006;
+  lfo.connect(lg); lg.connect(o.frequency);
+  o.connect(g);
+  [o,o2,lfo].forEach(x=>{x.start(t);x.stop(t+dur+0.6);});
+  const a=Math.min(0.35,dur*0.3);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.linearRampToValueAtTime(vel*0.5,t+a);
+  g.gain.setValueAtTime(vel*0.5,t+Math.max(a+0.05,dur-0.3));
+  g.gain.linearRampToValueAtTime(0.0001,t+dur+0.5);
+}
+// plucked harp/piano: harmonic stack, bright-to-dark filter sweep, exp decay
+function pluck(t,m,dur,vel){
+  vel=vel||0.5; const f=n2f(m);
+  const g=AC.createGain(); g.connect(mus); sendVerb(g,0.5);
+  const fl=AC.createBiquadFilter(); fl.type='lowpass'; fl.connect(g);
+  fl.frequency.setValueAtTime(4200,t);
+  fl.frequency.exponentialRampToValueAtTime(750,t+Math.min(1.4,dur+0.4));
+  [[1,'triangle',1],[2,'sine',0.32],[3,'sine',0.13],[4.02,'sine',0.05]].forEach(cfg=>{
+    const o=osc(cfg[1],f*cfg[0]), og=AC.createGain(); og.gain.value=cfg[2];
+    o.connect(og); og.connect(fl); o.start(t); o.stop(t+dur+0.8); });
+  const d=Math.max(dur+0.3,1.0);
+  g.gain.setValueAtTime(vel*0.55,t);
+  g.gain.exponentialRampToValueAtTime(0.0008,t+d);
+}
+// cello: low saw pair, slow bow attack, vibrato (physical-model flavor)
+function cello(t,m,dur,vel){
+  vel=vel||0.5; const f=n2f(m);
+  const g=AC.createGain(); g.connect(mus); sendVerb(g,0.35);
+  const fl=AC.createBiquadFilter(); fl.type='lowpass'; fl.frequency.value=850; fl.Q.value=1.4; fl.connect(g);
+  const o=osc('sawtooth',f), o2=osc('sawtooth',f*1.004);
+  const lfo=osc('sine',5.1), lg=AC.createGain(); lg.gain.value=f*0.009;
+  lfo.connect(lg); lg.connect(o.frequency); lg.connect(o2.frequency);
+  o.connect(fl); o2.connect(fl);
+  [o,o2,lfo].forEach(x=>{x.start(t);x.stop(t+dur+0.6);});
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.linearRampToValueAtTime(vel*0.5,t+0.28);
+  g.gain.setValueAtTime(vel*0.5,t+Math.max(0.3,dur-0.25));
+  g.gain.linearRampToValueAtTime(0.0001,t+dur+0.5);
+}
+// brass stab: saw stack, filter swell
+function brass(t,m,dur,vel){
+  vel=vel||0.5; const f=n2f(m);
+  const g=AC.createGain(); g.connect(mus); sendVerb(g,0.3);
+  const fl=AC.createBiquadFilter(); fl.type='lowpass'; fl.Q.value=2.2; fl.connect(g);
+  fl.frequency.setValueAtTime(550,t);
+  fl.frequency.linearRampToValueAtTime(2700,t+0.14);
+  fl.frequency.linearRampToValueAtTime(900,t+dur);
+  [-5,0,5].forEach(c=>{ const o=osc('sawtooth',f); o.detune.value=c;
+    o.connect(fl); o.start(t); o.stop(t+dur+0.4); });
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.linearRampToValueAtTime(vel*0.42,t+0.09);
+  g.gain.setValueAtTime(vel*0.42,t+Math.max(0.1,dur-0.12));
+  g.gain.linearRampToValueAtTime(0.0001,t+dur+0.3);
+}
+// taiko: pitch-dropping sine + skin noise
+function taiko(t,vel,base){
+  vel=vel||0.7; base=base||70;
+  const o=osc('sine',base*1.9), g=AC.createGain(); g.connect(mus);
+  o.frequency.exponentialRampToValueAtTime(base*0.55,t+0.2);
+  g.gain.setValueAtTime(vel*0.95,t);
+  g.gain.exponentialRampToValueAtTime(0.001,t+0.55);
+  o.connect(g); o.start(t); o.stop(t+0.65);
+  const ns=AC.createBufferSource(); ns.buffer=noiseBuf();
+  const nf=AC.createBiquadFilter(); nf.type='lowpass'; nf.frequency.value=480;
+  const ng=AC.createGain(); ng.gain.setValueAtTime(vel*0.3,t);
+  ng.gain.exponentialRampToValueAtTime(0.001,t+0.13);
+  ns.connect(nf); nf.connect(ng); ng.connect(mus); ns.start(t); ns.stop(t+0.16);
+}
+// thunder: long low noise swell
+function thunder(t,vel,dur){
+  vel=vel||0.5; dur=dur||2.5;
+  const ns=AC.createBufferSource(); ns.buffer=noiseBuf(); ns.loop=true;
+  const fl=AC.createBiquadFilter(); fl.type='lowpass';
+  fl.frequency.setValueAtTime(420,t);
+  fl.frequency.exponentialRampToValueAtTime(55,t+dur);
+  const g=AC.createGain(); g.connect(mus); sendVerb(g,0.4);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.linearRampToValueAtTime(vel*0.85,t+0.09);
+  g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+  ns.connect(fl); fl.connect(g); ns.start(t); ns.stop(t+dur+0.1);
+}
+// bell/chime: FM synthesis (carrier + decaying modulator index)
+function bell(t,m,vel,dur){
+  vel=vel||0.4; dur=dur||3; const f=n2f(m);
+  const car=osc('sine',f), mod=osc('sine',f*3.01);
+  const mg=AC.createGain();
+  mg.gain.setValueAtTime(f*2.4,t);
+  mg.gain.exponentialRampToValueAtTime(1.2,t+dur*0.7);
+  mod.connect(mg); mg.connect(car.frequency);
+  const g=AC.createGain(); g.connect(mus); sendVerb(g,0.65);
+  g.gain.setValueAtTime(vel*0.42,t);
+  g.gain.exponentialRampToValueAtTime(0.0008,t+dur);
+  car.connect(g);
+  [car,mod].forEach(o=>{o.start(t);o.stop(t+dur+0.25);});
+}
+// choir: detuned saw triads, slow swell ("ahh" via band-ish lowpass)
+function choir(t,mids,dur,vel){
+  vel=vel||0.4;
+  mids.forEach(m=>{ const f=n2f(m);
+    const g=AC.createGain(); g.connect(mus); sendVerb(g,0.65);
+    const fl=AC.createBiquadFilter(); fl.type='lowpass'; fl.frequency.value=1700; fl.connect(g);
+    const lfo=osc('sine',4.6+Math.random()*0.8), lg=AC.createGain(); lg.gain.value=f*0.006;
+    lfo.connect(lg);
+    for(let k=0;k<3;k++){ const o=osc('sawtooth',f);
+      o.detune.value=(k-1)*9+Math.random()*4; lg.connect(o.frequency);
+      o.connect(fl); o.start(t); o.stop(t+dur+1.2); }
+    lfo.start(t); lfo.stop(t+dur+1.2);
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.linearRampToValueAtTime(vel*0.15,t+dur*0.4);
+    g.gain.setValueAtTime(vel*0.15,t+dur*0.72);
+    g.gain.linearRampToValueAtTime(0.0001,t+dur+1.1);
+  });
+}
+// ambience beds: wind (wandering bandpass noise) / rain (highpassed noise)
+function bed(t,dur,type,vel){
+  const ns=AC.createBufferSource(); ns.buffer=noiseBuf(); ns.loop=true;
+  const fl=AC.createBiquadFilter(), g=AC.createGain();
+  if(type==='wind'){ fl.type='bandpass'; fl.frequency.value=380; fl.Q.value=0.7;
+    const lfo=osc('sine',0.12), lg=AC.createGain(); lg.gain.value=260;
+    lfo.connect(lg); lg.connect(fl.frequency); lfo.start(t); lfo.stop(t+dur+0.1);
+  } else { fl.type='highpass'; fl.frequency.value=2600; }
+  ns.connect(fl); fl.connect(g); g.connect(mus); sendVerb(g,0.5);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.linearRampToValueAtTime(vel,t+2.5);
+  g.gain.setValueAtTime(vel,t+Math.max(2.6,dur-2.5));
+  g.gain.linearRampToValueAtTime(0.0001,t+dur);
+  ns.start(t); ns.stop(t+dur+0.1);
+}
+// sequencer: events = [beatOffset, midi, beats, vel]
+function seq(t0,bpm,ev,fn){ const k=60/bpm;
+  for(const e of ev) fn(t0+e[0]*k, e[1], (e[2]||1)*k, e[3]); }
+
+
+
+// ---------------------------------------------------------------- score
+// Locked to the visual timeline below (seconds). T = film start.
+function scheduleScore(T){
+  mus.gain.setValueAtTime(0.9,T);
+  mus.gain.setValueAtTime(0.9,T+165);
+  mus.gain.linearRampToValueAtTime(0.0001,T+170);
+
+  // ---- TITLE 0-12 : calm sea at dusk
+  bed(T+0,12,'wind',0.05);
+  pad(T+0,[55,59,62],12,0.32,1200,3);
+  seq(T,58,[[0,67,1.5],[2,71,1.5],[4,74,2],[6,72,1.5],[8,71,1.5],[10,67,2.5]],
+    (t,m,d)=>pluck(t,m,d,0.5));
+
+  // ---- I. THE KEEPER 12-40 : the lamp theme; the crystal flickers and dims
+  pad(T+12,[50,54,57],7,0.34,1100,2);
+  pad(T+19,[59,62,66],7,0.34,1100,2);
+  pad(T+26,[55,59,62],7,0.34,1100,2);
+  pad(T+33,[57,61,64],7,0.34,1100,2);
+  cello(T+12,38,7,0.3); cello(T+19,47,7,0.3);
+  cello(T+26,43,7,0.3); cello(T+33,45,7,0.3);
+  seq(T+12,64,[
+    [0,74,1.5],[1.5,76,1.5],[3,79,2],[5,77,1.5],[6.5,76,1.5],[8,74,3],
+    [12,76,1.5],[13.5,79,1.5],[15,81,2],[17,79,1.5],[18.5,77,1.5],[20,76,3],
+    [24,74,2],[26,72,1.5],[27.5,71,1.5],[29,72,3]],
+    (t,m,d)=>flute(t,m,d,0.5));
+  bell(T+20,93,0.20,2); bell(T+26,91,0.14,2);
+  bell(T+32,93,0.09,2); bell(T+37,88,0.06,2);
+
+  // ---- II. THE FIREFLY JAR 40-68 : her playful motif
+  pad(T+40,[48,52,55],7,0.3,1400,2);
+  pad(T+47,[55,59,62],7,0.3,1400,2);
+  pad(T+54,[57,60,64],7,0.3,1400,2);
+  pad(T+61,[53,57,60],7,0.3,1400,2);
+  seq(T+40,80,[
+    [0,79,0.75],[1,81,0.75],[2,84,1],[3,81,0.75],[4,79,0.75],[5,76,1.5],
+    [8,79,0.75],[9,81,0.75],[10,84,1],[11,86,1],[12,84,0.75],[13,81,2],
+    [16,84,0.75],[17,81,0.75],[18,79,0.75],[19,76,0.75],[20,74,1.5],[22,76,3]],
+    (t,m,d)=>pluck(t,m,d,0.45));
+  bell(T+46,91,0.25,2); bell(T+52,95,0.25,2);
+  bell(T+58,93,0.25,2); bell(T+64,98,0.3,2.5);
+
+  // ---- III. THE STORM 68-96 : the lamp dies; the ship comes
+  bed(T+68,28,'wind',0.32); bed(T+68,28,'rain',0.14);
+  pad(T+68,[26,33,38],22,0.5,320,4);
+  for(let b=0;b<40;b+=4){ const tb=T+68+b*0.62;
+    taiko(tb,0.8,66); taiko(tb+0.93,0.5,60); taiko(tb+1.24,0.65,64); taiko(tb+2.17,0.55,58); }
+  seq(T+68,97,[[2,36,1.5],[6,37,1.5],[10,38,2],[14,39,2],
+    [18,38,1.5],[22,37,1.5],[26,36,2],[30,34,3]],
+    (t,m,d)=>brass(t,m,d,0.55));
+  thunder(T+72,0.5,3); thunder(T+80,0.55,3); thunder(T+88,0.6,3.5);
+  brass(T+76,33,4,0.5); brass(T+86,31,4,0.5);   // foghorn
+  choir(T+84,[50,51,56],10,0.28);
+
+  // ---- IV. THE LIVING LIGHT 96-120 : the climb, the release, IGNITION
+  pad(T+96,[50,54,57],6,0.4,1300,2);
+  pad(T+102,[59,62,66],6,0.42,1400,1.5);
+  choir(T+96,[62,66,69],12,0.38);
+  choir(T+102,[64,67,71],8,0.42);
+  [0,2,4,6,8].forEach(b=>taiko(T+96+b*0.8,0.6,70));
+  for(let i=0;i<10;i++) taiko(T+104+i*0.35,0.45+i*0.04,66);
+  taiko(T+108,1.0,50);
+  brass(T+108,50,3,0.6); brass(T+108,54,3,0.55); brass(T+108,57,3,0.5);
+  thunder(T+108,0.5,2);
+  choir(T+108,[62,66,69,74],8,0.5);
+  pad(T+108,[50,54,57,62],12,0.45,1700,1.5);
+  [0,1,2,3,4,5].forEach(i=>bell(T+108.5+i*0.9,86+i*2,0.3,3));
+  seq(T+110,84,[[0,74,1.5],[1.5,76,1.5],[3,79,2],[5,81,2],[7,79,1.5],[8.5,76,1.5],[10,74,3]],
+    (t,m,d)=>flute(t,m,d,0.5));
+
+  // ---- V. THE SHIP TURNS 120-140 : triumph, the storm breaks
+  pad(T+120,[53,57,60],5,0.42,1500,1.5);
+  pad(T+125,[55,59,62],5,0.42,1500,1.5);
+  pad(T+130,[57,60,64],5,0.42,1500,1.5);
+  pad(T+135,[50,54,57],5,0.42,1500,1.5);
+  choir(T+120,[60,64,67],10,0.42);
+  choir(T+130,[62,65,69],8,0.42);
+  seq(T+120,92,[
+    [0,53,1],[1,57,1],[2,60,1],[3,65,2],[5,64,1],[6,62,1],[7,60,2],
+    [10,60,1],[11,62,1],[12,64,2],[14,67,2],[16,65,3]],
+    (t,m,d)=>brass(t,m,d,0.5));
+  taiko(T+120,0.8,64); taiko(T+124,0.7,64); taiko(T+128,0.6,64);
+  bed(T+120,14,'wind',0.12);
+
+  // ---- VI. DAWN 140-156 : both themes together, resolution
+  pad(T+140,[50,54,57],5,0.4,1600,2);
+  pad(T+145,[55,59,62],5,0.4,1600,2);
+  pad(T+150,[50,54,57,62,66],8,0.4,1800,2);
+  seq(T+140,72,[[0,79,1],[1,81,1],[2,84,2],[4,81,1],[5,79,2],
+    [8,76,1],[9,79,1],[10,81,2],[12,79,3]],
+    (t,m,d)=>pluck(t,m,d,0.45));
+  seq(T+142,66,[[0,74,2],[2,76,2],[4,79,3],[8,77,2],[10,76,3]],
+    (t,m,d)=>flute(t,m,d,0.4));
+  bell(T+146,93,0.3,3); bell(T+150,95,0.3,3); bell(T+153,98,0.35,4);
+
+  // ---- CREDITS 156-170 : piano reprise, fade to silence
+  pad(T+156,[50,54,57],12,0.2,1000,3);
+  seq(T+156,58,[[0,74,1.5],[2,72,1.5],[4,71,2],[6,69,2],[8,67,4]],
+    (t,m,d)=>pluck(t,m,d,0.4));
+  bell(T+162,86,0.25,5);
+}
+</script>
+<script>
+'use strict';
+/* ============================ visuals ============================ */
+if(!window.THREE){ document.getElementById('err').style.display='flex';
+  document.getElementById('start').style.display='none'; }
+window.addEventListener('error',function(e){
+  var el=document.getElementById('err');
+  el.style.display='flex';
+  el.innerHTML='<div>Something interrupted the film.<br><br><span style="font-size:14px;color:#9d9176;">'+
+    String((e&&e.message)||e).replace(/</g,'&lt;')+'</span><br><br>Please reload to try again.</div>';
+});
+
+const canvas=document.getElementById('c');
+const renderer=new THREE.WebGLRenderer({canvas:canvas,antialias:true,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));
+renderer.setSize(window.innerWidth,window.innerHeight);
+renderer.outputEncoding=THREE.sRGBEncoding;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.15;
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(50,window.innerWidth/window.innerHeight,0.1,600);
+camera.position.set(0,6,-40);
+window.addEventListener('resize',()=>{
+  camera.aspect=window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth,window.innerHeight);
+});
+
+const V3=(x,y,z)=>new THREE.Vector3(x,y,z);
+const lerp=(a,b,u)=>a+(b-a)*u;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const smooth=u=>u*u*(3-2*u);
+const rnd=(a,b)=>a+Math.random()*(b-a);
+function std(color,rough,metal,emissive,ei){
+  return new THREE.MeshStandardMaterial({color:color,roughness:rough==null?0.9:rough,
+    metalness:metal||0,emissive:emissive||0x000000,emissiveIntensity:ei==null?1:ei});
+}
+const GLOW=(()=>{ const c=document.createElement('canvas'); c.width=c.height=128;
+  const x=c.getContext('2d');
+  const g=x.createRadialGradient(64,64,0,64,64,64);
+  g.addColorStop(0,'rgba(255,255,255,1)'); g.addColorStop(0.35,'rgba(255,255,255,.55)');
+  g.addColorStop(1,'rgba(255,255,255,0)');
+  x.fillStyle=g; x.fillRect(0,0,128,128);
+  return new THREE.CanvasTexture(c); })();
+function glowSprite(color,scale,opacity){
+  const m=new THREE.SpriteMaterial({map:GLOW,color:color,transparent:true,
+    opacity:opacity==null?0.85:opacity,blending:THREE.AdditiveBlending,depthWrite:false});
+  const s=new THREE.Sprite(m); s.scale.set(scale,scale,1); return s; }
+
+// ---------------- particles ----------------
+function makePoints(n,size,color,opacity,area,h){
+  const g=new THREE.BufferGeometry();
+  const p=new Float32Array(n*3);
+  for(let i=0;i<n;i++){ p[i*3]=rnd(-area,area); p[i*3+1]=rnd(0,h); p[i*3+2]=rnd(-area,area); }
+  g.setAttribute('position',new THREE.BufferAttribute(p,3));
+  const m=new THREE.PointsMaterial({color:color,size:size,transparent:true,
+    opacity:opacity,depthWrite:false,blending:THREE.AdditiveBlending});
+  const pts=new THREE.Points(g,m); pts.frustumCulled=false;
+  return {pts:pts,pos:p,n:n,area:area,h:h};
+}
+function makeRain(n,area,h){ const r=makePoints(n,0.14,0x9fb6d8,0.5,area,h); r.vel=46; return r; }
+function rainUpdate(r,dt){
+  for(let i=0;i<r.n;i++){ r.pos[i*3+1]-=r.vel*dt;
+    if(r.pos[i*3+1]<0){ r.pos[i*3+1]=r.h; r.pos[i*3]=rnd(-r.area,r.area); r.pos[i*3+2]=rnd(-r.area,r.area);} }
+  r.pts.geometry.attributes.position.needsUpdate=true;
+}
+function makeFireflies(n,area,h){
+  const f=makePoints(n,0.26,0xcfff9a,0.95,area,h||5);
+  f.phase=new Float32Array(n); f.base=new Float32Array(n*3);
+  for(let i=0;i<n;i++){ f.phase[i]=rnd(0,6.28);
+    f.base[i*3]=f.pos[i*3]; f.base[i*3+1]=f.pos[i*3+1]; f.base[i*3+2]=f.pos[i*3+2]; }
+  return f; }
+function fireflyUpdate(f,t,amp){
+  amp=amp||1;
+  for(let i=0;i<f.n;i++){ const ph=f.phase[i];
+    f.pos[i*3]  =f.base[i*3]  +Math.sin(t*0.7+ph)*1.4*amp;
+    f.pos[i*3+1]=f.base[i*3+1]+Math.sin(t*1.1+ph*1.7)*0.7*amp;
+    f.pos[i*3+2]=f.base[i*3+2]+Math.cos(t*0.5+ph)*1.4*amp; }
+  f.pts.geometry.attributes.position.needsUpdate=true;
+  f.pts.material.opacity=0.55+0.35*Math.sin(t*2.3);
+}
+function makeMist(n,color,op){
+  const grp=new THREE.Group(); const arr=[];
+  for(let i=0;i<n;i++){ const s=glowSprite(color,rnd(18,34),op);
+    s.position.set(rnd(-50,50),rnd(1,5),rnd(-50,20)); grp.add(s); arr.push(s); }
+  return {grp:grp,sprites:arr};
+}
+function mistUpdate(mi,t,dt,speed){
+  mi.sprites.forEach((s,i)=>{ s.position.x+=dt*(speed||0.5)*(1+0.3*Math.sin(i));
+    if(s.position.x>55) s.position.x=-55; });
+}
+function makeStars(n,r){
+  const g=new THREE.BufferGeometry(); const p=new Float32Array(n*3);
+  for(let i=0;i<n;i++){ const th=rnd(0,6.283), ph=rnd(0.05,1.4);
+    p[i*3]=r*Math.sin(ph)*Math.cos(th); p[i*3+1]=r*Math.cos(ph)*0.9+4; p[i*3+2]=r*Math.sin(ph)*Math.sin(th); }
+  g.setAttribute('position',new THREE.BufferAttribute(p,3));
+  const m=new THREE.PointsMaterial({color:0xcfe0ff,size:1.2,transparent:true,opacity:0.9,depthWrite:false});
+  const s=new THREE.Points(g,m); s.frustumCulled=false; return s;
+}
+
+// ---------------- sea / sky ----------------
+function waveH(x,z,t,amp){ amp=amp||1;
+  return (Math.sin(x*0.12+t*1.1)*0.8+Math.cos(z*0.15+t*0.85)*0.65
+    +Math.sin((x+z)*0.07+t*0.5)*0.5)*amp; }
+function makeSea(){
+  const geo=new THREE.PlaneGeometry(340,240,72,48);
+  const m=new THREE.MeshStandardMaterial({color:0x0e2438,roughness:0.25,metalness:0.7});
+  const mesh=new THREE.Mesh(geo,m); mesh.rotation.x=-Math.PI/2;
+  return {mesh:mesh,geo:geo,base:geo.attributes.position.array.slice(),amp:1};
+}
+function seaUpdate(s,t){
+  const p=s.geo.attributes.position, b=s.base;
+  for(let i=0;i<p.count;i++) p.setZ(i, waveH(b[i*3],b[i*3+1],t,s.amp));
+  p.needsUpdate=true; s.geo.computeVertexNormals();
+}
+function boatY(bx,bz,t,amp){ return waveH(bx,-bz,t,amp)+0.35; }
+
+// ---------------- the lighthouse ----------------
+function makeCliff(){
+  const geo=new THREE.CylinderGeometry(17,25,36,9,4);
+  const pos=geo.attributes.position;
+  for(let i=0;i<pos.count;i++){ const v=new THREE.Vector3().fromBufferAttribute(pos,i);
+    const s=1+rnd(-0.14,0.14); v.x*=s; v.z*=s; pos.setXYZ(i,v.x,v.y,v.z); }
+  geo.computeVertexNormals();
+  const m=new THREE.Mesh(geo,std(0x3b4046,1,0)); m.position.y=-4; return m; // top at y=14
+}
+function makeLighthouse(){
+  const g=new THREE.Group();
+  const white=std(0xe8e2d4,0.8,0), red=std(0xa02c28,0.8,0), dark=std(0x2a2a30,0.9,0);
+  const tower=new THREE.Mesh(new THREE.CylinderGeometry(3.1,4.3,22,18),white);
+  tower.position.y=11; g.add(tower);
+  [6.5,13,19.5].forEach(y=>{ const band=new THREE.Mesh(new THREE.CylinderGeometry(3.35-(22-y)*0.055+0.12,3.35-(22-y)*0.055+0.12,2.6,18),red);
+    band.position.y=y; g.add(band); });
+  const gal=new THREE.Mesh(new THREE.CylinderGeometry(4.8,4.8,0.5,18),dark);
+  gal.position.y=22.2; g.add(gal);
+  const rail=new THREE.Mesh(new THREE.TorusGeometry(4.6,0.08,8,32),dark);
+  rail.rotation.x=Math.PI/2; rail.position.y=23.4; g.add(rail);
+  // lamp room glazing: two half-panels that can swing open
+  const glassM=new THREE.MeshStandardMaterial({color:0xcfe0ff,transparent:true,opacity:0.22,
+    roughness:0.1,metalness:0.2,side:THREE.DoubleSide,depthWrite:false});
+  const panelA=new THREE.Mesh(new THREE.CylinderGeometry(2.7,2.7,3.6,12,1,true,0,Math.PI),glassM);
+  const panelB=new THREE.Mesh(new THREE.CylinderGeometry(2.7,2.7,3.6,12,1,true,Math.PI,Math.PI),glassM);
+  panelA.position.y=24.2; panelB.position.y=24.2; g.add(panelA); g.add(panelB);
+  const roof=new THREE.Mesh(new THREE.ConeGeometry(3.6,2.2,12),dark);
+  roof.position.y=27.1; g.add(roof);
+  // the crystal
+  const crystalM=new THREE.MeshStandardMaterial({color:0xbfe8ff,emissive:0x9fd4ff,
+    emissiveIntensity:1.6,roughness:0.15,metalness:0.1,transparent:true,opacity:0.95});
+  const crystal=new THREE.Mesh(new THREE.OctahedronGeometry(0.95),crystalM);
+  crystal.position.y=24.2; g.add(crystal);
+  const ped=new THREE.Mesh(new THREE.CylinderGeometry(0.7,1.0,1.4,10),dark);
+  ped.position.y=23.0; g.add(ped);
+  const lampGlow=glowSprite(0xbfe4ff,7,0.8); lampGlow.position.y=24.2; g.add(lampGlow);
+  const lampLight=new THREE.PointLight(0xbfe4ff,2.2,60,2); lampLight.position.y=24.2; g.add(lampLight);
+  // rotating beam: twin cones
+  const beamGrp=new THREE.Group(); beamGrp.position.y=24.2;
+  const beamM=new THREE.MeshBasicMaterial({color:0xfff2c8,transparent:true,opacity:0.4,
+    blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false});
+  [-1,1].forEach(s=>{ const cone=new THREE.Mesh(new THREE.ConeGeometry(5.5,46,14,1,true),beamM);
+    cone.rotation.z=s*Math.PI/2; cone.position.x=s*23; beamGrp.add(cone); });
+  g.add(beamGrp);
+  // lamp room floor
+  const floor=new THREE.Mesh(new THREE.CylinderGeometry(4.4,4.4,0.3,18),dark);
+  floor.position.y=22.35; g.add(floor);
+  return {g:g,beamGrp:beamGrp,beamM:beamM,lampLight:lampLight,lampGlow:lampGlow,
+    crystal:crystal,crystalM:crystalM,panelA:panelA,panelB:panelB,glassM:glassM};
+}
+function makeRocks(){
+  const g=new THREE.Group(); const m=std(0x23272e,1,0);
+  [[26,14,5],[32,8,7],[22,20,4],[38,16,6]].forEach(r=>{
+    const c=new THREE.Mesh(new THREE.ConeGeometry(r[2],r[2]*2.2,7),m);
+    c.position.set(r[0],r[2]*0.4,r[1]); c.rotation.y=rnd(0,3); g.add(c); });
+  return g;
+}
+
+// ---------------- characters ----------------
+function makeKeeper(){
+  const g=new THREE.Group();
+  const coatM=std(0x2c3a58,0.85,0);
+  const coat=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.75,1.6,12),coatM);
+  coat.position.y=0.8; g.add(coat);
+  const sh=new THREE.Mesh(new THREE.SphereGeometry(0.5,12,10),coatM);
+  sh.position.y=1.6; sh.scale.set(1,0.7,0.8); g.add(sh);
+  const head=new THREE.Group(); head.position.y=2.05;
+  const face=new THREE.Mesh(new THREE.SphereGeometry(0.26,14,12),std(0xd9a877,0.7,0));
+  head.add(face);
+  const beard=new THREE.Mesh(new THREE.ConeGeometry(0.2,0.55,10),std(0xe8e8e8,0.9,0));
+  beard.position.set(0,-0.22,0.14); beard.rotation.x=0.25; head.add(beard);
+  const cap=new THREE.Mesh(new THREE.CylinderGeometry(0.28,0.3,0.16,12),std(0x1c2438,0.9,0));
+  cap.position.y=0.28; head.add(cap);
+  g.add(head);
+  function arm(side){
+    const piv=new THREE.Group(); piv.position.set(side*0.52,1.62,0);
+    const a=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.11,0.9,8),coatM);
+    a.position.y=-0.45; piv.add(a); g.add(piv); return piv;
+  }
+  const armL=arm(-1), armR=arm(1);
+  armL.rotation.z=0.3; armR.rotation.z=-0.3;
+  // lantern in right hand
+  const lan=new THREE.Group();
+  const frame=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.42,0.3),std(0x1c1c22,0.8,0.4));
+  lan.add(frame);
+  const lglow=glowSprite(0xffc060,1.6,0.9); lan.add(lglow);
+  const llight=new THREE.PointLight(0xffb050,1.1,10,2); lan.add(llight);
+  lan.position.y=-0.95; armR.add(lan);
+  return {g:g,head:head,armL:armL,armR:armR,lantern:lan,lanternLight:llight,lanternGlow:lglow};
+}
+function makeLittleGirl(){
+  const g=new THREE.Group();
+  const dressM=std(0xd8b060,0.85,0);
+  const dress=new THREE.Mesh(new THREE.ConeGeometry(0.42,1.0,12),dressM);
+  dress.position.y=0.5; g.add(dress);
+  const torso=new THREE.Mesh(new THREE.SphereGeometry(0.26,12,10),dressM);
+  torso.position.y=1.1; g.add(torso);
+  const head=new THREE.Group(); head.position.y=1.5;
+  head.add(new THREE.Mesh(new THREE.SphereGeometry(0.22,14,12),std(0xe8b88a,0.7,0)));
+  const hair=new THREE.Mesh(new THREE.SphereGeometry(0.24,12,10,0,Math.PI*2,0,Math.PI/2),std(0x4a2c18,0.9,0));
+  hair.position.y=0.05; head.add(hair);
+  // pigtails
+  [-1,1].forEach(s=>{ const p=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.04,0.5,6),std(0x4a2c18,0.9,0));
+    p.position.set(s*0.24,-0.05,0); p.rotation.z=s*0.5; head.add(p); });
+  g.add(head);
+  function arm(side){
+    const piv=new THREE.Group(); piv.position.set(side*0.3,1.15,0);
+    const a=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.07,0.6,8),dressM);
+    a.position.y=-0.3; piv.add(a); g.add(piv); return piv;
+  }
+  const armL=arm(-1), armR=arm(1);
+  armL.rotation.z=0.4; armR.rotation.z=-0.4;
+  // the jar: glass + fireflies + lid
+  const jar=new THREE.Group();
+  const glass=new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.24,0.44,12,1,true),
+    new THREE.MeshStandardMaterial({color:0xd8f0ff,transparent:true,opacity:0.3,
+      roughness:0.1,metalness:0.1,side:THREE.DoubleSide,depthWrite:false}));
+  jar.add(glass);
+  const lid=new THREE.Mesh(new THREE.CylinderGeometry(0.26,0.26,0.08,12),std(0x6a4a28,0.8,0));
+  lid.position.y=0.26; jar.add(lid);
+  const jflies=makeFireflies(26,0.16,0.4); jar.add(jflies.pts);
+  const jglow=glowSprite(0xd8ff9a,1.4,0.75); jar.add(jglow);
+  const jlight=new THREE.PointLight(0xcfff9a,0.9,7,2); jar.add(jlight);
+  jar.position.set(0,-0.62,0.25); armR.add(jar);
+  return {g:g,head:head,armL:armL,armR:armR,jar:jar,lid:lid,jflies:jflies,jglow:jglow,jlight:jlight};
+}
+function makeRowboat(){
+  const g=new THREE.Group(); const m=std(0x4a3420,0.9,0);
+  const hull=new THREE.Mesh(new THREE.BoxGeometry(2.8,0.7,1.3),m); hull.position.y=0.35; g.add(hull);
+  const bow=new THREE.Mesh(new THREE.ConeGeometry(0.65,1.2,4),m);
+  bow.rotation.z=-Math.PI/2; bow.rotation.y=Math.PI/4; bow.position.set(1.9,0.35,0); bow.scale.z=1; g.add(bow);
+  const rim=new THREE.Mesh(new THREE.BoxGeometry(2.9,0.12,1.4),std(0x2e2012,0.9,0));
+  rim.position.y=0.72; g.add(rim);
+  return g;
+}
+function makeShip(){
+  const g=new THREE.Group(); const m=std(0x14161e,0.9,0);
+  const hull=new THREE.Mesh(new THREE.BoxGeometry(11,2.6,3.4),m); hull.position.y=1.3; g.add(hull);
+  const bow=new THREE.Mesh(new THREE.ConeGeometry(1.7,3.6,4),m);
+  bow.rotation.z=-Math.PI/2; bow.rotation.y=Math.PI/4; bow.position.set(7,1.3,0); g.add(bow);
+  const stern=new THREE.Mesh(new THREE.BoxGeometry(2.4,3.4,3.2),m); stern.position.set(-5.5,2.6,0); g.add(stern);
+  [-2.5,2.5].forEach(x=>{ const mast=new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.18,10,8),m);
+    mast.position.set(x,7,0); g.add(mast);
+    const sail=new THREE.Mesh(new THREE.PlaneGeometry(4.6,5.4),std(0x1d2028,0.95,0));
+    sail.position.set(x+0.4,7.4,0); sail.rotation.y=Math.PI/2.3; g.add(sail); });
+  const lamp=glowSprite(0xffc060,2.2,0.8); lamp.position.set(-5.5,4.6,0); g.add(lamp);
+  return {g:g,lamp:lamp};
+}
+function makeClouds(n,color,op,h){
+  const grp=new THREE.Group(); const arr=[];
+  for(let i=0;i<n;i++){ const s=glowSprite(color,rnd(26,48),op);
+    s.position.set(rnd(-90,90),rnd(h,h+22),rnd(-60,60)); grp.add(s); arr.push({s:s,v:rnd(2,5)}); }
+  return {grp:grp,arr:arr,
+    update(dt){ this.arr.forEach(c=>{ c.s.position.x+=c.v*dt; if(c.s.position.x>95) c.s.position.x=-95; }); }};
+}
+function applyShot(shots,lt){
+  let s=shots[0];
+  for(const q of shots){ if(lt>=q.a-0.001) s=q; }
+  const u=clamp((lt-s.a)/Math.max(0.001,(s.b-s.a)),0,1), e=smooth(u);
+  camera.position.set(lerp(s.p0[0],s.p1[0],e),lerp(s.p0[1],s.p1[1],e),lerp(s.p0[2],s.p1[2],e));
+  _look.set(lerp(s.l0[0],s.l1[0],e),lerp(s.l0[1],s.l1[1],e),lerp(s.l0[2],s.l1[2],e));
+  camera.lookAt(_look);
+}
+const _look=new THREE.Vector3();
+const hemi=new THREE.HemisphereLight(0x8aa0c8,0x1a1410,0.35); scene.add(hemi);
+const dirL=new THREE.DirectionalLight(0xbfd0ff,0.5); dirL.position.set(-20,30,-10); scene.add(dirL);
+
+/* ---------------- scenes ---------------- */
+function buildTitle(){
+  const g=new THREE.Group();
+  const sea=makeSea(); sea.amp=0.7; g.add(sea.mesh);
+  g.add(makeCliff());
+  const lh=makeLighthouse(); lh.g.position.set(0,14,0); g.add(lh.g);
+  g.add(makeStars(300,220));
+  const mist=makeMist(8,0x8a7a9a,0.08); g.add(mist.grp);
+  const sun=glowSprite(0xff9a60,26,0.7); sun.position.set(-70,6,120); g.add(sun);
+  return {group:g,
+    shots:[{a:0,b:12,p0:[38,22,-72],p1:[30,18,-58],l0:[0,26,0],l1:[0,26,0]}],
+    update(t,dt,lt){
+      seaUpdate(sea,t); mistUpdate(mist,t,dt);
+      lh.beamGrp.rotation.y+=dt*0.45;
+      lh.crystal.rotation.y+=dt*0.6;
+    }};
+}
+const LAMPY=14+24.2; // world y of the lamp
+function buildKeeper(){
+  const g=new THREE.Group();
+  const sea=makeSea(); sea.amp=0.7; g.add(sea.mesh);
+  g.add(makeCliff());
+  const lh=makeLighthouse(); lh.g.position.set(0,14,0); g.add(lh.g);
+  g.add(makeStars(200,220));
+  const keeper=makeKeeper(); keeper.g.position.set(1.9,14+22.5,1.1);
+  keeper.g.rotation.y=-2.2; g.add(keeper.g);
+  const mist=makeMist(6,0x7a6a8a,0.07); g.add(mist.grp);
+  return {group:g,
+    shots:[
+      {a:0,b:8, p0:[36,23,-66],p1:[29,19,-55], l0:[0,26,0],l1:[0,26,0]},
+      {a:8,b:16,p0:[7.5,39.5,7.5],p1:[6.2,39,6], l0:[0,38.2,0],l1:[0,38.2,0]},
+      {a:16,b:22,p0:[2.8,39,3.4],p1:[2.3,38.7,2.7], l0:[0,38.2,0],l1:[0,38.2,0]},
+      {a:22,b:28,p0:[4.6,39,3.8],p1:[4.1,38.7,3.1], l0:[1.9,38.4,1.1],l1:[1.9,38.4,1.1]}],
+    update(t,dt,lt){
+      seaUpdate(sea,t); mistUpdate(mist,t,dt);
+      const level=1-(lt/28)*0.55;                       // the light is dying
+      const flick=0.72+0.28*Math.sin(t*6.3)+0.12*Math.sin(t*17.7);
+      lh.crystalM.emissiveIntensity=Math.max(0.08,1.7*level*flick);
+      lh.lampLight.intensity=Math.max(0.1,2.4*level*flick);
+      lh.lampGlow.material.opacity=clamp(0.85*level*flick,0.05,0.9);
+      lh.beamM.opacity=0.42*level;
+      lh.beamGrp.rotation.y+=dt*0.45;
+      lh.crystal.rotation.y+=dt*(0.6*level+0.05);
+      // polishing, then worry
+      keeper.armR.rotation.x=-0.6+Math.sin(t*2.2)*0.22;
+      keeper.head.rotation.x=lerp(0.12,0.4,smooth(clamp((lt-18)/8,0,1)));
+      keeper.g.position.y=14+22.5+Math.sin(t*9)*0.02*smooth(clamp((lt-20)/6,0,1));
+      keeper.lanternLight.intensity=0.4;
+    }};
+}
+function buildJar(){
+  const g=new THREE.Group();
+  const sea=makeSea(); sea.amp=0.8; g.add(sea.mesh);
+  g.add(makeCliff());
+  const lh=makeLighthouse(); lh.g.position.set(0,14,0); g.add(lh.g);
+  g.add(makeStars(450,220));
+  const moon=glowSprite(0xf4ecd8,10,0.9); moon.position.set(-50,42,110); g.add(moon);
+  const jetty=new THREE.Mesh(new THREE.BoxGeometry(11,1,4.5),std(0x4a4a52,0.95,0));
+  jetty.position.set(26,0.4,10); g.add(jetty);
+  const keeper=makeKeeper(); keeper.g.position.set(26,0.9,10); keeper.g.rotation.y=-1.4; g.add(keeper.g);
+  const boat=makeRowboat(); g.add(boat);
+  const girl=makeLittleGirl(); g.add(girl.g);
+  // the jar travels as a free prop between their hands
+  const jar=girl.jar; girl.armR.remove(jar);
+  const jarState={t:0};
+  g.add(jar);
+  const fire=makeFireflies(30,30,4); g.add(fire.pts);
+  const mist=makeMist(6,0x8aa0c8,0.07); g.add(mist.grp);
+  const bow=new THREE.Vector3(), bowV=new THREE.Vector3();
+  return {group:g,
+    shots:[
+      {a:0,b:7, p0:[46,9,-24],p1:[41,7,-16], l0:[46,2,22],l1:[42,2,20]},
+      {a:7,b:14,p0:[41,4.5,4],p1:[38,3.6,6.5], l0:[35,1.8,13],l1:[34,1.8,13]},
+      {a:14,b:20,p0:[18,3.6,17],p1:[20.5,3,14.5], l0:[26,1.4,10],l1:[26,1.4,10]},
+      {a:20,b:28,p0:[28.5,2.8,4.2],p1:[27.4,2.5,5.4], l0:[25.5,1.4,10.5],l1:[25.5,1.4,10.5]}],
+    update(t,dt,lt){
+      seaUpdate(sea,t); mistUpdate(mist,t,dt); fireflyUpdate(fire,t,1.4);
+      fireflyUpdate(girl.jflies,t*1.6,0.5);
+      lh.beamGrp.rotation.y+=dt*0.45;
+      // boat approaches the jetty
+      const bx=lerp(58,34,smooth(clamp(lt/14,0,1))), bz=lerp(28,14.5,smooth(clamp(lt/14,0,1)));
+      boat.position.set(bx,boatY(bx,bz,t,0.8),bz);
+      boat.rotation.z=Math.sin(t*1.6)*0.07; boat.rotation.x=Math.sin(t*1.2+1)*0.06;
+      boat.rotation.y=-0.5;
+      // girl rides, then steps onto the jetty
+      const step=smooth(clamp((lt-13)/3,0,1));
+      const gx=lerp(bx,27.5,step), gz=lerp(bz,10,step);
+      const gy=lerp(boat.position.y+0.75,0.9,step);
+      girl.g.position.set(gx,gy+Math.abs(Math.sin(t*7))*0.06*(1-step),gz);
+      girl.g.rotation.y=lerp(-0.5,-1.4,step);
+      // keeper walks to meet her, then kneels
+      keeper.g.position.x=lerp(26,24.6,smooth(clamp((lt-10)/5,0,1)));
+      const kneel=smooth(clamp((lt-15)/3,0,1));
+      keeper.g.position.y=lerp(0.9,0.25,kneel);
+      keeper.head.rotation.x=lerp(0,0.3,kneel);
+      // the handoff: jar floats from her hands to his
+      const hand=smooth(clamp((lt-19)/3,0,1));
+      bow.set(gx+0.35,gy+0.75,gz+0.2); bowV.set(keeper.g.position.x+0.35,keeper.g.position.y+1.35,10.2);
+      jar.position.lerpVectors(bow,bowV,hand);
+      jar.position.y+=Math.sin(t*2)*0.08;
+      girl.armR.rotation.x=lerp(-0.4,-1.1,smooth(clamp((lt-17)/3,0,1)));
+      keeper.armR.rotation.x=lerp(-0.3,-1.0,hand);
+      jarState.t=lt;
+      girl.jglow.material.opacity=0.6+0.25*Math.sin(t*5);
+      girl.jlight.intensity=0.8+0.3*Math.sin(t*5);
+    }};
+}
+function buildStorm(){
+  const g=new THREE.Group();
+  const sea=makeSea(); sea.amp=2.3; g.add(sea.mesh);
+  g.add(makeCliff());
+  const lh=makeLighthouse(); lh.g.position.set(0,14,0); g.add(lh.g);
+  lh.beamM.opacity=0; lh.beamGrp.visible=false;
+  lh.crystalM.emissiveIntensity=0.05; lh.lampLight.intensity=0; lh.lampGlow.material.opacity=0.04;
+  g.add(makeRocks());
+  const ship=makeShip(); g.add(ship.g);
+  const keeper=makeKeeper(); keeper.g.position.set(-1.6,14+22.5,-1.2);
+  keeper.g.rotation.y=2.6; g.add(keeper.g);
+  const rain=makeRain(1100,50,34); g.add(rain.pts);
+  const clouds=makeClouds(14,0x1a1c24,0.5,26); g.add(clouds.grp);
+  const mist=makeMist(10,0x3a4048,0.16); g.add(mist.grp);
+  return {group:g,
+    shots:[
+      {a:0,b:8, p0:[-32,15,64],p1:[-25,12,54], l0:[20,4,20],l1:[22,4,20]},
+      {a:8,b:15,p0:[7.5,39.5,7.5],p1:[6.4,39,6.2], l0:[-0.5,38,0],l1:[-0.5,38,0]},
+      {a:15,b:22,p0:[52,11,44],p1:[47,9,37], l0:[42,3,22],l1:[40,3,21]},
+      {a:22,b:28,p0:[32,7,30],p1:[29.5,5.5,27], l0:[27,2,13],l1:[27,2,13]}],
+    update(t,dt,lt){
+      seaUpdate(sea,t); rainUpdate(rain,dt); clouds.update(dt*2.2); mistUpdate(mist,t,dt,2.5);
+      let L=0; [4,12,20].forEach(s=>{ if(lt>s) L+=Math.exp(-(lt-s)*2.8); });
+      dirL.intensity=0.2+4.5*L; hemi.intensity=0.2+0.8*L;
+      // the ship drives toward the rocks
+      const sx=lerp(72,36,smooth(clamp(lt/26,0,1))), sz=lerp(36,17,smooth(clamp(lt/26,0,1)));
+      ship.g.position.set(sx,boatY(sx,sz,t,2.3)+0.9,sz);
+      ship.g.rotation.y=2.68;
+      ship.g.rotation.z=Math.sin(t*2.3)*0.17; ship.g.rotation.x=Math.sin(t*1.8+1)*0.1;
+      ship.lamp.material.opacity=0.5+0.4*Math.sin(t*3);
+      // the keeper's despair: the light is dead
+      const desp=smooth(clamp((lt-8)/5,0,1));
+      keeper.head.rotation.x=lerp(0.1,0.62,desp);
+      keeper.armR.rotation.x=lerp(-0.3,-0.15,desp);
+      keeper.armL.rotation.x=lerp(0.3,-0.2,desp);
+      keeper.g.position.y=14+22.5-0.35*desp;
+      keeper.lanternLight.intensity=0.25;
+    }};
+}
+function buildLiving(){
+  const g=new THREE.Group();
+  const sea=makeSea(); sea.amp=1.4; g.add(sea.mesh);
+  g.add(makeCliff());
+  const lh=makeLighthouse(); lh.g.position.set(0,14,0); g.add(lh.g);
+  lh.beamM.opacity=0; lh.beamGrp.visible=false;
+  lh.crystalM.emissiveIntensity=0.05; lh.lampLight.intensity=0; lh.lampGlow.material.opacity=0.04;
+  const keeper=makeKeeper(); keeper.g.position.set(-2.0,14+22.5,-0.8);
+  keeper.g.rotation.y=1.8; g.add(keeper.g);
+  const girl=makeLittleGirl(); girl.g.position.set(1.7,14+22.5,1.9);
+  girl.g.rotation.y=-2.4; g.add(girl.g);
+  const jar=girl.jar; girl.armR.remove(jar); g.add(jar);
+  jar.position.set(1.9,14+22.5+0.75,2.1);
+  const rain=makeRain(900,50,34); g.add(rain.pts);
+  // the released swarm
+  const N=240, sw=makePoints(N,0.3,0xd8ff9a,1,1,1);
+  const delays=new Float32Array(N);
+  for(let i=0;i<N;i++){ delays[i]=(i/N)*5;
+    sw.pos[i*3]=jar.position.x; sw.pos[i*3+1]=jar.position.y; sw.pos[i*3+2]=jar.position.z; }
+  g.add(sw.pts);
+  const flash=glowSprite(0xeaffc8,3,0); flash.position.set(0,LAMPY,0); g.add(flash);
+  const flashLight=new THREE.PointLight(0xeaffc8,0,70,2); flashLight.position.set(0,LAMPY+1,0); g.add(flashLight);
+  const mist=makeMist(8,0x3a4048,0.12); g.add(mist.grp);
+  const JP=new THREE.Vector3(), LP=new THREE.Vector3(0,LAMPY,0);
+  return {group:g,
+    shots:[
+      {a:0,b:6, p0:[7.5,39.5,7.5],p1:[6.2,39,6], l0:[0,38.2,0],l1:[0,38.2,0]},
+      {a:6,b:11,p0:[3.8,38.6,4.6],p1:[3.2,38.3,3.9], l0:[1.8,37.4,2],l1:[1.8,37.4,2]},
+      {a:11,b:15,p0:[-6.5,40,8.5],p1:[-5.2,39.4,6.8], l0:[0,38.2,0],l1:[0,38.2,0]},
+      {a:15,b:24,p0:[42,27,-72],p1:[35,22,-59], l0:[0,30,0],l1:[0,30,0]}],
+    update(t,dt,lt){
+      seaUpdate(sea,t); mistUpdate(mist,t,dt);
+      if(lt<9){ rainUpdate(rain,dt); rain.pts.visible=true; } else rain.pts.visible=false;
+      dirL.intensity=0.25; hemi.intensity=0.28;
+      JP.copy(jar.position);
+      // the housing swings open
+      const open=smooth(clamp((lt-2)/4,0,1));
+      lh.panelA.rotation.y=open*1.9; lh.panelB.rotation.y=-open*1.9;
+      lh.glassM.opacity=lerp(0.22,0.07,open);
+      keeper.armR.rotation.x=lerp(-0.3,-1.2,open);
+      // she opens the jar
+      const pop=smooth(clamp((lt-6)/2,0,1));
+      girl.lid.position.y=lerp(0.26,0.62,pop);
+      girl.lid.rotation.z=pop*0.9;
+      girl.armR.rotation.x=lerp(-0.4,-1.3,pop);
+      girl.jglow.material.opacity=0.7+0.3*pop;
+      // the swarm streams out, spirals into the lamp
+      for(let i=0;i<N;i++){
+        const u=smooth(clamp((lt-7-delays[i])/4.5,0,1));
+        if(u<1){
+          const ang=u*11+i*0.7, rad=(1-u)*2.4;
+          sw.pos[i*3]  =lerp(JP.x,LP.x,u)+Math.cos(ang)*rad;
+          sw.pos[i*3+1]=lerp(JP.y,LP.y,u)+Math.sin(ang*0.8)*rad*0.5+u*1.2;
+          sw.pos[i*3+2]=lerp(JP.z,LP.z,u)+Math.sin(ang)*rad;
+        } else {
+          const ang=t*2.6+i*0.35;
+          sw.pos[i*3]  =LP.x+Math.cos(ang)*1.35;
+          sw.pos[i*3+1]=LP.y+Math.sin(t*3+i)*0.85;
+          sw.pos[i*3+2]=LP.z+Math.sin(ang)*1.35;
+        }
+      }
+      sw.pts.geometry.attributes.position.needsUpdate=true;
+      sw.pts.material.opacity=clamp((lt-6.5)/1.5,0,1);
+      // IGNITION
+      const ig=smooth(clamp((lt-12)/1.2,0,1));
+      const fl=(1-smooth(clamp((lt-12)/3.5,0,1)))*smooth(clamp((lt-11.4)/0.8,0,1));
+      flash.material.opacity=fl*0.95;
+      const fs=3+fl*20; flash.scale.set(fs,fs,1);
+      flashLight.intensity=fl*10;
+      if(ig>0){
+        lh.crystalM.emissive.setHex(0xaaff88);
+        lh.crystalM.emissiveIntensity=lerp(0.05,3.4,ig);
+        lh.lampLight.color.setHex(0xeaffc0); lh.lampLight.intensity=lerp(0,5.5,ig);
+        lh.lampGlow.material.color.setHex(0xd8ffb0); lh.lampGlow.material.opacity=lerp(0.04,0.95,ig);
+        const bs=6+ig*2; lh.lampGlow.scale.set(bs,bs,1);
+        lh.beamGrp.visible=true; lh.beamM.opacity=lerp(0,0.55,ig);
+        lh.beamM.color.setHex(0xfff0b8);
+      }
+      lh.beamGrp.rotation.y+=dt*lerp(0.2,0.9,ig);
+      lh.crystal.rotation.y+=dt*lerp(0.1,2.2,ig);
+      // awe and joy
+      keeper.armR.rotation.x=lerp(-1.2,-2.4,ig);
+      keeper.head.rotation.x=lerp(0.3,-0.25,ig);
+      girl.armL.rotation.z=lerp(0.4,1.5,ig); girl.armR.rotation.z=lerp(-0.4,-1.5,ig);
+      girl.g.position.y=14+22.5+Math.abs(Math.sin(t*4))*0.12*ig;
+    }};
+}
+function buildShip(){
+  const g=new THREE.Group();
+  const sea=makeSea(); sea.amp=1.1; g.add(sea.mesh);
+  g.add(makeCliff());
+  const lh=makeLighthouse(); lh.g.position.set(0,14,0); g.add(lh.g);
+  lh.crystalM.emissive.setHex(0xaaff88); lh.crystalM.emissiveIntensity=3.2;
+  lh.lampLight.color.setHex(0xeaffc0); lh.lampLight.intensity=5;
+  lh.lampGlow.material.color.setHex(0xd8ffb0); lh.lampGlow.material.opacity=0.95;
+  lh.beamM.opacity=0.55; lh.beamM.color.setHex(0xfff0b8);
+  g.add(makeRocks());
+  const ship=makeShip(); g.add(ship.g);
+  const mist=makeMist(8,0x6a7a8a,0.1); g.add(mist.grp);
+  return {group:g,
+    shots:[
+      {a:0,b:6, p0:[-22,32,74],p1:[-17,27,62], l0:[10,30,0],l1:[10,30,0]},
+      {a:6,b:13,p0:[48,11,34],p1:[43,8.5,28], l0:[42,4,8],l1:[43,4,4]},
+      {a:13,b:20,p0:[18,17,54],p1:[25,19,62], l0:[46,4,-2],l1:[48,4,-4]}],
+    update(t,dt,lt){
+      sea.amp=lerp(1.1,0.7,smooth(clamp(lt/14,0,1)));
+      seaUpdate(sea,t); mistUpdate(mist,t,dt,1.2);
+      dirL.intensity=lerp(0.3,0.7,smooth(clamp(lt/16,0,1)));
+      hemi.intensity=lerp(0.3,0.55,smooth(clamp(lt/16,0,1)));
+      lh.beamGrp.rotation.y+=dt*0.7;
+      lh.crystal.rotation.y+=dt*2;
+      // the ship turns away from the rocks
+      const turn=smooth(clamp((lt-4)/9,0,1));
+      const sx=lerp(36,54,turn)+Math.sin(turn*Math.PI)*4;
+      const sz=lerp(17,-7,turn);
+      ship.g.position.set(sx,boatY(sx,sz,t,sea.amp)+0.9,sz);
+      ship.g.rotation.y=lerp(2.68,0.89,turn);
+      ship.g.rotation.z=Math.sin(t*1.8)*0.08*(1-turn*0.6);
+      ship.g.rotation.x=Math.sin(t*1.4+1)*0.05*(1-turn*0.6);
+    }};
+}
+function buildDawn(){
+  const g=new THREE.Group();
+  const sea=makeSea(); sea.amp=0.55; g.add(sea.mesh);
+  g.add(makeCliff());
+  const lh=makeLighthouse(); lh.g.position.set(0,14,0); g.add(lh.g);
+  lh.crystalM.emissive.setHex(0xaaff88); lh.crystalM.emissiveIntensity=2.6;
+  lh.lampLight.color.setHex(0xeaffc0); lh.lampLight.intensity=4;
+  lh.lampGlow.material.color.setHex(0xd8ffb0); lh.lampGlow.material.opacity=0.9;
+  lh.beamM.opacity=0.4; lh.beamM.color.setHex(0xffe8b0);
+  const GY=14+22.45;
+  const keeper=makeKeeper(); keeper.g.position.set(1.5,GY,0.8); keeper.g.rotation.y=2.8; g.add(keeper.g);
+  const girl=makeLittleGirl(); girl.g.position.set(1.5,GY,0.8); girl.g.rotation.y=2.8; g.add(girl.g);
+  const ship=makeShip(); ship.g.scale.set(0.8,0.8,0.8);
+  ship.g.position.set(95,0.6,-45); ship.g.rotation.y=0.9; g.add(ship.g);
+  const sun=glowSprite(0xffc890,34,0.95); sun.position.set(75,4,140); g.add(sun);
+  const sunCore=glowSprite(0xfff0d0,12,1); sunCore.position.copy(sun.position); g.add(sunCore);
+  // fireflies spiral skyward, becoming stars
+  const N=130, asc=makePoints(N,0.3,0xe8ffb0,1,2,2);
+  g.add(asc.pts);
+  const mist=makeMist(6,0xd8a880,0.07); g.add(mist.grp);
+  return {group:g,
+    shots:[
+      {a:0,b:6, p0:[8.5,39,8.5],p1:[7.2,38.4,7], l0:[1.2,37.8,0.8],l1:[1.2,37.8,0.8]},
+      {a:6,b:11,p0:[-11,41,22],p1:[-8,45,26], l0:[0,46,0],l1:[0,50,0]},
+      {a:11,b:16,p0:[52,31,-84],p1:[45,27,-73], l0:[0,28,12],l1:[0,28,12]}],
+    update(t,dt,lt){
+      seaUpdate(sea,t); mistUpdate(mist,t,dt,0.6);
+      const dawn=smooth(clamp(lt/12,0,1));
+      sun.position.y=lerp(3,17,dawn); sunCore.position.y=sun.position.y;
+      dirL.intensity=lerp(0.5,1.5,dawn); dirL.color.setHex(0xffd0a0);
+      dirL.position.set(75,30,120);
+      hemi.intensity=lerp(0.5,0.8,dawn); hemi.color.setHex(0xffd9c0);
+      lh.beamGrp.rotation.y+=dt*0.5;
+      // he lifts her onto his shoulders
+      const lift=smooth(clamp((lt-1)/4,0,1));
+      girl.g.position.y=lerp(GY,GY+1.85,lift);
+      keeper.armL.rotation.x=lerp(0.3,-0.9,lift); keeper.armR.rotation.x=lerp(-0.3,-0.9,lift);
+      girl.armL.rotation.z=lerp(0.4,1.2,lift); girl.armR.rotation.z=lerp(-0.4,-1.2,lift);
+      keeper.head.rotation.x=lerp(0,-0.2,lift);
+      // the living light rises into the sky
+      for(let i=0;i<N;i++){
+        const cyc=((t*0.35+i/N*3)%3)/3;      // 0..1 rising cycle
+        const ang=i*2.4+t*1.2, rad=(1-cyc)*3+0.4;
+        asc.pos[i*3]  =Math.cos(ang)*rad;
+        asc.pos[i*3+1]=LAMPY+cyc*26;
+        asc.pos[i*3+2]=Math.sin(ang)*rad;
+      }
+      asc.pts.geometry.attributes.position.needsUpdate=true;
+      asc.pts.material.opacity=0.85;
+      ship.g.position.y=0.6+Math.sin(t*1.1)*0.3;
+    }};
+}
+
+/* ---------------- timeline ---------------- */
+const T_END=170;
+const SEGS=[
+  {id:'title',  t0:0,   t1:12,  build:buildTitle},
+  {id:'keeper', t0:12,  t1:40,  build:buildKeeper},
+  {id:'jar',    t0:40,  t1:68,  build:buildJar},
+  {id:'storm',  t0:68,  t1:96,  build:buildStorm},
+  {id:'living', t0:96,  t1:120, build:buildLiving},
+  {id:'ship',   t0:120, t1:140, build:buildShip},
+  {id:'dawn',   t0:140, t1:156, build:buildDawn},
+  {id:'credits',t0:156, t1:170, build:null},
+];
+const FOGS={
+  title:[0x2a2438,40,280], keeper:[0x232032,30,250], jar:[0x0a0e1a,30,250],
+  storm:[0x0c0e14,15,140], living:[0x0c0e16,20,170], ship:[0x2a3038,30,230],
+  dawn:[0xc09078,40,300], credits:[0x000000,1,10],
+};
+const CAPS=[
+  [12.8,17,'I · The Keeper of the Light'],[40.8,45,'II · The Firefly Jar'],
+  [68.8,73,'III · The Storm'],[96.8,101,'IV · The Living Light'],
+  [120.8,125,'V · The Ship Turns'],[140.8,145,'VI · Dawn'],
+];
+const elFade=document.getElementById('fade'), elCap=document.getElementById('cap'),
+      elTitle=document.getElementById('filmTitle'), elEnd=document.getElementById('endcard'),
+      elCredits=document.getElementById('credits');
+elCredits.innerHTML='<div class="big">THE LIVING LIGHT</div><br>A PURE-CODE CINEMATIC SHORT FILM<br><br>'+
+  'WRITTEN &middot; DIRECTED &middot; SCORED IN CODE<br><br>'+
+  '<div class="big">DAVID XU</div><br>'+
+  'ALL VISUALS PROCEDURAL &middot; ALL MUSIC SYNTHESIZED<br>NO VIDEO FILES WERE USED';
+
+let T0=0, lastT=0, activeSeg=null, started=false;
+function buildAll(){
+  SEGS.forEach(s=>{ if(!s.build) return;
+    const r=s.build(); s.group=r.group; s.update=r.update; s.shots=r.shots;
+    s.group.visible=false; scene.add(s.group); });
+}
+function enterSeg(s){
+  SEGS.forEach(o=>{ if(o.group) o.group.visible=(o===s); });
+  const f=FOGS[s.id];
+  scene.fog=new THREE.Fog(f[0],f[1],f[2]);
+  scene.background=new THREE.Color(f[0]);
+  if(s.id==='storm'){
+    hemi.color.setHex(0x3a4048); hemi.groundColor.setHex(0x0c0e14); hemi.intensity=0.22;
+    dirL.color.setHex(0xcfd8ff); dirL.intensity=0.22; dirL.position.set(-20,30,-10);
+  } else if(s.id==='dawn'){
+    hemi.color.setHex(0xffd9c0); hemi.groundColor.setHex(0x2a3038); hemi.intensity=0.5;
+    dirL.color.setHex(0xffd0a0); dirL.intensity=0.6; dirL.position.set(75,30,120);
+  } else {
+    hemi.color.setHex(0x8aa0c8); hemi.groundColor.setHex(0x1a1410); hemi.intensity=0.35;
+    dirL.color.setHex(0xbfd0ff); dirL.intensity=0.5; dirL.position.set(-20,30,-10);
+  }
+  activeSeg=s;
+}
+function overlays(t){
+  let fo=0;
+  if(activeSeg&&activeSeg.id!=='credits'){
+    const d=Math.min(t-activeSeg.t0,activeSeg.t1-t);
+    if(d<0.45) fo=Math.max(fo,(0.45-d)/0.45*0.92);
+  }
+  if(t<1.2) fo=Math.max(fo,1-t/1.2);
+  if(activeSeg&&activeSeg.id==='credits') fo=clamp((t-156)/1.6,0,1);
+  elFade.style.opacity=fo.toFixed(3);
+  let cap='';
+  for(const c of CAPS){ if(t>=c[0]&&t<=c[1]){ cap=c[2];
+    const din=clamp((t-c[0])/0.7,0,1), dout=clamp((c[1]-t)/0.7,0,1);
+    elCap.style.opacity=(Math.min(din,dout)).toFixed(3); break; } }
+  if(!cap) elCap.style.opacity=0; else elCap.textContent=cap;
+  elTitle.style.opacity=(t>1.5&&t<10)?clamp(Math.min((t-1.5)/1.2,(10-t)/1.2),0,1).toFixed(3):0;
+  elEnd.style.opacity=(t>156.4&&t<159.2)?clamp(Math.min((t-156.4)/0.8,(159.2-t)/0.8),0,1).toFixed(3):0;
+  elCredits.style.opacity=(t>159.4&&t<169)?clamp(Math.min((t-159.4)/1.5,(169-t)/1.5),0,1).toFixed(3):0;
+}
+function update(t,dt){
+  let s=SEGS[0];
+  for(const q of SEGS){ if(t>=q.t0) s=q; }
+  if(s!==activeSeg) enterSeg(s);
+  if(s.update) s.update(t,dt,t-s.t0);
+  if(s.shots) applyShot(s.shots,t-s.t0);
+  overlays(t);
+}
+function loop(){
+  const t=AC.currentTime-T0;
+  const dt=clamp(t-lastT,0.001,0.06); lastT=t;
+  if(t<=T_END+0.5){ update(Math.min(t,T_END),dt); renderer.render(scene,camera); requestAnimationFrame(loop); }
+}
+document.getElementById('start').addEventListener('click',()=>{
+  if(started) return; started=true;
+  try{
+    initAudio();
+    if(AC.state==='suspended') AC.resume();
+    buildAll();
+    const T=AC.currentTime+0.4;
+    scheduleScore(T); T0=T; lastT=0;
+    document.getElementById('start').style.display='none';
+    requestAnimationFrame(loop);
+  }catch(e){
+    started=false;
+    var el=document.getElementById('err');
+    el.style.display='flex';
+    el.innerHTML='<div>The film could not start.<br><br><span style="font-size:14px;color:#9d9176;">'+
+      String((e&&e.message)||e).replace(/</g,'&lt;')+'</span><br><br>Please reload to try again.</div>';
+  }
+});
+scene.fog=new THREE.Fog(0x05070f,30,190);
+scene.background=new THREE.Color(0x05070f);
+</script>
+</body>
+</html>

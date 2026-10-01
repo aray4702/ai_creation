@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gear Calculator</title>
+<style>
+  :root{
+    --bg:#15110c; --panel:rgba(28,22,15,.86); --edge:rgba(214,170,90,.35);
+    --ink:#f1e4c8; --muted:#b8a582; --brass:#d6aa5a; --accent:#ff7a3c; --ok:#8fd18a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
+    font:14px/1.4 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  #app{position:fixed;inset:0}
+  canvas{display:block}
+  .panel{position:fixed;background:var(--panel);border:1px solid var(--edge);border-radius:12px;
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-shadow:0 8px 30px rgba(0,0,0,.45)}
+  #calc{left:16px;top:16px;width:300px;padding:14px 16px}
+  #calc h1{margin:0 0 2px;font-size:17px;letter-spacing:.02em;color:var(--brass);font-weight:650}
+  #calc .sub{margin:0 0 12px;color:var(--muted);font-size:12px}
+  .row{display:flex;gap:6px;align-items:center}
+  input[type=number],select{background:#0d0a07;color:var(--ink);border:1px solid var(--edge);border-radius:8px;
+    padding:8px 8px;font:600 16px ui-monospace,SFMono-Regular,Menlo,monospace;min-width:0}
+  input[type=number]{flex:1;width:0}
+  select{width:52px;text-align:center}
+  button{background:linear-gradient(#e2b865,#b58535);color:#1d1408;border:0;border-radius:8px;padding:9px 12px;
+    font-weight:700;cursor:pointer;font-size:14px}
+  button.ghost{background:transparent;color:var(--ink);border:1px solid var(--edge);font-weight:500;padding:6px 9px;font-size:12px}
+  button:disabled{opacity:.45;cursor:default}
+  #go{width:100%;margin-top:10px;font-size:15px}
+  .readout{margin-top:12px;padding:10px;border-radius:10px;background:#0b0906;border:1px solid var(--edge)}
+  .readout .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+  #dials{font:700 30px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.18em;color:#fff3d6}
+  #dials span.moving{color:var(--accent)}
+  #result{font-size:13px;color:var(--ok);min-height:18px}
+  .ctl{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;color:var(--muted)}
+  .ctl input[type=range]{flex:1;accent-color:var(--brass)}
+  #log{right:16px;top:16px;width:280px;max-height:42vh;overflow:auto;padding:10px 12px;font-size:12px}
+  #log h2{margin:0 0 6px;font-size:12px;color:var(--brass);text-transform:uppercase;letter-spacing:.08em}
+  #log ol{margin:0;padding-left:18px;color:var(--muted)}
+  #log li.cur{color:var(--ink)}
+  #log li.carry{color:var(--accent)}
+  #hint{left:50%;bottom:14px;transform:translateX(-50%);padding:7px 14px;font-size:12px;color:var(--muted);white-space:nowrap}
+  #hint b{color:var(--ink);font-weight:600}
+  .tag{pointer-events:none;font-size:11px;color:#fff6e0;background:rgba(20,14,8,.78);border:1px solid rgba(214,170,90,.6);
+    padding:2px 7px;border-radius:999px;white-space:nowrap;transform:translateY(-14px)}
+  .tag::after{content:"";position:absolute;left:50%;top:100%;width:1px;height:12px;background:rgba(214,170,90,.8)}
+  .tag.col{background:rgba(214,170,90,.9);color:#1d1408;border:0;font-weight:700}
+  #start{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at center,rgba(21,17,12,.55),rgba(10,8,5,.92));z-index:10}
+  #start .card{max-width:520px;margin:16px;padding:26px 28px;text-align:center}
+  #start h1{margin:0 0 8px;color:var(--brass);font-size:26px}
+  #start p{color:var(--muted);margin:0 0 16px}
+  #start ul{text-align:left;color:var(--ink);font-size:13px;margin:0 0 18px;padding-left:18px}
+  @media (max-width:760px){
+    #calc{width:auto;right:16px;top:auto;bottom:52px;padding:10px 12px}
+    #calc .sub{display:none}
+    #log{display:none}
+    #hint{white-space:normal;width:calc(100% - 32px);text-align:center;bottom:8px}
+    #dials{font-size:22px}
+  }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="calc" class="panel">
+  <h1>Pascaline-style Gear Calculator</h1>
+  <p class="sub">Six accumulator wheels with odometer carry: every digit you see is turned by meshing teeth.</p>
+  <div class="row">
+    <input id="a" type="number" min="0" max="999999" value="8" aria-label="First operand">
+    <select id="op" aria-label="Operation"><option value="+">+</option><option value="-">−</option><option value="*">×</option></select>
+    <input id="b" type="number" min="0" max="999999" value="9" aria-label="Second operand">
+  </div>
+  <button id="go">Calculate</button>
+  <div class="readout">
+    <div class="lbl">Accumulator dials</div>
+    <div id="dials">000000</div>
+    <div id="result"></div>
+  </div>
+  <div class="ctl">
+    <span>Speed</span><input id="speed" type="range" min="0.25" max="6" step="0.25" value="1">
+    <span id="speedv">1×</span>
+  </div>
+  <div class="ctl">
+    <button class="ghost" id="clear">Clear</button>
+    <button class="ghost" id="lbls">Labels: on</button>
+    <button class="ghost" id="snd">Sound: on</button>
+  </div>
+  <div class="ctl">
+    <span>View</span>
+    <button class="ghost" data-view="front">Front</button>
+    <button class="ghost" data-view="carry">Carry mesh</button>
+    <button class="ghost" data-view="drive">Drive gears</button>
+    <button class="ghost" data-view="rear">Rear</button>
+  </div>
+</div>
+
+<div id="log" class="panel"><h2>Mechanism sequence</h2><ol id="steps"><li>Idle. Enter numbers and press Calculate.</li></ol></div>
+<div id="hint" class="panel"><b>Drag</b> orbit · <b>Right-drag / Shift-drag</b> pan · <b>Wheel / pinch</b> zoom · <b>Enter</b> calculate</div>
+
+<div id="start">
+  <div class="card panel">
+    <h1>Gear-Driven Calculator</h1>
+    <p>A working 3D model of a Pascal-style adding machine (1642) with an odometer carry train.</p>
+    <ul>
+      <li><b>Drive gears</b> (20T) under each column turn the <b>accumulator ring gears</b> (20T) 1:1.</li>
+      <li>When a wheel rolls from 9 to 0, its <b>2-tooth carry lug</b> kicks a <b>6-tooth transfer pinion</b>, which turns the next wheel exactly one digit (2 teeth of 20).</li>
+      <li>Subtraction turns the drive gears backwards, so borrows ripple the same way.</li>
+    </ul>
+    <button id="begin">Open the machine</button>
+  </div>
+</div>
+
+<script type="module">
+window.addEventListener('error',e=>{document.title='ERROR: '+e.message+' @'+e.lineno});
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+document.title = 'Gear Calculator';
+const params = new URLSearchParams(location.search);
+const AUTOTEST = params.has('autotest');
+
+// ---------------------------------------------------------------- constants
+const N = 6;                 // number of digit columns
+const PITCH = 2.0;           // spacing between columns along X
+const MOD = 0.1;             // gear module (all meshing gears share it)
+const RING_T = 20, DRIVE_T = 20, PIN_T = 6;
+const R_RING = MOD*RING_T/2;          // 1.0
+const R_PIN = MOD*PIN_T/2;            // 0.3
+const DRUM_R = 1.2, DRUM_W = 1.0;
+const A_DRIVE = Math.PI;              // drive gear sits straight below the ring (phi = pi)
+const A_PIN = -Math.PI/2;             // transfer pinion sits straight behind (phi = -pi/2)
+const D_DRIVE = MOD*(RING_T+DRIVE_T)/2;  // 2.0 centre distance
+const D_PIN = MOD*(RING_T+PIN_T)/2;      // 1.3 centre distance
+const WINDOW_PHI = Math.PI/4;         // reading index (top-front)
+const STEP = 2*Math.PI/10;            // one digit = 36 degrees
+const colX = i => ((N-1)/2 - i)*PITCH;   // units (i=0) on the right
+
+// ---------------------------------------------------------------- renderer / scene
+const app = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled = !AUTOTEST;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+app.appendChild(renderer.domElement);
+
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(innerWidth,innerHeight);
+labelRenderer.domElement.style.cssText='position:fixed;inset:0;pointer-events:none';
+app.appendChild(labelRenderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x15110c);
+scene.fog = new THREE.Fog(0x15110c, 30, 60);
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+const camera = new THREE.PerspectiveCamera(40, innerWidth/innerHeight, 0.05, 200);
+camera.position.set(1.8, 6.8, 16.5);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.target.set(-2.0, -0.8, 0);
+controls.minDistance = 1.5; controls.maxDistance = 40;
+controls.screenSpacePanning = true;
+controls.update();
+
+scene.add(new THREE.HemisphereLight(0xfff1d8, 0x2a1d10, 0.6));
+const key = new THREE.DirectionalLight(0xfff0d0, 2.2);
+key.position.set(6, 12, 9); key.castShadow = true;
+key.shadow.mapSize.set(2048,2048);
+Object.assign(key.shadow.camera,{left:-10,right:10,top:10,bottom:-10,near:1,far:40});
+key.shadow.bias = -0.0005;
+scene.add(key);
+const rim = new THREE.DirectionalLight(0x9ab8ff, 0.8); rim.position.set(-8, 4, -10); scene.add(rim);
+
+// ---------------------------------------------------------------- materials
+const M = {
+  brass: new THREE.MeshStandardMaterial({color:0xc9983e, metalness:0.95, roughness:0.32}),
+  brassDark: new THREE.MeshStandardMaterial({color:0x9c7228, metalness:0.9, roughness:0.42}),
+  bronze: new THREE.MeshStandardMaterial({color:0xb06a3a, metalness:0.9, roughness:0.38}),
+  steel: new THREE.MeshStandardMaterial({color:0xb9c0c8, metalness:1.0, roughness:0.25}),
+  blued: new THREE.MeshStandardMaterial({color:0x34465e, metalness:0.9, roughness:0.35}),
+  ivory: new THREE.MeshStandardMaterial({color:0xeee2c4, metalness:0.0, roughness:0.55}),
+  wood: new THREE.MeshStandardMaterial({color:0x4a2a17, metalness:0.0, roughness:0.7}),
+  red: new THREE.MeshStandardMaterial({color:0xd8402a, metalness:0.3, roughness:0.4, emissive:0x3a0800}),
+};
+
+// local (u,v,w) -> world (y,z,x): gear shapes are drawn in 2D and mapped into the YZ plane so that
+// rotation.x adds directly to the polar angle phi = atan2(z,y).
+const toAxisX = new THREE.Matrix4().set(0,0,1,0, 1,0,0,0, 0,1,0,0, 0,0,0,1);
+
+// ---------------------------------------------------------------- gear geometry
+function toothHalfAngle(r, rp, N){
+  const s = Math.PI*MOD/2 - 2*(r-rp)*Math.tan(20*Math.PI/180);  // rack-style thickness
+  return Math.max(0.02, s/(2*r));
+}
+// Outline of an N-tooth gear, tooth k centred at angle k*2pi/N. present(k) lets us build mutilated gears.
+function gearShape(Nt, {present=()=>true, baseR=null, hole=0.12, holes=0} = {}){
+  const rp = MOD*Nt/2, ra = rp+MOD, rf = rp-1.25*MOD;
+  const rb = baseR ?? rf;
+  const shape = new THREE.Shape();
+  const pitch = 2*Math.PI/Nt;
+  const pts = [];
+  const prof = 5;
+  for(let k=0;k<Nt;k++){
+    const c = k*pitch;
+    const gapStart = c - pitch/2;
+    if(!present(k)){
+      for(let j=0;j<=6;j++){ const a = gapStart + pitch*j/6; pts.push([rb*Math.cos(a), rb*Math.sin(a)]); }
+      continue;
+    }
+    const hr = Math.min(toothHalfAngle(rf,rp,Nt), pitch*0.36);
+    // root on the leading side
+    const ra0 = rb;
+    pts.push([ra0*Math.cos(gapStart), ra0*Math.sin(gapStart)]);
+    pts.push([ra0*Math.cos(c-hr), ra0*Math.sin(c-hr)]);
+    const rStart = Math.max(rb, rf);
+    for(let j=0;j<=prof;j++){ // flank up
+      const r = rStart + (ra-rStart)*j/prof;
+      const h = Math.min(toothHalfAngle(r,rp,Nt), pitch*0.36);
+      pts.push([r*Math.cos(c-h), r*Math.sin(c-h)]);
+    }
+    for(let j=prof;j>=0;j--){ // flank down
+      const r = rStart + (ra-rStart)*j/prof;
+      const h = Math.min(toothHalfAngle(r,rp,Nt), pitch*0.36);
+      pts.push([r*Math.cos(c+h), r*Math.sin(c+h)]);
+    }
+    pts.push([ra0*Math.cos(c+hr), ra0*Math.sin(c+hr)]);
+  }
+  shape.moveTo(pts[0][0], pts[0][1]);
+  for(let i=1;i<pts.length;i++) shape.lineTo(pts[i][0], pts[i][1]);
+  shape.closePath();
+  if(hole>0){
+    const h = new THREE.Path(); h.absarc(0,0,hole,0,Math.PI*2,true); shape.holes.push(h);
+  }
+  // lightening windows between hub and rim, like cut brass wheels
+  if(holes>0){
+    const r0 = hole+0.12, r1 = rf-0.13;
+    if(r1-r0>0.12){
+      for(let k=0;k<holes;k++){
+        const a0 = k*2*Math.PI/holes + 0.18, a1 = (k+1)*2*Math.PI/holes - 0.18;
+        const p = new THREE.Path();
+        p.absarc(0,0,r1,a0,a1,false);
+        p.absarc(0,0,r0,a1,a0,true);
+        p.closePath();
+        shape.holes.push(p);
+      }
+    }
+  }
+  return shape;
+}
+function gearMesh(Nt, width, mat, opts={}){
+  const g = new THREE.ExtrudeGeometry(gearShape(Nt,opts), {depth:width, bevelEnabled:false, curveSegments:24});
+  g.translate(0,0,-width/2);
+  g.applyMatrix4(toAxisX);
+  g.computeVertexNormals();
+  const m = new THREE.Mesh(g, mat);
+  m.castShadow = m.receiveShadow = true;
+  return m;
+}
+function shaft(len, r, mat=M.steel){
+  const g = new THREE.CylinderGeometry(r,r,len,20); g.rotateZ(Math.PI/2);
+  const m = new THREE.Mesh(g,mat); m.castShadow = true; return m;
+}
+function disc(r, w, mat, seg=48){
+  const g = new THREE.CylinderGeometry(r,r,w,seg); g.rotateZ(Math.PI/2);
+  const m = new THREE.Mesh(g,mat); m.castShadow = m.receiveShadow = true; return m;
+}
+
+// digit textures
+function digitTex(d, fg='#1b130a', bg=null, size=128){
+  const c = document.createElement('canvas'); c.width=c.height=size;
+  const x = c.getContext('2d');
+  if(bg){ x.fillStyle=bg; x.fillRect(0,0,size,size); }
+  x.fillStyle=fg; x.font=`700 ${size*0.78}px Georgia, "Times New Roman", serif`;
+  x.textAlign='center'; x.textBaseline='middle'; x.fillText(String(d), size/2, size/2+size*0.05);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
+}
+const digitMats = [...Array(10)].map((_,d)=>new THREE.MeshStandardMaterial({map:digitTex(d), transparent:true, alphaTest:0.3, roughness:0.6}));
+const digitMatsLight = [...Array(10)].map((_,d)=>new THREE.MeshStandardMaterial({map:digitTex(d,'#f5e7c7'), transparent:true, alphaTest:0.3, roughness:0.5}));
+// place a flat numeral tangent to a cylinder of radius r at polar angle phi (reads upright from the front)
+function numeral(parent, mat, r, phi, size, x=0){
+  const g = new THREE.Group(); g.rotation.x = phi; g.position.x = x;
+  const p = new THREE.Mesh(new THREE.PlaneGeometry(size,size), mat);
+  p.rotation.x = -Math.PI/2; p.position.y = r;
+  g.add(p); parent.add(g); return g;
+}
+
+// ---------------------------------------------------------------- build machine
+const machine = new THREE.Group(); scene.add(machine);
+const cols = [];
+const labels = [];
+function tag(text, obj, offset=[0,0,0], cls='tag'){
+  const el = document.createElement('div'); el.className = cls; el.textContent = text;
+  const o = new CSS2DObject(el); o.position.set(...offset); obj.add(o); labels.push(o); return o;
+}
+const placeNames = ['units','tens','hundreds','thousands','ten-thousands','hundred-thousands'];
+
+for(let i=0;i<N;i++){
+  const x = colX(i);
+  const c = {i, x};
+
+  // --- accumulator wheel (drum + numbers + ring gear + carry lug), one rigid body on the main axle
+  const wheel = new THREE.Group(); wheel.position.x = x; machine.add(wheel);
+  const drum = disc(DRUM_R, DRUM_W, M.ivory, 64); wheel.add(drum);
+  for(const s of [-1,1]){
+    const t = new THREE.Mesh(new THREE.TorusGeometry(DRUM_R, 0.045, 10, 64), M.brass);
+    t.rotation.y = Math.PI/2; t.position.x = s*DRUM_W/2; wheel.add(t);
+  }
+  for(let d=0; d<10; d++) numeral(wheel, digitMats[d], DRUM_R+0.012, WINDOW_PHI + d*STEP, 0.62);
+  // ring gear on the right face (20T)
+  const ring = gearMesh(RING_T, 0.24, M.brass, {hole:0.1, holes:5});
+  ring.position.x = DRUM_W/2 + 0.14; wheel.add(ring);
+  // carry lug on the left face: 2 teeth on the 20-tooth grid, so it meshes like the ring
+  // teeth sit at local angles A_PIN-36deg and A_PIN-18deg -> they sweep past the pinion during 9->0
+  const lugIdx = new Set([ ((Math.round((A_PIN-STEP)/(2*Math.PI/RING_T))%RING_T)+RING_T)%RING_T,
+                           ((Math.round((A_PIN-STEP/2)/(2*Math.PI/RING_T))%RING_T)+RING_T)%RING_T ]);
+  const lug = gearMesh(RING_T, 0.2, M.bronze, {present:k=>lugIdx.has(k), baseR:0.84, hole:0.1});
+  lug.position.x = -DRUM_W/2 - 0.15; wheel.add(lug);
+  // hub
+  const hub = disc(0.22, DRUM_W+0.7, M.brassDark, 24); wheel.add(hub);
+  c.wheel = wheel; c.lug = lug; c.ring = ring;
+
+  // --- drive gear (20T) below the ring + input setting wheel on the same shaft
+  const drive = new THREE.Group(); drive.position.set(x, D_DRIVE*Math.cos(A_DRIVE), D_DRIVE*Math.sin(A_DRIVE)); machine.add(drive);
+  const dg = gearMesh(DRIVE_T, 0.24, M.brass, {hole:0.1, holes:6}); dg.position.x = DRUM_W/2 + 0.14; drive.add(dg);
+  const sw = disc(0.7, 0.3, M.blued, 48); drive.add(sw);
+  for(let k=0;k<10;k++){ // spokes / stylus holes
+    const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.035,0.34,8), M.steel);
+    sp.rotation.z = Math.PI/2; sp.position.y = 0.72;
+    const gg = new THREE.Group(); gg.rotation.x = k*STEP + STEP/2; gg.add(sp); drive.add(gg);
+  }
+  c.driveNumerals = [];
+  const ds = shaft(DRUM_W+0.8, 0.07); ds.position.x = 0.25; drive.add(ds);
+  c.drive = drive; c.driveGear = dg;
+
+  // --- transfer pinion (6T) behind, in the gap to the next (higher) column
+  if(i < N-1){
+    const px = x - PITCH/2;
+    const pin = new THREE.Group(); pin.position.set(px, D_PIN*Math.cos(A_PIN), D_PIN*Math.sin(A_PIN)); machine.add(pin);
+    const pg = gearMesh(PIN_T, 0.92, M.steel.clone(), {hole:0.06}); pin.add(pg);
+    const pst = shaft(1.3, 0.05, M.blued); pin.add(pst);
+    c.pinion = pin; c.pinionMesh = pg;
+  }
+
+  // result index pointer (fixed to frame) at the reading window
+  const idx = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.3, 3), M.red);
+  const r = DRUM_R + 0.28;
+  idx.position.set(x - DRUM_W/2 - 0.05, r*Math.cos(WINDOW_PHI), r*Math.sin(WINDOW_PHI));
+  idx.rotation.x = WINDOW_PHI + Math.PI/2 + Math.PI; machine.add(idx);
+  c.index = idx;
+  cols.push(c);
+}
+// setting-wheel numerals: printed so the current dial digit faces the operator at phi = pi/2
+function settingNumerals(){
+  for(const c of cols){
+    for(let d=0; d<10; d++){
+      // world angle of numeral = L + thetaDrive; at theta=d, thetaDrive = driveAngle(psi(d)).
+      const L = Math.PI/2 - driveAngle(-d*STEP);
+      numeral(c.drive, digitMatsLight[d], 0.705, L, 0.3);
+    }
+  }
+}
+
+// --- frame: main axle, lay shafts, side plates, base
+const span = N*PITCH + 1.2;
+const axle = shaft(span, 0.1); machine.add(axle);
+const pinShaft = shaft(span-0.6, 0.05, M.blued); pinShaft.position.set(0, D_PIN*Math.cos(A_PIN), D_PIN*Math.sin(A_PIN)); machine.add(pinShaft);
+const driveBar = shaft(span, 0.04, M.blued); driveBar.position.set(0, -D_DRIVE, 0); machine.add(driveBar);
+for(const s of [-1,1]){
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(0.18, 4.6, 4.2), M.brassDark);
+  plate.position.set(s*span/2, -0.9, -0.2); plate.castShadow = plate.receiveShadow = true; machine.add(plate);
+  for(const [yy,zz] of [[0,0],[D_PIN*Math.cos(A_PIN), D_PIN*Math.sin(A_PIN)],[-D_DRIVE,0]]){
+    const boss = disc(0.22, 0.3, M.brass, 24); boss.position.set(s*(span/2+0.05), yy, zz); machine.add(boss);
+  }
+  for(const [yy,zz] of [[1.25,1.9],[1.25,-2.3],[-3.0,1.9],[-3.0,-2.3]]){
+    const bolt = disc(0.09, 0.26, M.steel, 12); bolt.position.set(s*(span/2+0.04), yy, zz); machine.add(bolt);
+  }
+}
+const base = new THREE.Mesh(new THREE.BoxGeometry(span+1.4, 0.5, 5.6), M.wood);
+base.position.set(0, -3.45, -0.2); base.receiveShadow = true; machine.add(base);
+const trim = new THREE.Mesh(new THREE.BoxGeometry(span+1.5, 0.08, 5.7), M.brassDark);
+trim.position.set(0,-3.18,-0.2); machine.add(trim);
+const floor = new THREE.Mesh(new THREE.CircleGeometry(40, 64), new THREE.MeshStandardMaterial({color:0x221911, roughness:0.95}));
+floor.rotation.x = -Math.PI/2; floor.position.y = -3.7; floor.receiveShadow = true; scene.add(floor);
+
+// stylus (the operator's pointer) that visits the column being entered
+const stylus = new THREE.Group();
+const stShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.06,2.2,12), M.steel);
+stShaft.position.y = 1.1; stylus.add(stShaft);
+const stTip = new THREE.Mesh(new THREE.ConeGeometry(0.035,0.2,12), M.steel); stTip.rotation.x = Math.PI; stTip.position.y = -0.1; stylus.add(stTip);
+const stGrip = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,0.7,16), M.wood); stGrip.position.y = 1.9; stylus.add(stGrip);
+stylus.rotation.x = 0.55;
+machine.add(stylus);
+stylus.visible = false;
+
+// ---------------------------------------------------------------- labels
+tag('Accumulator wheel (units)', cols[0].wheel, [0, DRUM_R+0.1, 0.35]);
+tag('Accumulator ring gear · 20T', cols[2].ring, [0.1, 0.6, 0.85]);
+tag('Drive gear · 20T', cols[0].drive, [DRUM_W/2+0.14, -0.3, 1.1]);
+tag('Input setting wheel', cols[2].drive, [0, -0.7, 0.5]);
+tag('Carry lug · 2T', cols[1].wheel, [-DRUM_W/2-0.15, 0.55, -0.9]);
+tag('Carry transfer pinion · 6T', cols[0].pinion, [0, 0.45, 0]);
+tag('Main axle', axle, [colX(1)-PITCH/2, 0.2, 0.3]);
+tag('Carry lay shaft', pinShaft, [colX(3)-PITCH/2, 0.2, 0]);
+tag('Drive shaft', cols[4].drive, [0.6, -0.15, 0.2]);
+tag('Result index', cols[3].index, [0, 0.25, 0]);
+tag('Frame side plate', machine, [span/2+0.1, 1.45, -1.5]);
+cols.forEach(c=>tag(['×1','×10','×100','×1 000','×10 000','×100 000'][c.i], c.wheel, [0, DRUM_R+0.95, 0], 'tag col'));
+
+// ---------------------------------------------------------------- kinematics
+// inp[i] : digits applied to column i by its drive gear (continuous, in digit units)
+// th[i]  : total turn of accumulator wheel i in digit units = inp[i] + carry received from wheel i-1
+// carry(t): the odometer carry. Zero except while the lower wheel crosses 9 -> 10, during which the
+//           lug's 2 teeth rotate the 6T pinion by 2 teeth, which turns the upper 20T ring by 2 teeth = 1 digit.
+const inp = new Array(N).fill(0);
+const th = new Array(N).fill(0);
+const carryOf = t => Math.floor(t/10) + Math.min(1, Math.max(0, (((t%10)+10)%10) - 9));
+function solve(){
+  th[0] = inp[0];
+  for(let i=1;i<N;i++) th[i] = inp[i] + carryOf(th[i-1]);
+}
+const psiOf = t => -t*STEP;   // wheel angle (rad) about X
+// mesh relation for gear B (Nb teeth) at direction alpha from gear A (Na teeth, angle thA):
+//   thB = alpha + pi - pi/Nb - (Na/Nb)(thA - alpha)   (A tooth on the line of centres <-> B gap there)
+const meshAngle = (thA, Na, Nb, alpha) => alpha + Math.PI - Math.PI/Nb - (Na/Nb)*(thA - alpha);
+const driveAngle = psi => meshAngle(psi, RING_T, DRIVE_T, A_DRIVE);
+const pinAngle = psiUpper => meshAngle(psiUpper, RING_T, PIN_T, A_PIN);
+settingNumerals();
+
+function applyPose(){
+  solve();
+  for(const c of cols){
+    const psi = psiOf(th[c.i]);
+    c.wheel.rotation.x = psi;
+    c.drive.rotation.x = driveAngle(psi);
+    if(c.pinion) c.pinion.rotation.x = pinAngle(psiOf(th[c.i+1]));
+    // highlight lug + pinion while a carry is actually being transmitted
+    if(c.pinion){
+      const f = (((th[c.i]%10)+10)%10);
+      const active = f > 9.001 && f < 9.999;
+      c.pinionMesh.material.emissive.setHex(active ? 0x7a2a00 : 0x000000);
+      c.lug.material = active ? M.carryHot : M.bronze;
+    }
+  }
+}
+M.carryHot = M.bronze.clone(); M.carryHot.emissive = new THREE.Color(0x802800);
+
+function dialDigits(){
+  return th.map(t=>{ const v = Math.floor(t+1e-6); return ((v%10)+10)%10; });
+}
+function dialValue(){ return dialDigits().reduce((s,d,i)=>s+d*10**i,0); }
+const dialsEl = document.getElementById('dials');
+let lastDialStr = '';
+function updateReadout(){
+  const digs = dialDigits();
+  let html = '';
+  for(let i=N-1;i>=0;i--){
+    const moving = Math.abs(th[i]-Math.round(th[i]))>1e-3;
+    html += moving ? `<span class="moving">${digs[i]}</span>` : digs[i];
+  }
+  if(html!==lastDialStr){ dialsEl.innerHTML = html; lastDialStr = html; }
+}
+
+// ---------------------------------------------------------------- audio (started by first click)
+let actx = null, soundOn = true;
+function initAudio(){ if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } }
+function click(freq=1800, gain=0.12, dur=0.035){
+  if(!actx || !soundOn) return;
+  const t = actx.currentTime;
+  const len = Math.floor(actx.sampleRate*dur);
+  const buf = actx.createBuffer(1, len, actx.sampleRate); const d = buf.getChannelData(0);
+  for(let i=0;i<len;i++) d[i] = (Math.random()*2-1)*Math.pow(1-i/len,4);
+  const src = actx.createBufferSource(); src.buffer = buf;
+  const bp = actx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=freq; bp.Q.value=4;
+  const g = actx.createGain(); g.gain.value = gain;
+  src.connect(bp).connect(g).connect(actx.destination); src.start(t);
+}
+
+// ---------------------------------------------------------------- animation engine
+let speed = 1;
+const tweens = [];
+function tween(dur, fn){
+  return new Promise(res=>tweens.push({t:0, dur:Math.max(0.001,dur), fn, res}));
+}
+const ease = p => p<0.5 ? 4*p*p*p : 1-Math.pow(-2*p+2,3)/2;
+const wait = s => tween(s/speed, ()=>{});
+
+const stepsEl = document.getElementById('steps');
+function log(text, cls=''){
+  stepsEl.querySelectorAll('li.cur').forEach(li=>li.classList.remove('cur'));
+  const li = document.createElement('li'); li.textContent = text; li.className = 'cur '+cls;
+  stepsEl.appendChild(li); stepsEl.parentElement.scrollTop = 1e9;
+}
+
+let stylusTarget = null;
+function moveStylus(col){
+  if(col==null){ stylusTarget = null; return; }
+  stylus.visible = true;
+  stylusTarget = new THREE.Vector3(colX(col), -D_DRIVE + 0.55, 0.95);
+}
+
+// turn drive gear `col` by `units` digits (sign = direction), one digit per detent
+async function turnColumn(col, units){
+  const dir = Math.sign(units);
+  moveStylus(col);
+  await wait(0.25);
+  for(let k=0;k<Math.abs(units);k++){
+    const before = dialDigits();
+    const start = inp[col];
+    await tween(0.42/speed, p=>{ inp[col] = start + dir*ease(p); });
+    inp[col] = start + dir;
+    solve();
+    const after = dialDigits();
+    click(1700, 0.1);
+    for(let j=col+1;j<N;j++){
+      if(after[j]!==before[j]){
+        log(`${dir>0?'Carry':'Borrow'}: ${placeNames[j-1]} ${dir>0?'9→0':'0→9'} · pinion turns ${placeNames[j]} to ${after[j]}`, 'carry');
+        click(600, 0.18, 0.06);
+      }
+    }
+  }
+}
+async function enterNumber(n, sign){
+  const digits = String(n).padStart(N,'0').split('').reverse().map(Number);
+  for(let i=0;i<N;i++){
+    if(digits[i]===0) continue;
+    log(`${sign>0?'Add':'Subtract'} ${digits[i]} on ${placeNames[i]} drive gear`);
+    await turnColumn(i, sign*digits[i]);
+  }
+}
+async function clearMachine(){
+  if(inp.every(v=>v===0)) return;
+  log('Zeroing: all drive gears wind back to 0');
+  const start = inp.slice();
+  await tween(1.2/speed, p=>{ const e = ease(p); for(let i=0;i<N;i++) inp[i] = start[i]*(1-e); });
+  inp.fill(0); solve();
+}
+
+let busy = false;
+const goBtn = document.getElementById('go');
+const resultEl = document.getElementById('result');
+async function calculate(){
+  if(busy) return;
+  const MAX = 10**N - 1;
+  let a = Math.max(0, Math.min(MAX, Math.floor(+document.getElementById('a').value || 0)));
+  let b = Math.max(0, Math.min(MAX, Math.floor(+document.getElementById('b').value || 0)));
+  const op = document.getElementById('op').value;
+  document.getElementById('a').value = a; document.getElementById('b').value = b;
+  if(op==='*' && String(b).split('').reduce((s,d)=>s+ +d,0) > 60){ resultEl.textContent = 'Multiplier too long for the demo (digit sum ≤ 60).'; return; }
+  busy = true; goBtn.disabled = true; resultEl.textContent = '';
+  stepsEl.innerHTML = '';
+  const opSym = {'+':'+','-':'−','*':'×'}[op];
+  log(`Problem: ${a} ${opSym} ${b}`);
+  await clearMachine();
+  await wait(0.2);
+  if(op!=='*'){ log(`Set first operand ${a}`); await enterNumber(a, +1); }
+  if(op==='+'){
+    log(`Add second operand ${b}`);
+    await enterNumber(b, +1);
+  } else if(op==='-'){
+    log(`Subtract ${b}: drive gears turn backwards`);
+    await enterNumber(b, -1);
+  } else {
+    // multiplication = shift-and-add, like later stepped-drum machines: add A (shifted) b_k times
+    log(`Multiply: add ${a} shifted, digit by digit of ${b}`);
+    const bd = String(b).split('').reverse().map(Number);
+    for(let k=0;k<bd.length;k++){
+      for(let r=0;r<bd[k];r++){
+        const shifted = a*10**k;
+        if(shifted > MAX) break;
+        log(`Pass ${r+1}/${bd[k]} of ×10^${k}: add ${shifted}`);
+        await enterNumber(shifted, +1);
+      }
+    }
+  }
+  moveStylus(null);
+  const v = dialValue();
+  const truth = op==='+' ? a+b : op==='-' ? a-b : a*b;
+  let msg;
+  if(truth < 0) msg = `= ${truth}  (dials show 10's complement ${String(v).padStart(N,'0')})`;
+  else if(truth > MAX) msg = `= ${v} (overflow: true value ${truth} exceeds ${N} wheels)`;
+  else msg = `= ${v}`;
+  resultEl.textContent = `${a} ${opSym} ${b} ${msg}`;
+  log(`Result on the dials: ${String(v).padStart(N,'0')}`);
+  document.title = `Gear Calculator · ${a} ${opSym} ${b} = ${truth<0?truth:v}`;
+  busy = false; goBtn.disabled = false;
+}
+
+// ---------------------------------------------------------------- UI wiring
+goBtn.onclick = ()=>{ initAudio(); calculate(); };
+addEventListener('keydown', e=>{ if(e.key==='Enter' && !document.getElementById('start').offsetParent) calculate(); });
+document.getElementById('clear').onclick = async ()=>{
+  if(busy) return; busy = true; goBtn.disabled = true; stepsEl.innerHTML=''; await clearMachine(); resultEl.textContent=''; busy=false; goBtn.disabled=false;
+};
+const speedEl = document.getElementById('speed');
+speedEl.oninput = ()=>{ speed = +speedEl.value; document.getElementById('speedv').textContent = speed+'×'; };
+let labelsOn = true;
+document.getElementById('lbls').onclick = e=>{ labelsOn = !labelsOn; labels.forEach(l=>l.visible=labelsOn); e.target.textContent = 'Labels: '+(labelsOn?'on':'off'); };
+document.getElementById('snd').onclick = e=>{ initAudio(); soundOn = !soundOn; e.target.textContent = 'Sound: '+(soundOn?'on':'off'); };
+
+const views = {
+  front: {pos:[1.8,6.8,16.5], tgt:[-2.0,-0.8,0]},
+  carry: {pos:[colX(0)-2.6, 1.6, -4.4], tgt:[colX(0)-1.0, 0, -1.2]},
+  drive: {pos:[colX(0)+3.2, -2.2, 3.4], tgt:[colX(1)+0.6, -1.6, -0.2]},
+  rear:  {pos:[-5, 4.5, -12], tgt:[0,-0.5,0]},
+};
+let camAnim = null;
+function goView(name){
+  const v = views[name]; if(!v) return;
+  camAnim = {t:0, dur:1.1, p0:camera.position.clone(), t0:controls.target.clone(), p1:new THREE.Vector3(...v.pos), t1:new THREE.Vector3(...v.tgt)};
+}
+document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>goView(b.dataset.view));
+
+document.getElementById('begin').onclick = ()=>{ initAudio(); document.getElementById('start').style.display='none'; };
+
+function onResize(){
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight); labelRenderer.setSize(innerWidth,innerHeight);
+  // pull back on narrow screens so the whole machine fits
+  const narrow = innerWidth/innerHeight < 1;
+  views.front.pos = narrow ? [5,9,24] : [1.8,6.8,16.5];
+  views.front.tgt = narrow ? [0,-0.8,0] : [-2.0,-0.8,0];
+}
+addEventListener('resize', onResize); onResize();
+if(innerWidth/innerHeight<1){ camera.position.set(...views.front.pos); controls.target.set(...views.front.tgt); controls.update(); }
+
+// ---------------------------------------------------------------- loop
+// stepSim() advances the mechanical simulation (tweens, carry, stylus) by dt seconds of
+// simulated time. Normally it's called once per requestAnimationFrame using the real elapsed
+// time. But headless/software-rendered screenshots (see check.sh) can render only a handful of
+// rAF frames in many real seconds, which would stall the sequential digit-by-digit carry
+// animation indefinitely. So under ?autotest we instead drive stepSim from a plain setInterval
+// ticker that is completely decoupled from rendering: it fires at native JS-timer speed
+// regardless of how slowly renderer.render() runs, so the arithmetic always completes quickly
+// in real time, and whatever rAF frames do eventually render just show the (by-then-correct,
+// or converging) state. This changes only *pacing*, never the arithmetic itself.
+const clock = new THREE.Clock();
+function stepSim(dt){
+  for(let k=tweens.length-1;k>=0;k--){
+    const tw = tweens[k]; tw.t += dt;
+    const p = Math.min(1, tw.t/tw.dur); tw.fn(p);
+    if(p>=1){ tweens.splice(k,1); tw.res(); }
+  }
+  if(camAnim){
+    camAnim.t += dt; const p = ease(Math.min(1, camAnim.t/camAnim.dur));
+    camera.position.lerpVectors(camAnim.p0, camAnim.p1, p);
+    controls.target.lerpVectors(camAnim.t0, camAnim.t1, p);
+    if(p>=1) camAnim = null;
+  }
+  if(stylus.visible){
+    const tgt = stylusTarget ?? new THREE.Vector3(colX(0)+PITCH*0.9, -D_DRIVE+2.5, 2.5);
+    stylus.position.lerp(tgt, Math.min(1, dt*8));
+    if(!stylusTarget && stylus.position.distanceTo(tgt)<0.05) stylus.visible = false;
+  }
+  applyPose();
+  updateReadout();
+}
+applyPose();
+function frame(){
+  // In autotest mode, an independent ticker (below) advances the sim; frame() only renders.
+  if(!AUTOTEST) stepSim(Math.min(clock.getDelta(), 0.25));
+  controls.update();
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+frame();
+
+// ---------------------------------------------------------------- autotest
+if(AUTOTEST){
+  document.getElementById('start').style.display='none';
+  if(params.get('a')!==null) document.getElementById('a').value = params.get('a');
+  if(params.get('b')!==null) document.getElementById('b').value = params.get('b');
+  if(params.get('op')) document.getElementById('op').value = params.get('op')===' ' ? '+' : params.get('op');
+  if(params.get('view')) goView(params.get('view'));
+  speed = +(params.get('speed') || 6); speedEl.value = speed; document.getElementById('speedv').textContent = speed+'×';
+  // Fast, render-independent ticker: fires at native timer speed (not tied to rAF/GPU), so the
+  // sequential carry animation always finishes in well under a second of real time even when
+  // actual rendered frames are sparse under software (swiftshader) rasterization.
+  const FAST_DT = 0.08;
+  setInterval(()=>stepSim(FAST_DT), 0);
+  if(params.get('run')!=='0') setTimeout(calculate, 100);
+}
+</script>
+</body>
+</html>
