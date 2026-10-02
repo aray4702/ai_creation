@@ -1,0 +1,11 @@
+{
+ "skill_name": "task-progress",
+ "evals": [
+  {"id": 0, "prompt": "where are we overall on the ai_creation tasks? how many are done, what's in flight, and is anything finished but not published yet?",
+   "expected_output": "54 tasks: 29 published (cards in dev:index.html), 0 completed-unpublished, 0 in progress, 25 not started; notes QUEUE.md is stale (still calls the Oct 1 tasks unpublished) without editing it.", "files": []},
+  {"id": 1, "prompt": "list the tasks we completed on Oct 1 with how long each took and the tokens, and a total",
+   "expected_output": "14 tasks completed 2026-10-01 with figures from index.html; total counts shared runs once (ink pair, music pair, Codex/Muse group of eight): about 4h 47m and ~62.8M tokens.", "files": []},
+  {"id": 2, "prompt": "among the tasks we haven't started, which ones can I kick off right now with no dependencies? group anything that should be built together",
+   "expected_output": "13 ready (lens explainer+lab pair, South Song EN/CN pair, drawing trebuchet, colossus, FPS, lawn mowing, etc.), 12 blocked with reasons (input image, Blender, Godot, Unity, Tinkercad, Xcode/iOS, computer use).", "files": []}
+ ]
+}
