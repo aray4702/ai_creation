@@ -9,9 +9,9 @@ Twenty-nine builds: single-file web pieces plus two native macOS apps. Most were
 
 | Tasks completed | Active agent time | Output tokens | Total tokens |
 |:-:|:-:|:-:|:-:|
-| **29** | **14h 39m** | **1.1M** | **131.5M** |
+| **29** | **13h 10m** | **1.1M** | **121.8M** |
 
-> **Active time** leaves out waiting for the usage limit to reset (about 4.3 h, twice) and any idle gap over 20 minutes.
+> **Active time** leaves out waiting for the usage limit to reset (about 4.3 h, twice) and any idle gap over 20 minutes. For each task it counts only the session work that finished it, not planning for other tasks or earlier attempts.
 > **Total tokens** = fresh input + cache writes + cache reads + output; cache reads are most of it.
 > The subagents ran in parallel, so their times overlap on the clock.
 > Each output is a single self-contained HTML file. To run one, open it from the [live site](https://aray4702.github.io/ai_creation/); links on github.com show only the source.
@@ -337,11 +337,11 @@ A working Pascaline-style adding machine in which meshing teeth turn every digit
 
 A native SwiftUI + AVFoundation player with a translucent sidebar, Songs / Albums / Artists / Playlists views, a Now Playing bar, a floating Mini Player, file import and built-in synthesized sample tracks. The Swift package builds with `swift run` on macOS 14+ (Command Line Tools are enough).
 
-> Built in the same agent run as *悦听 Music Player (Chinese macOS App)*; the figures cover both tasks.
+> Built in the same run as its EN/CN counterpart (figures cover both). The packages were first written by a subagent on 29–30 Sep, which isn't counted; the figures cover the 1 Oct session that got both building and checked.
 
 | Active time | Output tokens | Total tokens |
 |:-:|:-:|:-:|
-| 1h 42m | 56,701 | 11.9M (11,934,792) |
+| 53.7 min | 44,730 | 9.6M (9,612,102) |
 
 **Output:** [Source & build steps](music-player/music-player/)  
 **Task brief:** [music player.md](music-player/music%20player.md)
@@ -357,11 +357,11 @@ A native SwiftUI + AVFoundation player with a translucent sidebar, Songs / Album
 
 The Chinese-language macOS player: featured album and playlist grids, artist browsing, an Up Next queue, favourites, a collapsible frosted-glass sidebar and a mini player, with synthesized demo audio. The Swift package builds with `swift run` on macOS 14+ (Command Line Tools are enough).
 
-> Built in the same agent run as *Music Player (Apple Music–Style macOS App)*; the figures cover both tasks.
+> Built in the same run as its EN/CN counterpart (figures cover both). The packages were first written by a subagent on 29–30 Sep, which isn't counted; the figures cover the 1 Oct session that got both building and checked.
 
 | Active time | Output tokens | Total tokens |
 |:-:|:-:|:-:|
-| 1h 42m | 56,701 | 11.9M (11,934,792) |
+| 53.7 min | 44,730 | 9.6M (9,612,102) |
 
 **Output:** [查看源码与构建说明](music-player-cn/music-player-cn/)  
 **Task brief:** [music player[Chinese].md](music-player-cn/music%20player%5BChinese%5D.md)
@@ -377,9 +377,11 @@ The Chinese-language macOS player: featured album and playlist grids, artist bro
 
 A big-eyed fox with a glowing lantern, springy ears and a physics tail: triple jump, glide and a spin attack that sends crates flying while you gather 12 embers across a dreamy glade.
 
+> A first version built by a subagent on 30 Sep isn't counted; the figures cover the 1 Oct session that finished it.
+
 | Active time | Output tokens | Total tokens |
 |:-:|:-:|:-:|
-| 31.8 min | 23,445 | 2.0M (2,016,861) |
+| 21.1 min | 20,120 | 1.8M (1,773,032) |
 
 **Output:** [Play Fox Lantern](fox-lantern-adventure/fox-lantern-adventure.html)  
 **Task brief:** [3d fox action game.md](fox-lantern-adventure/3d%20fox%20action%20game.md)
@@ -395,9 +397,11 @@ A big-eyed fox with a glowing lantern, springy ears and a physics tail: triple j
 
 Five stages grounded in archaeology: quarrying at Rano Raraku, carving, the rope-rocked “walking moai”, raising the statue on the ahu with levers and packed stones, and rolling the red pukao up a ramp. 360° view and a scrubbable timeline.
 
+> A first version built by a subagent on 30 Sep isn't counted; the figures cover the 1 Oct session that finished it.
+
 | Active time | Output tokens | Total tokens |
 |:-:|:-:|:-:|
-| 1h 2m | 62,688 | 5.3M (5,330,171) |
+| 1h 1m | 62,137 | 5.2M (5,220,450) |
 
 **Output:** [Open simulator](moai-process-simulator/moai-process-simulator.html)  
 **Task brief:** [easter island moai process simulator.md](moai-process-simulator/easter%20island%20moai%20process%20simulator.md)
@@ -413,11 +417,11 @@ Five stages grounded in archaeology: quarrying at Rano Raraku, carving, the rope
 
 Ink blooms across rice paper into misty mountains and a rising sun, a lotus pond, and a plum branch under the moon, painted with a dry-brush engine and scored with a synthesized guqin.
 
-> Built in the same agent run as *水墨 · 七幕 (Ink-Wash in Seven Acts, Chinese)*; the figures cover both tasks.
+> Built in the same run as its EN/CN counterpart (figures cover both). An earlier subagent attempt on 30 Sep isn't counted.
 
 | Active time | Output tokens | Total tokens |
 |:-:|:-:|:-:|
-| 1h 48m | 102,849 | 17.6M (17,593,345) |
+| 1h 48m | 101,330 | 16.9M (16,911,597) |
 
 **Output:** [Watch the painting](ink-wash-painting/ink-wash-painting.html)  
 **Task brief:** [chinese ink-wash painting animation.md](ink-wash-painting/chinese%20ink-wash%20painting%20animation.md)
@@ -433,11 +437,11 @@ Ink blooms across rice paper into misty mountains and a rising sun, a lotus pond
 
 A two-minute ink scroll in seven acts: a falling drop, mountains, a river bursting from a gorge, a Jiangnan water town with fireworks, a storm, a red-crowned crane breaking the clouds, and everything returning to one drop of ink.
 
-> Built in the same agent run as *Chinese Ink-Wash Painting (3 Scenes)*; the figures cover both tasks.
+> Built in the same run as its EN/CN counterpart (figures cover both). An earlier subagent attempt on 30 Sep isn't counted.
 
 | Active time | Output tokens | Total tokens |
 |:-:|:-:|:-:|
-| 1h 48m | 102,849 | 17.6M (17,593,345) |
+| 1h 48m | 101,330 | 16.9M (16,911,597) |
 
 **Output:** [观看七幕](ink-wash-seven-acts-cn/ink-wash-seven-acts-cn.html)  
 **Task brief:** [chinese ink canvas animation Chinese.md](ink-wash-seven-acts-cn/chinese%20ink%20canvas%20animation%20Chinese.md)
@@ -453,11 +457,11 @@ A two-minute ink scroll in seven acts: a falling drop, mountains, a river bursti
 
 A lightweight canvas wallpaper of noise-driven colour flows and glowing particles that ripple away from the cursor. Click to cycle three palettes.
 
-> First built by Codex or Muse; Claude then checked all eight and filled the gaps in one run. The figures cover that whole Claude run (it also filed the day's tasks) and leave out Codex's and Muse's own usage, which isn't recorded.
+> First built by Codex or Muse; Claude then checked all eight and filled the gaps in one run. The figures cover Claude's finishing work for all eight (filing and publishing excluded) and leave out Codex's and Muse's own usage, which isn't recorded.
 
 | Active time | Output tokens | Total tokens |
 |:-:|:-:|:-:|
-| 1h 13m | 54,286 | 35.6M (35,621,092) |
+| 42.8 min | 47,758 | 29.3M (29,324,451) |
 
 **Output:** [Open wallpaper](interactive-procedural-wallpaper/interactive-procedural-wallpaper.html)  
 **Task brief:** [Interactive Procedural Animated Canvas Wallpaper.md](interactive-procedural-wallpaper/Interactive%20Procedural%20Animated%20Canvas%20Wallpaper.md)
@@ -473,11 +477,11 @@ A lightweight canvas wallpaper of noise-driven colour flows and glowing particle
 
 A 144 BPM motion-graphics piece: five acts of kinetic typography, hard camera cuts, liquid morphing and particle bursts, run through a WebGL pass for chromatic aberration, glare and glitch, with a synthesized track.
 
-> First built by Codex or Muse; Claude then checked all eight and filled the gaps in one run. The figures cover that whole Claude run (it also filed the day's tasks) and leave out Codex's and Muse's own usage, which isn't recorded.
+> First built by Codex or Muse; Claude then checked all eight and filled the gaps in one run. The figures cover Claude's finishing work for all eight (filing and publishing excluded) and leave out Codex's and Muse's own usage, which isn't recorded.
 
 | Active time | Output tokens | Total tokens |
 |:-:|:-:|:-:|
-| 1h 13m | 54,286 | 35.6M (35,621,092) |
+| 42.8 min | 47,758 | 29.3M (29,324,451) |
 
 **Output:** [Play showreel](kinetic-showreel/kinetic-showreel.html)  
 **Task brief:** [motion designer 15-second high octane kinetic showreel.md](kinetic-showreel/motion%20designer%2015-second%20high%20octane%20kinetic%20showreel.md)
@@ -493,11 +497,11 @@ A 144 BPM motion-graphics piece: five acts of kinetic typography, hard camera cu
 
 A streaming voxel world with Perlin terrain, caves, biomes and trees, a day–night sky, soft shadows, reflective and refractive water with flowing fluid, and a crystal-hunt goal.
 
-> First built by Codex or Muse; Claude then checked all eight and filled the gaps in one run. The figures cover that whole Claude run (it also filed the day's tasks) and leave out Codex's and Muse's own usage, which isn't recorded.
+> First built by Codex or Muse; Claude then checked all eight and filled the gaps in one run. The figures cover Claude's finishing work for all eight (filing and publishing excluded) and leave out Codex's and Muse's own usage, which isn't recorded.
 
 | Active time | Output tokens | Total tokens |
 |:-:|:-:|:-:|
-| 1h 13m | 54,286 | 35.6M (35,621,092) |
+| 42.8 min | 47,758 | 29.3M (29,324,451) |
 
 **Output:** [Play Voxel Tides](voxel-tides/voxel-tides.html)  
 **Task brief:** [brower based voxel engine with shaders & water physics.md](voxel-tides/brower%20based%20voxel%20engine%20with%20shaders%20%26%20water%20physics.md)
@@ -513,11 +517,11 @@ A streaming voxel world with Perlin terrain, caves, biomes and trees, a day–ni
 
 Defend a remote radio post from waves of spider and flying drones with a flashlight-lit rifle, recoil and reloads, until the transmission reaches 100% and fires its beam into the sky.
 
-> First built by Codex or Muse; Claude then checked all eight and filled the gaps in one run. The figures cover that whole Claude run (it also filed the day's tasks) and leave out Codex's and Muse's own usage, which isn't recorded.
+> First built by Codex or Muse; Claude then checked all eight and filled the gaps in one run. The figures cover Claude's finishing work for all eight (filing and publishing excluded) and leave out Codex's and Muse's own usage, which isn't recorded.
 
 | Active time | Output tokens | Total tokens |
 |:-:|:-:|:-:|
-| 1h 13m | 54,286 | 35.6M (35,621,092) |
+| 42.8 min | 47,758 | 29.3M (29,324,451) |
 
 **Output:** [Play Dead Signal](dead-signal/dead-signal.html)  
 **Task brief:** [dead signal atmospheric first person shooter.md](dead-signal/dead%20signal%20atmospheric%20first%20person%20shooter.md)
@@ -533,11 +537,11 @@ Defend a remote radio post from waves of spider and flying drones with a flashli
 
 An eight-second shader loop of refractive glass tiles with colour dispersion and caustics. Koi, cranes and doves drift beneath the glass as daylight turns gold and then indigo.
 
-> First built by Codex or Muse; Claude then checked all eight and filled the gaps in one run. The figures cover that whole Claude run (it also filed the day's tasks) and leave out Codex's and Muse's own usage, which isn't recorded.
+> First built by Codex or Muse; Claude then checked all eight and filled the gaps in one run. The figures cover Claude's finishing work for all eight (filing and publishing excluded) and leave out Codex's and Muse's own usage, which isn't recorded.
 
 | Active time | Output tokens | Total tokens |
 |:-:|:-:|:-:|
-| 1h 13m | 54,286 | 35.6M (35,621,092) |
+| 42.8 min | 47,758 | 29.3M (29,324,451) |
 
 **Output:** [Watch the loop](glass-tile-cycle/glass-tile-cycle.html)  
 **Task brief:** [glass tile day-to-night ambiet visual experience.md](glass-tile-cycle/glass%20tile%20day-to-night%20ambiet%20visual%20experience.md)
@@ -553,11 +557,11 @@ An eight-second shader loop of refractive glass tiles with colour dispersion and
 
 A spinning neutron star with a glowing core, dipole field lines, relativistic polar jets and a lensed starfield, with sliders for spin, field strength, jet brightness and time.
 
-> First built by Codex or Muse; Claude then checked all eight and filled the gaps in one run. The figures cover that whole Claude run (it also filed the day's tasks) and leave out Codex's and Muse's own usage, which isn't recorded.
+> First built by Codex or Muse; Claude then checked all eight and filled the gaps in one run. The figures cover Claude's finishing work for all eight (filing and publishing excluded) and leave out Codex's and Muse's own usage, which isn't recorded.
 
 | Active time | Output tokens | Total tokens |
 |:-:|:-:|:-:|
-| 1h 13m | 54,286 | 35.6M (35,621,092) |
+| 42.8 min | 47,758 | 29.3M (29,324,451) |
 
 **Output:** [Open simulation](neutron-star/neutron-star.html)  
 **Task brief:** [neutron star pyhsics & compit animation.md](neutron-star/neutron%20star%20pyhsics%20%26%20compit%20animation.md)
@@ -573,11 +577,11 @@ A spinning neutron star with a glowing core, dipole field lines, relativistic po
 
 A continuous 3D metamorphosis in a meadow: the egg hatches, the caterpillar eats its way up the plant, forms a chrysalis, and the butterfly emerges and flies off. Play, speed, scrub and stage cameras.
 
-> First built by Codex or Muse; Claude then checked all eight and filled the gaps in one run. The figures cover that whole Claude run (it also filed the day's tasks) and leave out Codex's and Muse's own usage, which isn't recorded.
+> First built by Codex or Muse; Claude then checked all eight and filled the gaps in one run. The figures cover Claude's finishing work for all eight (filing and publishing excluded) and leave out Codex's and Muse's own usage, which isn't recorded.
 
 | Active time | Output tokens | Total tokens |
 |:-:|:-:|:-:|
-| 1h 13m | 54,286 | 35.6M (35,621,092) |
+| 42.8 min | 47,758 | 29.3M (29,324,451) |
 
 **Output:** [Watch the cycle](butterfly-life-cycle/butterfly-life-cycle.html)  
 **Task brief:** [buttefly lift cycle procedural animation.md](butterfly-life-cycle/buttefly%20lift%20cycle%20procedural%20animation.md)
@@ -593,11 +597,11 @@ A continuous 3D metamorphosis in a meadow: the egg hatches, the caterpillar eats
 
 3D space combat with throttle, roll and heat-managed blasters, AI fighters firing plasma, asteroids that fracture, engine trails, radar and a synthesized score across three waves.
 
-> First built by Codex or Muse; Claude then checked all eight and filled the gaps in one run. The figures cover that whole Claude run (it also filed the day's tasks) and leave out Codex's and Muse's own usage, which isn't recorded.
+> First built by Codex or Muse; Claude then checked all eight and filled the gaps in one run. The figures cover Claude's finishing work for all eight (filing and publishing excluded) and leave out Codex's and Muse's own usage, which isn't recorded.
 
 | Active time | Output tokens | Total tokens |
 |:-:|:-:|:-:|
-| 1h 13m | 54,286 | 35.6M (35,621,092) |
+| 42.8 min | 47,758 | 29.3M (29,324,451) |
 
 **Output:** [Play Void Wing](void-wing/void-wing.html)  
 **Task brief:** [void wing 3d space dogfight &asteroid battle.md](void-wing/void%20wing%203d%20space%20dogfight%20%26asteroid%20battle.md)
@@ -623,23 +627,23 @@ A continuous 3D metamorphosis in a meadow: the egg hatches, the caterpillar eats
 | Procedural Pixel Art Wizard | 29.9 min | 56 | 178,363 | 1,827,164 | 17,979 | 2,023,562 |
 | Antikythera Mechanism Reconstruction | 36.5 min | 92 | 337,400 | 5,135,200 | 34,459 | 5,507,151 |
 | 3D Gear-Driven Mechanical Calculator | 1h 4m | 88 | 461,041 | 2,970,492 | 31,925 | 3,463,546 |
-| Music Player (Apple Music–Style macOS App) \* | 1h 42m | 236 | 278,483 | 11,599,372 | 56,701 | 11,934,792 |
-| 悦听 Music Player (Chinese macOS App) \* | 1h 42m | 236 | 278,483 | 11,599,372 | 56,701 | 11,934,792 |
-| Fox Lantern Adventure: 3D Action Platformer | 31.8 min | 52 | 84,404 | 1,908,960 | 23,445 | 2,016,861 |
-| Easter Island Moai: Quarry to Pukao (摩艾全流程模拟) | 1h 2m | 62 | 125,818 | 5,141,603 | 62,688 | 5,330,171 |
-| Chinese Ink-Wash Painting (3 Scenes) \* | 1h 48m | 88 | 202,587 | 17,287,821 | 102,849 | 17,593,345 |
-| 水墨 · 七幕 (Ink-Wash in Seven Acts, Chinese) \* | 1h 48m | 88 | 202,587 | 17,287,821 | 102,849 | 17,593,345 |
-| Interactive Procedural Wallpaper † | 1h 13m | 124 | 156,306 | 35,410,376 | 54,286 | 35,621,092 |
-| OVERDRIVE: 15-Second Kinetic Showreel † | 1h 13m | 124 | 156,306 | 35,410,376 | 54,286 | 35,621,092 |
-| Voxel Tides: Browser Voxel Engine † | 1h 13m | 124 | 156,306 | 35,410,376 | 54,286 | 35,621,092 |
-| Dead Signal: Atmospheric FPS † | 1h 13m | 124 | 156,306 | 35,410,376 | 54,286 | 35,621,092 |
-| Hikari: Glass Tiles from Day to Night † | 1h 13m | 124 | 156,306 | 35,410,376 | 54,286 | 35,621,092 |
-| Neutron Star: Magnetic Field and Polar Jets † | 1h 13m | 124 | 156,306 | 35,410,376 | 54,286 | 35,621,092 |
-| Butterfly Life Cycle † | 1h 13m | 124 | 156,306 | 35,410,376 | 54,286 | 35,621,092 |
-| Void Wing: Space Dogfight & Asteroid Battle † | 1h 13m | 124 | 156,306 | 35,410,376 | 54,286 | 35,621,092 |
+| Music Player (Apple Music–Style macOS App) \* | 53.7 min | 190 | 89,015 | 9,478,167 | 44,730 | 9,612,102 |
+| 悦听 Music Player (Chinese macOS App) \* | 53.7 min | 190 | 89,015 | 9,478,167 | 44,730 | 9,612,102 |
+| Fox Lantern Adventure: 3D Action Platformer | 21.1 min | 40 | 61,668 | 1,691,204 | 20,120 | 1,773,032 |
+| Easter Island Moai: Quarry to Pukao (摩艾全流程模拟) | 1h 1m | 60 | 125,136 | 5,033,117 | 62,137 | 5,220,450 |
+| Chinese Ink-Wash Painting (3 Scenes) \* | 1h 48m | 84 | 199,247 | 16,610,936 | 101,330 | 16,911,597 |
+| 水墨 · 七幕 (Ink-Wash in Seven Acts, Chinese) \* | 1h 48m | 84 | 199,247 | 16,610,936 | 101,330 | 16,911,597 |
+| Interactive Procedural Wallpaper † | 42.8 min | 104 | 135,232 | 29,141,357 | 47,758 | 29,324,451 |
+| OVERDRIVE: 15-Second Kinetic Showreel † | 42.8 min | 104 | 135,232 | 29,141,357 | 47,758 | 29,324,451 |
+| Voxel Tides: Browser Voxel Engine † | 42.8 min | 104 | 135,232 | 29,141,357 | 47,758 | 29,324,451 |
+| Dead Signal: Atmospheric FPS † | 42.8 min | 104 | 135,232 | 29,141,357 | 47,758 | 29,324,451 |
+| Hikari: Glass Tiles from Day to Night † | 42.8 min | 104 | 135,232 | 29,141,357 | 47,758 | 29,324,451 |
+| Neutron Star: Magnetic Field and Polar Jets † | 42.8 min | 104 | 135,232 | 29,141,357 | 47,758 | 29,324,451 |
+| Butterfly Life Cycle † | 42.8 min | 104 | 135,232 | 29,141,357 | 47,758 | 29,324,451 |
+| Void Wing: Space Dogfight & Asteroid Battle † | 42.8 min | 104 | 135,232 | 29,141,357 | 47,758 | 29,324,451 |
 
 \* One agent run covered both tasks in the pair; each pair is counted once in the totals.  
-† First built by Codex or Muse and finished by Claude. The figures are Claude’s single finishing run for all eight (counted once in the totals); Codex’s and Muse’s own usage isn’t recorded.
+† First built by Codex or Muse and finished by Claude. The figures are Claude’s finishing work for all eight in one run (counted once in the totals; filing and publishing excluded); Codex’s and Muse’s own usage isn’t recorded.
 
 Source: Claude Code session transcripts, 28 Sep – 1 Oct 2026. Screenshots were taken with headless Chrome at 1280×720.
 
