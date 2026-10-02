@@ -343,7 +343,7 @@ A native SwiftUI + AVFoundation player with a translucent sidebar, Songs / Album
 |:-:|:-:|:-:|
 | 1h 42m | 56,701 | 11.9M (11,934,792) |
 
-**Output:** [Source & build steps](music-player/music-player/)
+**Output:** [Source & build steps](music-player/music-player/)  
 **Task brief:** [music player.md](music-player/music%20player.md)
 
 ---
@@ -363,7 +363,7 @@ The Chinese-language macOS player: featured album and playlist grids, artist bro
 |:-:|:-:|:-:|
 | 1h 42m | 56,701 | 11.9M (11,934,792) |
 
-**Output:** [查看源码与构建说明](music-player-cn/music-player-cn/)
+**Output:** [查看源码与构建说明](music-player-cn/music-player-cn/)  
 **Task brief:** [music player[Chinese].md](music-player-cn/music%20player%5BChinese%5D.md)
 
 ---
@@ -381,7 +381,7 @@ A big-eyed fox with a glowing lantern, springy ears and a physics tail: triple j
 |:-:|:-:|:-:|
 | 31.8 min | 23,445 | 2.0M (2,016,861) |
 
-**Output:** [Play Fox Lantern](fox-lantern-adventure/fox-lantern-adventure.html)
+**Output:** [Play Fox Lantern](fox-lantern-adventure/fox-lantern-adventure.html)  
 **Task brief:** [3d fox action game.md](fox-lantern-adventure/3d%20fox%20action%20game.md)
 
 ---
@@ -399,7 +399,7 @@ Five stages grounded in archaeology: quarrying at Rano Raraku, carving, the rope
 |:-:|:-:|:-:|
 | 1h 2m | 62,688 | 5.3M (5,330,171) |
 
-**Output:** [Open simulator](moai-process-simulator/moai-process-simulator.html)
+**Output:** [Open simulator](moai-process-simulator/moai-process-simulator.html)  
 **Task brief:** [easter island moai process simulator.md](moai-process-simulator/easter%20island%20moai%20process%20simulator.md)
 
 ---
@@ -419,7 +419,7 @@ Ink blooms across rice paper into misty mountains and a rising sun, a lotus pond
 |:-:|:-:|:-:|
 | 1h 48m | 102,849 | 17.6M (17,593,345) |
 
-**Output:** [Watch the painting](ink-wash-painting/ink-wash-painting.html)
+**Output:** [Watch the painting](ink-wash-painting/ink-wash-painting.html)  
 **Task brief:** [chinese ink-wash painting animation.md](ink-wash-painting/chinese%20ink-wash%20painting%20animation.md)
 
 ---
@@ -439,7 +439,7 @@ A two-minute ink scroll in seven acts: a falling drop, mountains, a river bursti
 |:-:|:-:|:-:|
 | 1h 48m | 102,849 | 17.6M (17,593,345) |
 
-**Output:** [观看七幕](ink-wash-seven-acts-cn/ink-wash-seven-acts-cn.html)
+**Output:** [观看七幕](ink-wash-seven-acts-cn/ink-wash-seven-acts-cn.html)  
 **Task brief:** [chinese ink canvas animation Chinese.md](ink-wash-seven-acts-cn/chinese%20ink%20canvas%20animation%20Chinese.md)
 
 ---
@@ -459,7 +459,7 @@ A lightweight canvas wallpaper of noise-driven colour flows and glowing particle
 |:-:|:-:|:-:|
 | 1h 13m | 54,286 | 35.6M (35,621,092) |
 
-**Output:** [Open wallpaper](interactive-procedural-wallpaper/interactive-procedural-wallpaper.html)
+**Output:** [Open wallpaper](interactive-procedural-wallpaper/interactive-procedural-wallpaper.html)  
 **Task brief:** [Interactive Procedural Animated Canvas Wallpaper.md](interactive-procedural-wallpaper/Interactive%20Procedural%20Animated%20Canvas%20Wallpaper.md)
 
 ---
@@ -479,7 +479,7 @@ A 144 BPM motion-graphics piece: five acts of kinetic typography, hard camera cu
 |:-:|:-:|:-:|
 | 1h 13m | 54,286 | 35.6M (35,621,092) |
 
-**Output:** [Play showreel](kinetic-showreel/kinetic-showreel.html)
+**Output:** [Play showreel](kinetic-showreel/kinetic-showreel.html)  
 **Task brief:** [motion designer 15-second high octane kinetic showreel.md](kinetic-showreel/motion%20designer%2015-second%20high%20octane%20kinetic%20showreel.md)
 
 ---
@@ -499,7 +499,7 @@ A streaming voxel world with Perlin terrain, caves, biomes and trees, a day–ni
 |:-:|:-:|:-:|
 | 1h 13m | 54,286 | 35.6M (35,621,092) |
 
-**Output:** [Play Voxel Tides](voxel-tides/voxel-tides.html)
+**Output:** [Play Voxel Tides](voxel-tides/voxel-tides.html)  
 **Task brief:** [brower based voxel engine with shaders & water physics.md](voxel-tides/brower%20based%20voxel%20engine%20with%20shaders%20%26%20water%20physics.md)
 
 ---
@@ -519,7 +519,7 @@ Defend a remote radio post from waves of spider and flying drones with a flashli
 |:-:|:-:|:-:|
 | 1h 13m | 54,286 | 35.6M (35,621,092) |
 
-**Output:** [Play Dead Signal](dead-signal/dead-signal.html)
+**Output:** [Play Dead Signal](dead-signal/dead-signal.html)  
 **Task brief:** [dead signal atmospheric first person shooter.md](dead-signal/dead%20signal%20atmospheric%20first%20person%20shooter.md)
 
 ---
@@ -539,7 +539,7 @@ An eight-second shader loop of refractive glass tiles with colour dispersion and
 |:-:|:-:|:-:|
 | 1h 13m | 54,286 | 35.6M (35,621,092) |
 
-**Output:** [Watch the loop](glass-tile-cycle/glass-tile-cycle.html)
+**Output:** [Watch the loop](glass-tile-cycle/glass-tile-cycle.html)  
 **Task brief:** [glass tile day-to-night ambiet visual experience.md](glass-tile-cycle/glass%20tile%20day-to-night%20ambiet%20visual%20experience.md)
 
 ---
@@ -559,7 +559,7 @@ A spinning neutron star with a glowing core, dipole field lines, relativistic po
 |:-:|:-:|:-:|
 | 1h 13m | 54,286 | 35.6M (35,621,092) |
 
-**Output:** [Open simulation](neutron-star/neutron-star.html)
+**Output:** [Open simulation](neutron-star/neutron-star.html)  
 **Task brief:** [neutron star pyhsics & compit animation.md](neutron-star/neutron%20star%20pyhsics%20%26%20compit%20animation.md)
 
 ---
@@ -579,7 +579,7 @@ A continuous 3D metamorphosis in a meadow: the egg hatches, the caterpillar eats
 |:-:|:-:|:-:|
 | 1h 13m | 54,286 | 35.6M (35,621,092) |
 
-**Output:** [Watch the cycle](butterfly-life-cycle/butterfly-life-cycle.html)
+**Output:** [Watch the cycle](butterfly-life-cycle/butterfly-life-cycle.html)  
 **Task brief:** [buttefly lift cycle procedural animation.md](butterfly-life-cycle/buttefly%20lift%20cycle%20procedural%20animation.md)
 
 ---
@@ -599,7 +599,7 @@ A continuous 3D metamorphosis in a meadow: the egg hatches, the caterpillar eats
 |:-:|:-:|:-:|
 | 1h 13m | 54,286 | 35.6M (35,621,092) |
 
-**Output:** [Play Void Wing](void-wing/void-wing.html)
+**Output:** [Play Void Wing](void-wing/void-wing.html)  
 **Task brief:** [void wing 3d space dogfight &asteroid battle.md](void-wing/void%20wing%203d%20space%20dogfight%20%26asteroid%20battle.md)
 
 ---
