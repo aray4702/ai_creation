@@ -1,0 +1,63 @@
+{
+ "skill_name": "publish-completed-tasks",
+ "evals": [
+  {
+   "id": 0,
+   "prompt": "Please publish the fox game and the moai simulator we verified yesterday (2026-10-01): file them away, put them on the site with their time and token stats, and get the PR ready.",
+   "expected_output": "Both tasks filed in .completed_tasks with spec+output+screenshot, top-level folders with cleaned briefs, index/README entries with stats ~31.8 min and ~61.7 min from the transcripts, committed on dev, publish branch with only published paths, stopped before push with PR text.",
+   "files": [],
+   "assertions": [
+    "Both tasks filed in .completed_tasks/<slug>/ (spec + output + screenshot) and removed from .tasks/",
+    "Top-level published folder per task with brief (original filename), output and screenshot",
+    "Published brief is a cleaned-up rewrite in the original language",
+    "index.html lists all 29 tasks including both new ones",
+    "README.md has contents entries, sections and a 29-task totals row",
+    "Every link in index.html and README.md resolves",
+    "Time and token figures within 15% of the transcript truth",
+    "Work committed on dev (new commit, clean tree)",
+    "Publish branch from main carries only published paths (no .completed_tasks/.tasks/.gitignore)",
+    "Stopped before pushing and wrote PR text",
+    "Credited as Main session"
+   ]
+  },
+  {
+   "id": 1,
+   "prompt": "The two ink-wash animations are done (the English 3-scene one and the Chinese seven-act one). Move them to completed and publish them on the site. They were built together in one run yesterday.",
+   "expected_output": "Both filed and published; marked as a shared pair with the same stats (~108 min, ~17.6M tokens) counted once in totals; Chinese brief stays Chinese; branch prepared, no push.",
+   "files": [],
+   "assertions": [
+    "Both tasks filed in .completed_tasks/<slug>/ (spec + output + screenshot) and removed from .tasks/",
+    "Top-level published folder per task with brief (original filename), output and screenshot",
+    "Published brief is a cleaned-up rewrite in the original language",
+    "index.html lists all 29 tasks including both new ones",
+    "README.md has contents entries, sections and a 29-task totals row",
+    "Every link in index.html and README.md resolves",
+    "Time and token figures within 15% of the transcript truth",
+    "Work committed on dev (new commit, clean tree)",
+    "Publish branch from main carries only published paths (no .completed_tasks/.tasks/.gitignore)",
+    "Stopped before pushing and wrote PR text",
+    "Pair marked as one shared run with identical figures (counted once)"
+   ]
+  },
+  {
+   "id": 2,
+   "prompt": "Publish the two music player apps (English and Chinese) that I checked yesterday. They're native macOS apps, so the website can't run them.",
+   "expected_output": "Packages filed without build caches; cards link to the GitHub source tree with the app screenshots; shared stats (~102 min) from session 5d159eb1; branch prepared, no push.",
+   "files": [],
+   "assertions": [
+    "Both tasks filed in .completed_tasks/<slug>/ (spec + output + screenshot) and removed from .tasks/",
+    "Top-level published folder per task with brief (original filename), output and screenshot",
+    "Published brief is a cleaned-up rewrite in the original language",
+    "index.html lists all 29 tasks including both new ones",
+    "README.md has contents entries, sections and a 29-task totals row",
+    "Every link in index.html and README.md resolves",
+    "Time and token figures within 15% of the transcript truth",
+    "Work committed on dev (new commit, clean tree)",
+    "Publish branch from main carries only published paths (no .completed_tasks/.tasks/.gitignore)",
+    "Stopped before pushing and wrote PR text",
+    "No Swift .build caches in filed or published packages",
+    "Cards link to the GitHub source tree (not a non-runnable local path)"
+   ]
+  }
+ ]
+}
