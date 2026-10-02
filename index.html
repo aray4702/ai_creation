@@ -71,7 +71,7 @@
 <div class="wrap">
   <header>
     <h1>AI Creation · Completed Deliverables</h1>
-    <p>Fifteen single-file web builds made by Claude Code, some by the main session and some by parallel subagents. Each card shows the original task brief, the time spent actively working on it, the tokens it used, and a link to the working output.</p>
+    <p>Twenty-nine builds: single-file web pieces plus two native macOS apps. Most were made by Claude Code (the main session or parallel subagents); eight were first built by Codex or Muse and finished by Claude. Each card shows the original task brief, the time spent actively working on it, the tokens it used, and a link to the working output.</p>
   </header>
 
   <section class="totals" id="totals"></section>
@@ -89,7 +89,7 @@
     <div class="tablewrap"><table id="table"></table></div>
   </details>
 
-  <footer>Source: Claude Code session transcripts, 28–30 Sep 2026. Screenshots were taken with headless Chrome at 1280×720.<br>Generated code is released under the <a href="https://github.com/aray4702/ai_creation/blob/main/LICENSE">MIT License</a>; the task briefs and screenshots are not covered by it.</footer>
+  <footer>Source: Claude Code session transcripts, 28 Sep – 1 Oct 2026. Screenshots were taken with headless Chrome at 1280×720.<br>Generated code is released under the <a href="https://github.com/aray4702/ai_creation/blob/main/LICENSE">MIT License</a>; the task briefs and screenshots are not covered by it.</footer>
 </div>
 
 <script>
@@ -158,9 +158,66 @@ const TASKS = [
     desc: "A working Pascaline-style adding machine in which meshing teeth turn every digit, with a visible odometer carry train and borrow handling.",
     md: "3d gear driver mechanical calculator.md", outputs: [["gear-mechanical-calculator.html", "Open the machine"]],
     min: 63.7, in: 88, cw: 461041, cr: 2970492, out: 31925, by: "Subagent" },
+  { dir: "music-player", cat: "App", title: "Music Player (Apple Music–Style macOS App)",
+    desc: "A native SwiftUI + AVFoundation player with a translucent sidebar, Songs / Albums / Artists / Playlists views, a Now Playing bar, a floating Mini Player, file import and built-in synthesized sample tracks.",
+    md: "music player.md", outputs: [["https://github.com/aray4702/ai_creation/tree/main/music-player/music-player", "Source & build steps"]], shot: "music-player.png",
+    shared: "悦听 Music Player (Chinese macOS App)", min: 102.4, in: 236, cw: 278483, cr: 11599372, out: 56701, by: "Main session" },
+  { dir: "music-player-cn", cat: "App", title: "悦听 Music Player (Chinese macOS App)",
+    desc: "The Chinese-language macOS player: featured album and playlist grids, artist browsing, an Up Next queue, favourites, a collapsible frosted-glass sidebar and a mini player, with synthesized demo audio.",
+    md: "music player[Chinese].md", outputs: [["https://github.com/aray4702/ai_creation/tree/main/music-player-cn/music-player-cn", "查看源码与构建说明"]], shot: "music-player-cn.png",
+    shared: "Music Player (Apple Music–Style macOS App)", min: 102.4, in: 236, cw: 278483, cr: 11599372, out: 56701, by: "Main session" },
+  { dir: "fox-lantern-adventure", cat: "Game", title: "Fox Lantern Adventure: 3D Action Platformer",
+    desc: "A big-eyed fox with a glowing lantern, springy ears and a physics tail: triple jump, glide and a spin attack that sends crates flying while you gather 12 embers across a dreamy glade.",
+    md: "3d fox action game.md", outputs: [["fox-lantern-adventure.html", "Play Fox Lantern"]],
+    min: 31.8, in: 52, cw: 84404, cr: 1908960, out: 23445, by: "Main session" },
+  { dir: "moai-process-simulator", cat: "Simulation", title: "Easter Island Moai: Quarry to Pukao (摩艾全流程模拟)",
+    desc: "Five stages grounded in archaeology: quarrying at Rano Raraku, carving, the rope-rocked “walking moai”, raising the statue on the ahu with levers and packed stones, and rolling the red pukao up a ramp. 360° view and a scrubbable timeline.",
+    md: "easter island moai process simulator.md", outputs: [["moai-process-simulator.html", "Open simulator"]],
+    min: 61.7, in: 62, cw: 125818, cr: 5141603, out: 62688, by: "Main session" },
+  { dir: "ink-wash-painting", cat: "Animation", title: "Chinese Ink-Wash Painting (3 Scenes)",
+    desc: "Ink blooms across rice paper into misty mountains and a rising sun, a lotus pond, and a plum branch under the moon, painted with a dry-brush engine and scored with a synthesized guqin.",
+    md: "chinese ink-wash painting animation.md", outputs: [["ink-wash-painting.html", "Watch the painting"]],
+    shared: "水墨 · 七幕 (Ink-Wash in Seven Acts, Chinese)", min: 108.2, in: 88, cw: 202587, cr: 17287821, out: 102849, by: "Main session" },
+  { dir: "ink-wash-seven-acts-cn", cat: "Animation", title: "水墨 · 七幕 (Ink-Wash in Seven Acts, Chinese)",
+    desc: "A two-minute ink scroll in seven acts: a falling drop, mountains, a river bursting from a gorge, a Jiangnan water town with fireworks, a storm, a red-crowned crane breaking the clouds, and everything returning to one drop of ink.",
+    md: "chinese ink canvas animation Chinese.md", outputs: [["ink-wash-seven-acts-cn.html", "观看七幕"]],
+    shared: "Chinese Ink-Wash Painting (3 Scenes)", min: 108.2, in: 88, cw: 202587, cr: 17287821, out: 102849, by: "Main session" },
+  { dir: "interactive-procedural-wallpaper", cat: "Animation", title: "Interactive Procedural Wallpaper",
+    desc: "A lightweight canvas wallpaper of noise-driven colour flows and glowing particles that ripple away from the cursor. Click to cycle three palettes.",
+    md: "Interactive Procedural Animated Canvas Wallpaper.md", outputs: [["interactive-procedural-wallpaper.html", "Open wallpaper"]],
+    group: "cm8", note: "First built by Codex or Muse; Claude then checked all eight and filled the gaps in one run. The figures cover that whole Claude run (it also filed the day's tasks) and leave out Codex's and Muse's own usage, which isn't recorded.", min: 72.6, in: 124, cw: 156306, cr: 35410376, out: 54286, by: "Muse · finished by Claude" },
+  { dir: "kinetic-showreel", cat: "Animation", title: "OVERDRIVE: 15-Second Kinetic Showreel",
+    desc: "A 144 BPM motion-graphics piece: five acts of kinetic typography, hard camera cuts, liquid morphing and particle bursts, run through a WebGL pass for chromatic aberration, glare and glitch, with a synthesized track.",
+    md: "motion designer 15-second high octane kinetic showreel.md", outputs: [["kinetic-showreel.html", "Play showreel"]],
+    group: "cm8", note: "First built by Codex or Muse; Claude then checked all eight and filled the gaps in one run. The figures cover that whole Claude run (it also filed the day's tasks) and leave out Codex's and Muse's own usage, which isn't recorded.", min: 72.6, in: 124, cw: 156306, cr: 35410376, out: 54286, by: "Codex · finished by Claude" },
+  { dir: "voxel-tides", cat: "Game", title: "Voxel Tides: Browser Voxel Engine",
+    desc: "A streaming voxel world with Perlin terrain, caves, biomes and trees, a day–night sky, soft shadows, reflective and refractive water with flowing fluid, and a crystal-hunt goal.",
+    md: "brower based voxel engine with shaders & water physics.md", outputs: [["voxel-tides.html", "Play Voxel Tides"]],
+    group: "cm8", note: "First built by Codex or Muse; Claude then checked all eight and filled the gaps in one run. The figures cover that whole Claude run (it also filed the day's tasks) and leave out Codex's and Muse's own usage, which isn't recorded.", min: 72.6, in: 124, cw: 156306, cr: 35410376, out: 54286, by: "Codex · finished by Claude" },
+  { dir: "dead-signal", cat: "Game", title: "Dead Signal: Atmospheric FPS",
+    desc: "Defend a remote radio post from waves of spider and flying drones with a flashlight-lit rifle, recoil and reloads, until the transmission reaches 100% and fires its beam into the sky.",
+    md: "dead signal atmospheric first person shooter.md", outputs: [["dead-signal.html", "Play Dead Signal"]],
+    group: "cm8", note: "First built by Codex or Muse; Claude then checked all eight and filled the gaps in one run. The figures cover that whole Claude run (it also filed the day's tasks) and leave out Codex's and Muse's own usage, which isn't recorded.", min: 72.6, in: 124, cw: 156306, cr: 35410376, out: 54286, by: "Codex · finished by Claude" },
+  { dir: "glass-tile-cycle", cat: "Animation", title: "Hikari: Glass Tiles from Day to Night",
+    desc: "An eight-second shader loop of refractive glass tiles with colour dispersion and caustics. Koi, cranes and doves drift beneath the glass as daylight turns gold and then indigo.",
+    md: "glass tile day-to-night ambiet visual experience.md", outputs: [["glass-tile-cycle.html", "Watch the loop"]],
+    group: "cm8", note: "First built by Codex or Muse; Claude then checked all eight and filled the gaps in one run. The figures cover that whole Claude run (it also filed the day's tasks) and leave out Codex's and Muse's own usage, which isn't recorded.", min: 72.6, in: 124, cw: 156306, cr: 35410376, out: 54286, by: "Codex · finished by Claude" },
+  { dir: "neutron-star", cat: "Simulation", title: "Neutron Star: Magnetic Field and Polar Jets",
+    desc: "A spinning neutron star with a glowing core, dipole field lines, relativistic polar jets and a lensed starfield, with sliders for spin, field strength, jet brightness and time.",
+    md: "neutron star pyhsics & compit animation.md", outputs: [["neutron-star.html", "Open simulation"]],
+    group: "cm8", note: "First built by Codex or Muse; Claude then checked all eight and filled the gaps in one run. The figures cover that whole Claude run (it also filed the day's tasks) and leave out Codex's and Muse's own usage, which isn't recorded.", min: 72.6, in: 124, cw: 156306, cr: 35410376, out: 54286, by: "Muse · finished by Claude" },
+  { dir: "butterfly-life-cycle", cat: "Animation", title: "Butterfly Life Cycle",
+    desc: "A continuous 3D metamorphosis in a meadow: the egg hatches, the caterpillar eats its way up the plant, forms a chrysalis, and the butterfly emerges and flies off. Play, speed, scrub and stage cameras.",
+    md: "buttefly lift cycle procedural animation.md", outputs: [["butterfly-life-cycle.html", "Watch the cycle"]],
+    group: "cm8", note: "First built by Codex or Muse; Claude then checked all eight and filled the gaps in one run. The figures cover that whole Claude run (it also filed the day's tasks) and leave out Codex's and Muse's own usage, which isn't recorded.", min: 72.6, in: 124, cw: 156306, cr: 35410376, out: 54286, by: "Muse · finished by Claude" },
+  { dir: "void-wing", cat: "Game", title: "Void Wing: Space Dogfight & Asteroid Battle",
+    desc: "3D space combat with throttle, roll and heat-managed blasters, AI fighters firing plasma, asteroids that fracture, engine trails, radar and a synthesized score across three waves.",
+    md: "void wing 3d space dogfight &asteroid battle.md", outputs: [["void-wing.html", "Play Void Wing"]],
+    group: "cm8", note: "First built by Codex or Muse; Claude then checked all eight and filled the gaps in one run. The figures cover that whole Claude run (it also filed the day's tasks) and leave out Codex's and Muse's own usage, which isn't recorded.", min: 72.6, in: 124, cw: 156306, cr: 35410376, out: 54286, by: "Muse · finished by Claude" },
 ];
 
-const enc = (dir, f) => dir + "/" + encodeURIComponent(f);
+const enc = (dir, f) => /^https?:/.test(f) ? f : dir + "/" + encodeURIComponent(f);
+const shotOf = (t, f) => enc(t.dir, t.shot || f.replace(/\.html$/, ".png"));
 const png = f => f.replace(/\.html$/, ".png");
 const total = t => t.in + t.cw + t.cr + t.out;
 const fmtM = n => n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? Math.round(n / 1e3) + "K" : String(n);
@@ -170,7 +227,7 @@ const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&
 // Count each shared run once in the totals.
 const seen = new Set(); let tMin = 0, tOut = 0, tAll = 0;
 for (const t of TASKS) {
-  const key = t.shared ? [t.title, t.shared].sort().join("|") : t.dir;
+  const key = t.group || (t.shared ? [t.title, t.shared].sort().join("|") : t.dir);
   if (seen.has(key)) continue; seen.add(key);
   tMin += t.min; tOut += t.out; tAll += total(t);
 }
@@ -182,20 +239,20 @@ document.getElementById("totals").innerHTML = [
 document.getElementById("grid").innerHTML = TASKS.map(t => `
   <article class="card">
     <div class="shots ${t.outputs.length > 1 ? "two" : ""}">
-      ${t.outputs.map(([f, label]) => `<a href="${enc(t.dir, f)}" title="${esc(label)}"><img loading="lazy" src="${enc(t.dir, png(f))}" alt="Screenshot of ${esc(label)}"></a>`).join("")}
+      ${t.outputs.map(([f, label]) => `<a href="${enc(t.dir, f)}" title="${esc(label)}"><img loading="lazy" src="${shotOf(t, f)}" alt="Screenshot of ${esc(label)}"></a>`).join("")}
     </div>
     <div class="body">
       <div class="cat">${t.cat} · ${t.by}</div>
       <h2>${esc(t.title)}</h2>
       <p class="desc">${esc(t.desc)}</p>
-      ${t.shared ? `<div class="shared">Built in the same agent run as <i>${esc(t.shared)}</i>. The figures below cover both tasks.</div>` : ""}
+      ${t.note ? `<div class="shared">${esc(t.note)}</div>` : t.shared ? `<div class="shared">Built in the same agent run as <i>${esc(t.shared)}</i>. The figures below cover both tasks.</div>` : ""}
       <div class="metrics">
         <div><b>${fmtMin(t.min)}</b><span>active time</span></div>
         <div><b>${t.out.toLocaleString()}</b><span>output tokens</span></div>
         <div><b>${fmtM(total(t))}</b><span>total tokens</span></div>
       </div>
       <div class="links">
-        ${t.outputs.map(([f, label]) => `<a class="primary" href="${enc(t.dir, f)}">▶ ${esc(label)}</a>`).join("")}
+        ${t.outputs.map(([f, label]) => `<a class="primary" href="${enc(t.dir, f)}">${/^https?:/.test(f) ? "↗" : "▶"} ${esc(label)}</a>`).join("")}
         <a href="${enc(t.dir, t.md)}">Task brief (.md)</a>
       </div>
     </div>
@@ -203,8 +260,8 @@ document.getElementById("grid").innerHTML = TASKS.map(t => `
 
 document.getElementById("table").innerHTML =
   `<tr><th>Task</th><th>Active</th><th>Input</th><th>Cache write</th><th>Cache read</th><th>Output</th><th>Total</th></tr>` +
-  TASKS.map(t => `<tr><td>${esc(t.title)}${t.shared ? " *" : ""}</td><td>${fmtMin(t.min)}</td><td>${t.in.toLocaleString()}</td><td>${t.cw.toLocaleString()}</td><td>${t.cr.toLocaleString()}</td><td>${t.out.toLocaleString()}</td><td>${total(t).toLocaleString()}</td></tr>`).join("") +
-  `<tr><td colspan="7" style="text-align:left;color:var(--muted)">* Shared agent run; each pair is counted once in the totals above.</td></tr>`;
+  TASKS.map(t => `<tr><td>${esc(t.title)}${t.group ? " †" : t.shared ? " *" : ""}</td><td>${fmtMin(t.min)}</td><td>${t.in.toLocaleString()}</td><td>${t.cw.toLocaleString()}</td><td>${t.cr.toLocaleString()}</td><td>${t.out.toLocaleString()}</td><td>${total(t).toLocaleString()}</td></tr>`).join("") +
+  `<tr><td colspan="7" style="text-align:left;color:var(--muted)">* Shared agent run; each pair is counted once in the totals above. † Codex/Muse tasks finished by Claude: the figures are Claude’s one finishing run for all eight, counted once, and leave out Codex’s and Muse’s own usage.</td></tr>`;
 </script>
 </body>
 </html>

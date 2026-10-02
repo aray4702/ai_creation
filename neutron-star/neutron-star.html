@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neutron Star</title>
+<style>
+  html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#000;
+    font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;color:#cfe9ff;}
+  #scene{position:fixed;inset:0;display:block;}
+  .glass{background:rgba(8,14,26,0.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    border:1px solid rgba(120,190,255,0.22);border-radius:12px;}
+  #start{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at center, rgba(4,8,18,0.25) 0%, rgba(1,2,6,0.92) 100%);
+    z-index:20;cursor:pointer;text-align:center;padding:20px;}
+  #start.hidden{display:none;}
+  #start h1{font-size:44px;letter-spacing:0.35em;margin:0 0 10px 0;font-weight:200;color:#eaf6ff;
+    text-shadow:0 0 30px rgba(90,180,255,0.8);}
+  #start p{font-size:14px;opacity:0.7;max-width:520px;line-height:1.7;margin:0 0 26px 0;}
+  #start .begin{font-size:15px;letter-spacing:0.25em;padding:12px 42px;border:1px solid rgba(140,200,255,0.5);
+    border-radius:30px;color:#eaf6ff;text-transform:uppercase;animation:pulse 2.2s infinite;}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 rgba(120,190,255,0);}50%{box-shadow:0 0 26px rgba(120,190,255,0.55);}}
+  #title{position:fixed;top:14px;left:18px;z-index:10;pointer-events:none;}
+  #title h2{margin:0;font-size:15px;font-weight:600;letter-spacing:0.28em;color:#eaf6ff;opacity:0.92;}
+  #title span{font-size:11px;letter-spacing:0.12em;opacity:0.55;}
+  #readout{position:fixed;top:14px;right:18px;z-index:10;text-align:right;pointer-events:none;
+    font-size:11px;letter-spacing:0.08em;line-height:1.9;opacity:0.85;text-shadow:0 1px 6px #000;}
+  #readout b{color:#8fd8ff;font-weight:600;}
+  #panel{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:10;
+    display:flex;gap:18px;align-items:center;padding:12px 20px;flex-wrap:wrap;justify-content:center;
+    max-width:94vw;}
+  .ctl{display:flex;flex-direction:column;gap:6px;min-width:130px;}
+  .ctl label{font-size:10px;letter-spacing:0.18em;text-transform:uppercase;opacity:0.7;
+    display:flex;justify-content:space-between;}
+  .ctl label output{color:#8fd8ff;opacity:1;}
+  .ctl input[type=range]{width:130px;accent-color:#4fb7ff;cursor:pointer;}
+  .btnrow{display:flex;gap:8px;}
+  button{background:rgba(30,60,100,0.5);border:1px solid rgba(120,190,255,0.35);color:#dff1ff;
+    border-radius:8px;padding:8px 14px;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;
+    cursor:pointer;font-family:inherit;}
+  button:hover{background:rgba(60,110,170,0.6);}
+  button.on{background:rgba(80,160,230,0.55);box-shadow:0 0 12px rgba(120,190,255,0.4);}
+  #hint{position:fixed;bottom:86px;left:50%;transform:translateX(-50%);z-index:9;pointer-events:none;
+    font-size:11px;letter-spacing:0.1em;opacity:0.5;transition:opacity 1.5s;}
+  #hint.hidden{opacity:0;}
+  #cockpit{position:fixed;inset:0;z-index:5;pointer-events:none;display:none;}
+  #cockpit.on{display:block;}
+  #cockpit .strut{position:absolute;background:linear-gradient(to bottom, #0a0f18, #1c2a40);}
+  #cockpit .sL{left:-2%;top:-5%;width:16%;height:70%;transform:rotate(18deg);border-right:2px solid rgba(140,200,255,0.25);}
+  #cockpit .sR{right:-2%;top:-5%;width:16%;height:70%;transform:rotate(-18deg);border-left:2px solid rgba(140,200,255,0.25);}
+  #cockpit .dash{left:0;right:0;bottom:0;height:17%;
+    background:linear-gradient(to top, #05080f 55%, rgba(5,8,15,0) 100%);}
+  #cockpit .hud{position:absolute;left:0;right:0;bottom:12px;text-align:center;font-size:11px;
+    letter-spacing:0.22em;color:rgba(160,220,255,0.75);text-transform:uppercase;}
+  #vign{position:fixed;inset:0;pointer-events:none;z-index:4;
+    background:radial-gradient(ellipse at center, rgba(0,0,0,0) 60%, rgba(0,0,0,0.5) 100%);}
+  @media (max-width:760px){ .ctl{min-width:100px;} .ctl input[type=range]{width:100px;} #start h1{font-size:30px;} }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div id="vign"></div>
+
+<div id="title"><h2>NEUTRON STAR</h2><span>PSR J-Forge · relativistic particle sim</span></div>
+<div id="readout"></div>
+
+<div id="panel" class="glass">
+  <div class="ctl"><label>Rotation <output id="oRot">32 Hz</output></label>
+    <input id="sRot" type="range" min="0" max="100" value="34"></div>
+  <div class="ctl"><label>Mag. field <output id="oMag">4.2×10⁸ T</output></label>
+    <input id="sMag" type="range" min="0" max="100" value="55"></div>
+  <div class="ctl"><label>Jet brightness <output id="oJet">70%</output></label>
+    <input id="sJet" type="range" min="0" max="100" value="70"></div>
+  <div class="ctl"><label>Time accel <output id="oTime">1.0×</output></label>
+    <input id="sTime" type="range" min="0" max="100" value="38"></div>
+  <div class="btnrow">
+    <button id="bCam">Cockpit</button>
+    <button id="bPause">Pause</button>
+  </div>
+</div>
+<div id="hint">drag to look · scroll to zoom · C camera · Space pause</div>
+
+<div id="cockpit">
+  <div class="strut sL"></div><div class="strut sR"></div><div class="dash"></div>
+  <div class="hud" id="cockpitHud">OBSERVATION CRAFT · PROXIMITY 6.4 R★ · SHIELDS NOMINAL</div>
+</div>
+
+<div id="start">
+  <h1>NEUTRON STAR</h1>
+  <p>A city-sized stellar remnant spinning hundreds of times per second, wrapped in a magnetic
+  field a trillion times stronger than Earth's, firing relativistic jets from its poles.
+  Drag to orbit, scroll to zoom, tune the physics below.</p>
+  <div class="begin">Click to begin</div>
+</div>
+
+<script>
+window.addEventListener('error', e => { document.title = 'ERROR: ' + e.message + ' @' + e.lineno; });
+window.addEventListener('unhandledrejection', e => { document.title = 'ERROR: ' + (e.reason && e.reason.message || e.reason); });
+</script>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+document.title = 'Neutron Star';
+const AUTOTEST = location.search.indexOf('autotest') >= 0;
+
+/* ============================ renderer / scene ============================ */
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio||1, 2));
+renderer.setSize(innerWidth, innerHeight);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 400);
+
+/* ============================ params ============================ */
+const P = { rot:0.34, mag:0.55, jet:0.70, time:1.0, paused:false, cockpit:false };
+const timeAccelOf = v => Math.pow(10, -1 + v*2);
+const spinHzOf   = v => 2 + v*v*698;
+const bFieldOf   = v => Math.pow(10, 8 + v*4);
+
+/* ============================ starfield + lensing backdrop ============================ */
+const skyUni = {
+  uTime:{value:0},
+  uStarDir:{value:new THREE.Vector3(0,0,-1)},
+  uLens:{value:0.045},
+};
+const skyMat = new THREE.ShaderMaterial({
+  uniforms: skyUni, side: THREE.BackSide, depthWrite:false,
+  vertexShader:`
+    varying vec3 vDir;
+    void main(){ vDir = normalize(position);
+      vec4 mv = modelViewMatrix*vec4(position,1.0);
+      gl_Position = projectionMatrix*mv; }`,
+  fragmentShader:`
+    varying vec3 vDir;
+    uniform float uTime; uniform vec3 uStarDir; uniform float uLens;
+    float hash(vec3 p){ p=fract(p*0.3183099+vec3(0.1,0.2,0.3)); p*=17.0;
+      return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
+    void main(){
+      vec3 d = normalize(vDir);
+      vec3 s = normalize(uStarDir);
+      float cosang = clamp(dot(d,s),-1.0,1.0);
+      float sep = acos(cosang);
+      vec3 perp = d - s*cosang;
+      float pl = length(perp);
+      if (pl > 1e-4) {
+        float bend = uLens / max(sep, 0.035);
+        d = normalize(d + (perp/pl)*bend*0.35);
+      }
+      vec3 g = d*160.0;
+      vec3 cell = floor(g);
+      float h = hash(cell);
+      vec3 f = fract(g)-0.5;
+      float star = smoothstep(0.42,0.05,length(f)) * step(0.992,h);
+      float tw = 0.6+0.4*sin(uTime*(2.0+h*6.0)+h*40.0);
+      vec3 col = vec3(0.012,0.016,0.030);
+      col += vec3(0.020,0.030,0.055)*(0.5+0.5*sin(d.y*4.0+1.0));
+      col += vec3(0.030,0.012,0.045)*pow(max(0.0,sin(d.x*3.0-d.z*2.0)),3.0);
+      vec3 scol = mix(vec3(0.75,0.85,1.0), vec3(1.0,0.85,0.7), fract(h*7.0));
+      col += scol * star * tw * (0.4+0.6*fract(h*13.0));
+      float ring = exp(-pow((sep-0.115)/0.028, 2.0));
+      col += vec3(0.55,0.75,1.0)*ring*(0.35+0.25*sin(uTime*3.0+sep*40.0));
+      gl_FragColor = vec4(col,1.0);
+    }`
+});
+scene.add(new THREE.Mesh(new THREE.SphereGeometry(180, 48, 32), skyMat));
+
+/* ============================ neutron star core ============================ */
+const coreUni = { uTime:{value:0}, uSpin:{value:0} };
+const coreMat = new THREE.ShaderMaterial({
+  uniforms: coreUni,
+  vertexShader:`
+    varying vec3 vN; varying vec3 vWp; varying vec2 vUv; varying vec3 vLp;
+    void main(){ vUv=uv; vN=normalize(normalMatrix*normal);
+      vec4 wp=modelMatrix*vec4(position,1.0); vWp=wp.xyz; vLp=normalize(position);
+      gl_Position=projectionMatrix*viewMatrix*wp; }`,
+  fragmentShader:`
+    varying vec3 vN; varying vec3 vWp; varying vec2 vUv; varying vec3 vLp;
+    uniform float uTime; uniform float uSpin;
+    float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+    float vnoise(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.0-2.0*f);
+      return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y); }
+    void main(){
+      vec3 V = normalize(cameraPosition - vWp);
+      vec3 N = normalize(vN);
+      vec2 p = vUv*vec2(24.0,14.0) + vec2(uSpin*0.8, uTime*0.15);
+      float n = vnoise(p)*0.6 + vnoise(p*2.3+7.0)*0.28 + vnoise(p*5.1+3.0)*0.12;
+      float pole = smoothstep(0.55,0.95,abs(vLp.y));
+      float beam = 0.5+0.5*sin(uSpin*6.2831 + atan(vLp.z,vLp.x));
+      vec3 deep=vec3(0.10,0.16,0.55), mid=vec3(0.35,0.62,1.0), hot=vec3(1.0,0.98,0.92);
+      vec3 col = mix(deep, mid, smoothstep(0.25,0.62,n));
+      col = mix(col, hot, smoothstep(0.62,0.92,n));
+      col += vec3(1.0,0.9,0.75)*pole*(0.55+0.45*beam);
+      float fr = pow(1.0-abs(dot(N,V)), 2.2);
+      col += vec3(0.45,0.55,1.0)*fr*1.4;
+      gl_FragColor = vec4(col*1.9, 1.0);
+    }`
+});
+const starGroup = new THREE.Group();
+scene.add(starGroup);
+const core = new THREE.Mesh(new THREE.SphereGeometry(1, 72, 48), coreMat);
+starGroup.add(core);
+
+function radialTex(stops){
+  const c=document.createElement('canvas'); c.width=c.height=256;
+  const g=c.getContext('2d'); const gr=g.createRadialGradient(128,128,0,128,128,128);
+  stops.forEach(s=>gr.addColorStop(s[0],s[1])); g.fillStyle=gr; g.fillRect(0,0,256,256);
+  return new THREE.CanvasTexture(c);
+}
+const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+  map: radialTex([[0,'rgba(160,200,255,0.85)'],[0.25,'rgba(90,140,255,0.35)'],[1,'rgba(40,80,255,0)']]),
+  blending: THREE.AdditiveBlending, depthWrite:false, transparent:true }));
+halo.scale.set(7.5,7.5,1); scene.add(halo);
+
+/* ============================ dipole magnetic field lines ============================ */
+const fieldGroup = new THREE.Group();
+starGroup.add(fieldGroup);
+const fieldMats = [];
+(function buildField(){
+  const shells=[1.7,2.15,2.7,3.4], per=14;
+  shells.forEach((L,si)=>{
+    const th0=Math.asin(Math.sqrt(1/L));
+    for(let k=0;k<per;k++){
+      const lon=k/per*Math.PI*2, pts=[];
+      const N=140;
+      for(let i=0;i<=N;i++){
+        const th=th0+(Math.PI-2*th0)*i/N;
+        const r=L*Math.sin(th)*Math.sin(th);
+        pts.push(new THREE.Vector3(r*Math.sin(th)*Math.cos(lon), r*Math.cos(th), r*Math.sin(th)*Math.sin(lon)));
+      }
+      const geo=new THREE.BufferGeometry().setFromPoints(pts);
+      const mat=new THREE.LineBasicMaterial({ color:0x59d8ff, transparent:true, opacity:0.5,
+        blending:THREE.AdditiveBlending, depthWrite:false });
+      fieldMats.push(mat);
+      fieldGroup.add(new THREE.Line(geo,mat));
+    }
+  });
+})();
+
+/* ============================ relativistic polar jets ============================ */
+function makeJet(sign){
+  const N=2600;
+  const pos=new Float32Array(N*3), seed=new Float32Array(N*4);
+  for(let i=0;i<N;i++){
+    seed[i*4]=Math.random(); seed[i*4+1]=Math.random()*Math.PI*2;
+    seed[i*4+2]=Math.pow(Math.random(),2.0); seed[i*4+3]=0.6+Math.random()*0.8;
+  }
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  geo.setAttribute('aSeed', new THREE.BufferAttribute(seed,4));
+  const uni={ uTime:{value:0}, uBright:{value:0.7}, uSign:{value:sign}, uLen:{value:16.0} };
+  const mat=new THREE.ShaderMaterial({
+    uniforms:uni, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending,
+    vertexShader:`
+      attribute vec4 aSeed; uniform float uTime,uBright,uSign,uLen; varying float vA; varying float vT;
+      void main(){
+        float t = fract(aSeed.x + uTime*0.22*aSeed.w);
+        vT=t;
+        float ang = aSeed.y + t*7.0*uSign + uTime*0.6;
+        float rad = aSeed.z*(0.12+t*1.5);
+        vec3 p = vec3(cos(ang)*rad, uSign*(1.05+t*uLen), sin(ang)*rad);
+        vA = (1.0-t)*(1.0-t)*uBright;
+        vec4 mv=modelViewMatrix*vec4(p,1.0);
+        gl_PointSize=(1.0-t)*(170.0/-mv.z)*(0.6+0.4*aSeed.w);
+        gl_Position=projectionMatrix*mv; }`,
+    fragmentShader:`
+      varying float vA; varying float vT;
+      void main(){
+        vec2 c=gl_PointCoord-0.5; float d=length(c);
+        float a=smoothstep(0.5,0.05,d)*vA;
+        vec3 col=mix(vec3(1.0,0.98,0.9), vec3(0.35,0.75,1.0), vT);
+        gl_FragColor=vec4(col*a, a); }`
+  });
+  const pts=new THREE.Points(geo,mat);
+  pts.frustumCulled=false;
+  return {pts, uni};
+}
+const jetN=makeJet(1), jetS=makeJet(-1);
+scene.add(jetN.pts, jetS.pts);
+
+/* ============================ camera rig ============================ */
+const camRig={ theta:0.6, phi:1.12, radius:13.5, tTheta:0.6, tPhi:1.12, tRadius:13.5 };
+let dragging=false, px=0, py=0;
+canvas.addEventListener('pointerdown',e=>{dragging=true;px=e.clientX;py=e.clientY;});
+addEventListener('pointerup',()=>dragging=false);
+addEventListener('pointermove',e=>{
+  if(!dragging)return;
+  camRig.tTheta-=(e.clientX-px)*0.005; camRig.tPhi-= (e.clientY-py)*0.005;
+  camRig.tPhi=Math.min(1.65,Math.max(0.35,camRig.tPhi));
+  px=e.clientX;py=e.clientY; hideHint();
+});
+canvas.addEventListener('wheel',e=>{camRig.tRadius=Math.min(40,Math.max(4.5,camRig.tRadius+e.deltaY*0.01));},{passive:true});
+
+/* ============================ UI ============================ */
+const $=id=>document.getElementById(id);
+const readout=$('readout'), hint=$('hint');
+function fmtB(v){ const e=Math.floor(Math.log10(v)); const m=(v/Math.pow(10,e)).toFixed(1); return m+'×10<sup>'+e+'</sup> T'; }
+function refreshLabels(){
+  $('oRot').textContent=Math.round(spinHzOf(P.rot))+' Hz';
+  $('oMag').innerHTML=fmtB(bFieldOf(P.mag));
+  $('oJet').textContent=Math.round(P.jet*100)+'%';
+  $('oTime').textContent=timeAccelOf(P.time).toFixed(1)+'×';
+}
+$('sRot').addEventListener('input',e=>{P.rot=e.target.value/100;refreshLabels();});
+$('sMag').addEventListener('input',e=>{P.mag=e.target.value/100;refreshLabels();});
+$('sJet').addEventListener('input',e=>{P.jet=e.target.value/100;refreshLabels();});
+$('sTime').addEventListener('input',e=>{P.time=e.target.value/100;refreshLabels();});
+$('bPause').addEventListener('click',()=>{P.paused=!P.paused;$('bPause').textContent=P.paused?'Resume':'Pause';$('bPause').classList.toggle('on',P.paused);});
+function setCam(cockpit){
+  P.cockpit=cockpit;
+  $('bCam').textContent=cockpit?'Orbit':'Cockpit';
+  $('bCam').classList.toggle('on',cockpit);
+  $('cockpit').classList.toggle('on',cockpit);
+}
+$('bCam').addEventListener('click',()=>setCam(!P.cockpit));
+addEventListener('keydown',e=>{
+  if(e.code==='Space'){e.preventDefault();$('bPause').click();}
+  if(e.key==='c'||e.key==='C')setCam(!P.cockpit);
+});
+let hintHidden=false;
+function hideHint(){ if(!hintHidden){hint.classList.add('hidden');hintHidden=true;} }
+setTimeout(hideHint, 9000);
+refreshLabels();
+
+const startEl=$('start');
+function begin(){ startEl.classList.add('hidden'); }
+startEl.addEventListener('click',begin);
+if (AUTOTEST) begin();
+
+window.__sim={P,setCam,spinHzOf,bFieldOf,timeAccelOf};
+
+/* ============================ loop ============================ */
+const clock=new THREE.Clock();
+let simT=0, spinAngle=0;
+const starDirV=new THREE.Vector3();
+const cockpitPos=new THREE.Vector3();
+
+function animate(){
+  requestAnimationFrame(animate);
+  const rawDt=Math.min(clock.getDelta(),0.1);
+  const dt=P.paused?0:rawDt*timeAccelOf(P.time);
+  simT+=dt;
+
+  const hz=spinHzOf(P.rot);
+  const visSpin=hz*0.02;
+  spinAngle+=visSpin*dt;
+  starGroup.rotation.y=spinAngle;
+  coreUni.uTime.value=simT; coreUni.uSpin.value=spinAngle;
+
+  const fOp=0.12+P.mag*0.75;
+  fieldMats.forEach(m=>m.opacity=fOp);
+  fieldGroup.visible=P.mag>0.02;
+
+  [jetN,jetS].forEach(j=>{ j.uni.uTime.value=simT; j.uni.uBright.value=0.08+P.jet*1.1; });
+  jetN.pts.visible=jetS.pts.visible=P.jet>0.02;
+
+  const hp=1+0.05*Math.sin(simT*2.2);
+  halo.scale.set(7.5*hp,7.5*hp,1);
+
+  skyUni.uTime.value=simT;
+  skyUni.uLens.value=0.02+P.mag*0.05;
+
+  if(P.cockpit){
+    const a=simT*0.25;
+    cockpitPos.set(Math.cos(a)*6.6, 1.6+Math.sin(simT*0.7)*0.25, Math.sin(a)*6.6);
+    const shake=0.02;
+    camera.position.set(cockpitPos.x+(Math.random()-0.5)*shake, cockpitPos.y+(Math.random()-0.5)*shake, cockpitPos.z+(Math.random()-0.5)*shake);
+    camera.lookAt(0,0.4,0);
+    camera.fov=62; camera.updateProjectionMatrix();
+    $('cockpitHud').textContent='OBSERVATION CRAFT · PROXIMITY '+(6.6).toFixed(1)+' R★ · SPIN '+Math.round(hz)+' HZ · SHIELDS NOMINAL';
+  } else {
+    if(!dragging){ camRig.tTheta+=rawDt*0.12; }
+    camRig.theta+=(camRig.tTheta-camRig.theta)*0.06;
+    camRig.phi+=(camRig.tPhi-camRig.phi)*0.06;
+    camRig.radius+=(camRig.tRadius-camRig.radius)*0.08;
+    const sp=Math.sin(camRig.phi), r=camRig.radius;
+    camera.position.set(r*sp*Math.cos(camRig.theta), r*Math.cos(camRig.phi), r*sp*Math.sin(camRig.theta));
+    camera.lookAt(0,0,0);
+    camera.fov=55; camera.updateProjectionMatrix();
+  }
+  starDirV.set(0,0,0).sub(camera.position).normalize();
+  skyUni.uStarDir.value.copy(starDirV);
+
+  readout.innerHTML='SPIN <b>'+Math.round(hz)+' Hz</b> · PERIOD <b>'+(1000/hz).toFixed(2)+' ms</b><br>'+
+    'B-FIELD <b>'+fmtB(bFieldOf(P.mag))+'</b><br>'+
+    'JET POWER <b>'+Math.round(P.jet*100)+'%</b> · T+<b>'+simT.toFixed(1)+'s</b>';
+
+  renderer.render(scene,camera);
+}
+animate();
+
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+</script>
+</body>
+</html>
