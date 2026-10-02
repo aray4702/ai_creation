@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Butterfly Life Cycle</title>
+<style>
+  html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#0b1410;
+    font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;color:#e8f5e9;}
+  #scene{position:fixed;inset:0;display:block;}
+  .glass{background:rgba(10,20,14,0.66);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    border:1px solid rgba(150,220,170,0.22);border-radius:12px;}
+  #start{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at center, rgba(6,14,10,0.25) 0%, rgba(2,6,4,0.92) 100%);
+    z-index:20;cursor:pointer;text-align:center;padding:20px;}
+  #start.hidden{display:none;}
+  #start h1{font-size:40px;letter-spacing:0.3em;margin:0 0 10px 0;font-weight:200;color:#f2fbf3;
+    text-shadow:0 0 30px rgba(120,230,150,0.7);}
+  #start p{font-size:14px;opacity:0.7;max-width:540px;line-height:1.7;margin:0 0 26px 0;}
+  #start .begin{font-size:15px;letter-spacing:0.25em;padding:12px 42px;border:1px solid rgba(150,220,170,0.5);
+    border-radius:30px;color:#f2fbf3;text-transform:uppercase;animation:pulse 2.2s infinite;}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 rgba(150,220,170,0);}50%{box-shadow:0 0 26px rgba(150,220,170,0.55);}}
+  #title{position:fixed;top:14px;left:18px;z-index:10;pointer-events:none;}
+  #title h2{margin:0;font-size:15px;font-weight:600;letter-spacing:0.28em;color:#f2fbf3;opacity:0.92;}
+  #title span{font-size:11px;letter-spacing:0.12em;opacity:0.55;}
+  #stage{position:fixed;top:14px;right:18px;z-index:10;text-align:right;pointer-events:none;
+    font-size:12px;letter-spacing:0.1em;text-shadow:0 1px 6px #000;}
+  #stageName{font-size:15px;font-weight:600;letter-spacing:0.22em;color:#b9f5c9;}
+  #dots{display:flex;gap:7px;justify-content:flex-end;margin-top:8px;}
+  #dots i{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,0.22);display:block;}
+  #dots i.on{background:#9df0b3;box-shadow:0 0 8px #9df0b3;}
+  #panel{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:10;
+    display:flex;gap:14px;align-items:center;padding:10px 18px;flex-wrap:wrap;justify-content:center;
+    max-width:96vw;}
+  #panel .grp{display:flex;gap:6px;align-items:center;}
+  #panel .lbl{font-size:10px;letter-spacing:0.18em;text-transform:uppercase;opacity:0.65;}
+  button{background:rgba(30,70,40,0.5);border:1px solid rgba(150,220,170,0.35);color:#eafbef;
+    border-radius:8px;padding:7px 12px;font-size:10.5px;letter-spacing:0.12em;text-transform:uppercase;
+    cursor:pointer;font-family:inherit;white-space:nowrap;}
+  button:hover{background:rgba(60,120,75,0.6);}
+  button.on{background:rgba(90,190,115,0.55);box-shadow:0 0 12px rgba(150,220,170,0.4);}
+  input[type=range]{accent-color:#7fe6a0;cursor:pointer;}
+  #scrub{width:min(300px,40vw);}
+  #speed{width:90px;}
+  #hint{position:fixed;bottom:84px;left:50%;transform:translateX(-50%);z-index:9;pointer-events:none;
+    font-size:11px;letter-spacing:0.1em;opacity:0.5;transition:opacity 1.5s;}
+  #hint.hidden{opacity:0;}
+  #vign{position:fixed;inset:0;pointer-events:none;z-index:4;
+    background:radial-gradient(ellipse at center, rgba(0,0,0,0) 62%, rgba(0,0,0,0.45) 100%);}
+  @media (max-width:760px){ #start h1{font-size:28px;} #scrub{width:34vw;} }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div id="vign"></div>
+
+<div id="title"><h2>BUTTERFLY LIFE CYCLE</h2><span>complete metamorphosis · procedural</span></div>
+<div id="stage"><div id="stageName">EGG</div><div id="dots"><i></i><i></i><i></i><i></i></div></div>
+
+<div id="panel" class="glass">
+  <div class="grp"><button id="bPlay">Pause</button></div>
+  <div class="grp"><span class="lbl">Speed</span><input id="speed" type="range" min="25" max="300" value="100"><span class="lbl" id="speedVal">1.0×</span></div>
+  <div class="grp"><input id="scrub" type="range" min="0" max="960" value="0"></div>
+  <div class="grp" id="cams">
+    <button data-cam="orbit" class="on">Orbit</button><button data-cam="egg">Egg</button><button data-cam="larva">Larva</button><button data-cam="pupa">Pupa</button><button data-cam="flight">Flight</button>
+  </div>
+</div>
+<div id="hint">drag to look · scroll to zoom · Space play/pause</div>
+
+<div id="start">
+  <h1>BUTTERFLY</h1>
+  <p>Egg &rarr; caterpillar &rarr; chrysalis &rarr; butterfly.<br>
+  A smooth, continuous procedural metamorphosis. Scrub the timeline, change speed, or jump the camera to any stage.</p>
+  <div class="begin">Click to begin</div>
+</div>
+
+<script>
+window.addEventListener('error', e => { document.title = 'ERROR: ' + e.message + ' @' + e.lineno; });
+window.addEventListener('unhandledrejection', e => { document.title = 'ERROR: ' + (e.reason && e.reason.message || e.reason); });
+</script>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+document.title = 'Butterfly Life Cycle';
+const AUTOTEST = location.search.indexOf('autotest') >= 0;
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio||1, 2));
+renderer.setSize(innerWidth, innerHeight);
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0xcfe4d8, 45, 130);
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 400);
+scene.add(new THREE.HemisphereLight(0xd8f0ff, 0x3d5a34, 0.95));
+const sun = new THREE.DirectionalLight(0xfff2d8, 1.6);
+sun.position.set(18, 30, 12);
+scene.add(sun);
+{ const skyMat = new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite:false, fog:false,
+  vertexShader:'varying vec3 vP; void main(){ vP=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+  fragmentShader:'varying vec3 vP; void main(){ float h=normalize(vP).y*0.5+0.5; vec3 top=vec3(0.45,0.68,0.86), mid=vec3(0.82,0.90,0.86), bot=vec3(0.72,0.82,0.70); vec3 c = h>0.5 ? mix(mid,top,(h-0.5)*2.0) : mix(bot,mid,h*2.0); gl_FragColor=vec4(c,1.0); }'});
+scene.add(new THREE.Mesh(new THREE.SphereGeometry(160, 32, 16), skyMat)); }
+function canvasTex(w, h, draw){
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  draw(c.getContext('2d'), w, h);
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+const leafTex = canvasTex(128,128,(g,w,h)=>{
+  const gr=g.createLinearGradient(0,0,0,h);
+  gr.addColorStop(0,'#5da24f'); gr.addColorStop(1,'#2e7a32');
+  g.fillStyle=gr; g.fillRect(0,0,w,h);
+  g.strokeStyle='rgba(220,255,220,0.55)'; g.lineWidth=3;
+  g.beginPath(); g.moveTo(w/2,0); g.lineTo(w/2,h); g.stroke();
+  g.strokeStyle='rgba(220,255,220,0.28)'; g.lineWidth=1.5;
+  for(let i=1;i<5;i++){ g.beginPath(); g.moveTo(w/2,i*h/5); g.lineTo(w/2+22,i*h/5+14); g.stroke();
+    g.beginPath(); g.moveTo(w/2,i*h/5); g.lineTo(w/2-22,i*h/5+14); g.stroke(); }
+});
+const groundTex = canvasTex(256,256,(g,w,h)=>{
+  const gr=g.createRadialGradient(w/2,h/2,10,w/2,h/2,w/2);
+  gr.addColorStop(0,'#69a85c'); gr.addColorStop(0.6,'#4c8a44'); gr.addColorStop(1,'#356b31');
+  g.fillStyle=gr; g.fillRect(0,0,w,h);
+  g.fillStyle='rgba(255,255,255,0.05)';
+  for(let i=0;i<300;i++) g.fillRect(Math.random()*w, Math.random()*h, 2, 2);
+});
+const wingTex = canvasTex(256,256,(g,w,h)=>{
+  const gr=g.createLinearGradient(0,h,0,0);
+  gr.addColorStop(0,'#e8722a'); gr.addColorStop(0.7,'#f5a83d'); gr.addColorStop(1,'#f7c05e');
+  g.fillStyle=gr; g.fillRect(0,0,w,h);
+  g.strokeStyle='#1c1c1c'; g.lineWidth=14; g.strokeRect(0,0,w,h);
+  g.strokeStyle='rgba(20,20,20,0.85)'; g.lineWidth=5;
+  for(let i=0;i<5;i++){ g.beginPath(); g.moveTo(w*0.08,h*0.92); g.lineTo(w*(0.2+i*0.18),h*0.08); g.stroke(); }
+  g.fillStyle='#f5f5f5';
+  for(let i=0;i<7;i++){ g.beginPath(); g.arc(w*(0.12+i*0.125),h*0.075,7,0,7); g.fill(); }
+  for(let i=0;i<4;i++){ g.beginPath(); g.arc(w*0.93,h*(0.25+i*0.2),6,0,7); g.fill(); }
+});
+const chrysTex = canvasTex(128,256,(g,w,h)=>{
+  const gr=g.createLinearGradient(0,0,w,0);
+  gr.addColorStop(0,'#3f7a34'); gr.addColorStop(0.5,'#79c25e'); gr.addColorStop(1,'#3f7a34');
+  g.fillStyle=gr; g.fillRect(0,0,w,h);
+  g.fillStyle='rgba(255,215,120,0.9)';
+  for(let i=0;i<10;i++){ g.beginPath(); g.arc(14+Math.random()*(w-28), 20+Math.random()*(h-40), 4, 0, 7); g.fill(); }
+  g.fillStyle='rgba(30,60,25,0.35)';
+  for(let i=0;i<6;i++) g.fillRect(0, i*h/6, w, 3);
+});
+const ground = new THREE.Mesh(new THREE.CircleGeometry(60, 48),
+  new THREE.MeshStandardMaterial({ map:groundTex, roughness:1 }));
+ground.rotation.x = -Math.PI/2; scene.add(ground);
+const leafMat = new THREE.MeshStandardMaterial({ map:leafTex, roughness:0.9, side:THREE.DoubleSide });
+function leafShape(len, wid){
+  const s=new THREE.Shape();
+  s.moveTo(0,0);
+  s.bezierCurveTo(wid*0.5, len*0.15, wid*0.55, len*0.7, 0, len);
+  s.bezierCurveTo(-wid*0.55, len*0.7, -wid*0.5, len*0.15, 0, 0);
+  return new THREE.ShapeGeometry(s, 8);
+}
+const stemMat = new THREE.MeshStandardMaterial({ color:0x4a7c3a, roughness:1 });
+function tube(points, r){
+  const curve=new THREE.CatmullRomCurve3(points.map(p=>new THREE.Vector3(...p)));
+  return new THREE.Mesh(new THREE.TubeGeometry(curve, 24, r, 8), stemMat);
+}
+scene.add(tube([[0,0,0],[0.4,3,-0.3],[-0.3,6,0.2],[0,9,0]], 0.28));
+scene.add(tube([[-0.3,6,0.2],[1.5,7.5,-0.8],[3.2,8.6,-1.6]], 0.16));
+function addLeaf(pos, rot, len, wid){
+  const m=new THREE.Mesh(leafShape(len,wid), leafMat);
+  m.position.set(...pos); m.rotation.set(...rot); scene.add(m); return m;
+}
+addLeaf([0.4,3,-0.3],[0.4,0,2.6], 3.2, 1.6);
+addLeaf([-0.3,6,0.2],[0.5,2.4,-2.4], 3.0, 1.5);
+addLeaf([1.2,7.2,-0.6],[-0.4,1.2,2.2], 2.6, 1.3);
+const eggLeaf = addLeaf([-2.6,3.4,1.2],[0.9,0.4,2.8], 3.4, 1.7);
+const eggPos = new THREE.Vector3(-2.6, 2.95, 1.2);
+const mealLeaf1 = addLeaf([1.6,5.2,0.9],[-0.5,0.8,-2.0], 3.0, 1.5);
+const mealLeaf2 = addLeaf([-1.6,7.0,0.6],[0.6,2.0,2.4], 2.8, 1.4);
+const hangPoint = new THREE.Vector3(3.2, 8.45, -1.6);
+/* ---- meadow: instanced grass, wildflowers and a few distant plants so the stage reads as a garden ---- */
+{
+  const R=(()=>{ let a=4242; return ()=>{ a=(a*1664525+1013904223)>>>0; return a/4294967296; }; })();
+  const bladeGeo=new THREE.ConeGeometry(0.06,1,3); bladeGeo.translate(0,0.5,0);
+  const bladeMat=new THREE.MeshStandardMaterial({ color:0x5f9f4a, roughness:1 });
+  const N=2600, grass=new THREE.InstancedMesh(bladeGeo, bladeMat, N), m=new THREE.Matrix4(), q=new THREE.Quaternion(), e=new THREE.Euler(), sc=new THREE.Vector3(), ps=new THREE.Vector3(), col=new THREE.Color();
+  for(let i=0;i<N;i++){
+    const a=R()*Math.PI*2, r=1.2+Math.pow(R(),0.7)*38;
+    ps.set(Math.cos(a)*r, 0, Math.sin(a)*r);
+    e.set((R()-0.5)*0.5, R()*Math.PI, (R()-0.5)*0.5); q.setFromEuler(e);
+    const h=0.5+R()*1.1*(r<6?1.3:1); sc.set(1+R(),h,1+R());
+    m.compose(ps,q,sc); grass.setMatrixAt(i,m);
+    col.setHSL(0.24+R()*0.07, 0.45+R()*0.2, 0.3+R()*0.15); grass.setColorAt(i,col);
+  }
+  scene.add(grass);
+  const petalGeo=new THREE.CircleGeometry(0.16,8), centerGeo=new THREE.SphereGeometry(0.09,8,6);
+  const hues=[0xf2f0e6,0xf3c74a,0xd96aa8,0x8f7ee8,0xf08a4b];
+  for(let i=0;i<70;i++){
+    const a=R()*Math.PI*2, r=2.5+R()*26, x=Math.cos(a)*r, z=Math.sin(a)*r, h=0.7+R()*1.0;
+    const stem=new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.03,h,5), stemMat); stem.position.set(x,h/2,z); scene.add(stem);
+    const head=new THREE.Group(); head.position.set(x,h,z); head.rotation.set(-0.9+R()*0.5,R()*6,0);
+    const pm=new THREE.MeshStandardMaterial({ color:hues[i%hues.length], roughness:0.8, side:THREE.DoubleSide });
+    for(let k=0;k<6;k++){ const pt=new THREE.Mesh(petalGeo,pm); const an=k/6*Math.PI*2; pt.position.set(Math.cos(an)*0.15,Math.sin(an)*0.15,0); pt.scale.set(1,0.55,1); pt.rotation.z=an; head.add(pt); }
+    head.add(new THREE.Mesh(centerGeo,new THREE.MeshStandardMaterial({ color:0xd9a520 })));
+    scene.add(head);
+  }
+  // a ring of taller plants behind the stage
+  for(let i=0;i<9;i++){
+    const a=i/9*Math.PI*2+0.3, r=11+R()*8, x=Math.cos(a)*r, z=Math.sin(a)*r, h=4+R()*4;
+    scene.add(tube([[x,0,z],[x+R()-0.5,h*0.5,z+R()-0.5],[x+(R()-0.5)*1.5,h,z+(R()-0.5)*1.5]], 0.14));
+    for(let k=0;k<3;k++) addLeaf([x,h*(0.3+k*0.22),z],[R()*1.2-0.6,R()*6,2+R()], 1.6+R(), 0.8+R()*0.4);
+  }
+}
+{ const n=220, p=new Float32Array(n*3);
+  for(let i=0;i<n;i++){ p[i*3]=(Math.random()-0.5)*60; p[i*3+1]=Math.random()*22+1; p[i*3+2]=(Math.random()-0.5)*60; }
+  const g=new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p,3));
+  const pts=new THREE.Points(g, new THREE.PointsMaterial({ color:0xfff8d0, size:0.14, transparent:true, opacity:0.65 }));
+  pts.frustumCulled=false; scene.add(pts);
+  pts.onBeforeRender=()=>{ pts.rotation.y += 0.0004; }; }
+const T_TOTAL=96;
+const STAGES=[ { name:'EGG', t0:0, t1:14 }, { name:'LARVA', t0:14, t1:44 }, { name:'PUPA', t0:44, t1:62 }, { name:'BUTTERFLY', t0:62, t1:96 } ];
+let simT=0, playing=true, speed=1;
+const stageOf = t => STAGES.findIndex(s=>t<s.t1);
+const bug = new THREE.Group(); scene.add(bug);
+const eggMat = new THREE.MeshStandardMaterial({ color:0xf7f3df, roughness:0.55 });
+const eggTop = new THREE.Mesh(new THREE.SphereGeometry(0.34, 24, 12, 0, Math.PI*2, 0, Math.PI/2), eggMat);
+const eggBot = new THREE.Mesh(new THREE.SphereGeometry(0.34, 24, 12, 0, Math.PI*2, Math.PI/2, Math.PI/2), eggMat);
+const eggGroup = new THREE.Group();
+eggGroup.add(eggTop, eggBot);
+eggGroup.position.copy(eggPos);
+bug.add(eggGroup);
+const CAT_N=13;
+const catGroup = new THREE.Group(); bug.add(catGroup);
+const catSegs=[];
+const catMat = new THREE.MeshStandardMaterial({ color:0x7cc24f, roughness:0.8 });
+const catMatD = new THREE.MeshStandardMaterial({ color:0x4e8f33, roughness:0.8 });
+for(let i=0;i<CAT_N;i++){
+  const r = i===0 ? 0.30 : 0.26*(1 - i/CAT_N*0.35);
+  const m=new THREE.Mesh(new THREE.SphereGeometry(r, 18, 14), i%2? catMatD : catMat);
+  catGroup.add(m); catSegs.push(m);
+}
+const eyeMat=new THREE.MeshStandardMaterial({ color:0x141414, roughness:0.4 });
+[-1,1].forEach(s=>{
+  const e=new THREE.Mesh(new THREE.SphereGeometry(0.055,10,8), eyeMat);
+  e.position.set(0.13*s, 0.10, 0.24); catSegs[0].add(e);
+});
+const crawlCurve = new THREE.CatmullRomCurve3([
+  new THREE.Vector3(-2.6,3.0,1.2), new THREE.Vector3(-1.2,3.5,0.6),
+  new THREE.Vector3(0.4,4.2,-0.2), new THREE.Vector3(1.6,5.0,0.9),
+  new THREE.Vector3(0.6,5.9,1.4), new THREE.Vector3(-1.6,6.8,0.6),
+  new THREE.Vector3(-0.6,7.3,-0.4) ]);
+const climbCurve = new THREE.CatmullRomCurve3([
+  new THREE.Vector3(-0.6,7.3,-0.4), new THREE.Vector3(0.8,7.8,-0.9),
+  new THREE.Vector3(2.0,8.2,-1.3), hangPoint.clone().add(new THREE.Vector3(0,-0.15,0)) ]);
+const chrysGroup = new THREE.Group(); bug.add(chrysGroup);
+const chrys = new THREE.Mesh(new THREE.CapsuleGeometry(0.46, 1.25, 8, 20),
+  new THREE.MeshStandardMaterial({ map:chrysTex, roughness:0.5 }));
+chrysGroup.add(chrys);
+const silk = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.9,6),
+  new THREE.MeshStandardMaterial({ color:0xe8e0c8 }));
+silk.position.y=1.15; chrysGroup.add(silk);
+chrysGroup.position.copy(hangPoint).add(new THREE.Vector3(0,-1.35,0));
+const bfGroup = new THREE.Group(); bug.add(bfGroup);
+const bfBody = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 1.1, 6, 12),
+  new THREE.MeshStandardMaterial({ color:0x2b2018, roughness:0.7 }));
+bfBody.rotation.x=Math.PI/2; bfGroup.add(bfBody);
+const bfHead = new THREE.Mesh(new THREE.SphereGeometry(0.17,14,12),
+  new THREE.MeshStandardMaterial({ color:0x2b2018 }));
+bfHead.position.z=0.72; bfGroup.add(bfHead);
+[-1,1].forEach(s=>{
+  const ant=new THREE.Mesh(new THREE.CylinderGeometry(0.015,0.015,0.55,6),
+    new THREE.MeshStandardMaterial({ color:0x1c1c1c }));
+  ant.position.set(0.08*s,0.28,0.85); ant.rotation.z=-0.5*s; ant.rotation.x=0.5; bfGroup.add(ant);
+});
+function wingGeometry(){
+  const s=new THREE.Shape();
+  s.moveTo(0,0);
+  s.bezierCurveTo(0.9,0.15, 1.9,0.7, 2.15,1.9);
+  s.bezierCurveTo(1.7,2.15, 1.05,1.95, 0.75,1.55);
+  s.bezierCurveTo(1.15,1.15, 1.25,0.55, 0.95,-0.35);
+  s.bezierCurveTo(0.55,-0.75, 0.15,-0.45, 0,0);
+  const g=new THREE.ShapeGeometry(s, 10);
+  g.computeBoundingBox();
+  const bb=g.boundingBox, uv=g.attributes.uv, pos=g.attributes.position;
+  for(let i=0;i<uv.count;i++) uv.setXY(i, (pos.getX(i)-bb.min.x)/(bb.max.x-bb.min.x), (pos.getY(i)-bb.min.y)/(bb.max.y-bb.min.y));
+  return g;
+}
+const wingMat = new THREE.MeshStandardMaterial({ map:wingTex, side:THREE.DoubleSide, roughness:0.75 });
+function makeWing(side){
+  const grp=new THREE.Group();
+  const mesh=new THREE.Mesh(wingGeometry(), wingMat);
+  mesh.rotation.x=-Math.PI/2;
+  if(side<0) mesh.scale.x=-1;
+  grp.add(mesh); grp.position.set(0.07*side, 0.12, 0.05);
+  bfGroup.add(grp); return grp;
+}
+const wingL=makeWing(1), wingR=makeWing(-1);
+const flightCurve = new THREE.CatmullRomCurve3([
+  new THREE.Vector3(10,8,0), new THREE.Vector3(4,11.5,9), new THREE.Vector3(-7,9.5,7),
+  new THREE.Vector3(-11,7,-3), new THREE.Vector3(-4,10.5,-9), new THREE.Vector3(5,8,-7),
+  new THREE.Vector3(9,6.5,-2) ], true);
+const crumbGeo=new THREE.BufferGeometry();
+const CR_N=60; const crumbPos=new Float32Array(CR_N*3); const crumbVel=[];
+for(let i=0;i<CR_N;i++){ crumbVel.push(new THREE.Vector3()); crumbPos[i*3+1]=-50; }
+crumbGeo.setAttribute('position', new THREE.BufferAttribute(crumbPos,3));
+const crumbs=new THREE.Points(crumbGeo, new THREE.PointsMaterial({ color:0x86c860, size:0.12 }));
+crumbs.frustumCulled=false; scene.add(crumbs);
+let crumbHead=0;
+function puff(p){
+  for(let k=0;k<6;k++){
+    const i=crumbHead=(crumbHead+1)%CR_N;
+    crumbPos[i*3]=p.x; crumbPos[i*3+1]=p.y; crumbPos[i*3+2]=p.z;
+    crumbVel[i].set((Math.random()-0.5)*2, Math.random()*1.5, (Math.random()-0.5)*2);
+  }
+}
+const clock=new THREE.Clock();
+let camSnapped=false;   // first frame jumps straight to the framing instead of gliding in from far away
+const V1=new THREE.Vector3(), V2=new THREE.Vector3(), V3=new THREE.Vector3();
+const ease=u=>u*u*(3-2*u);
+const clamp01=u=>Math.max(0,Math.min(1,u));
+function setCaterpillar(u, t, growth){
+  catGroup.visible=true;
+  const lag=0.016;
+  for(let i=0;i<CAT_N;i++){
+    const uu=clamp01(u - i*lag);
+    const p = u<1 ? crawlCurve.getPointAt(uu) : climbCurve.getPointAt(uu);
+    const bob=Math.sin(t*9 - i*0.75)*0.07*(i===0?0.4:1);
+    catSegs[i].position.set(p.x, p.y+bob+0.28*growth, p.z);
+    catSegs[i].scale.setScalar((i===0?1:0.92)*growth);
+  }
+}
+function animate(){
+  requestAnimationFrame(animate);
+  const rawDt=Math.min(clock.getDelta(),0.1);
+  const dt=playing?rawDt*speed:0;
+  simT=(simT+dt)%T_TOTAL;
+  const t=simT;
+  if(document.activeElement!==scrub) scrub.value=Math.round(t*10);
+  const si=stageOf(t);
+  stageName.textContent=['EGG','LARVA','PUPA','BUTTERFLY'][si];
+  [...dots.children].forEach((d,i)=>d.classList.toggle('on', i===si));
+  eggGroup.visible=false; catGroup.visible=false; chrysGroup.visible=false; bfGroup.visible=false;
+  if(si===0){
+    const u=t/14;
+    eggGroup.visible=true;
+    const wig=ease(clamp01((u-0.42)/0.22));
+    eggGroup.rotation.z=Math.sin(t*22)*0.16*wig;
+    eggGroup.rotation.x=Math.cos(t*19)*0.12*wig;
+    const open=ease(clamp01((u-0.64)/0.2));
+    eggTop.position.y=open*0.55; eggTop.rotation.z=open*0.9;
+    eggBot.position.y=-open*0.1;
+    if(u>0.66){
+      const hu=ease(clamp01((u-0.66)/0.3));
+      setCaterpillar(0.001, t, 0.42);
+      catGroup.position.set(hu*0.9, -hu*0.15, hu*0.3);
+    }
+  } else if(si===1){
+    const u=(t-14)/30;
+    setCaterpillar(u, t, 0.45+1.05*ease(u));
+    const meals=[{u:0.30,leaf:mealLeaf1},{u:0.72,leaf:mealLeaf2}];
+    meals.forEach(m=>{
+      const d=Math.abs(u-m.u);
+      if(d<0.09){
+        m.leaf.scale.setScalar(Math.max(0.12, 1-ease(clamp01(1-d/0.09))));
+        if(Math.random()<0.5) puff(V3.set(crawlCurve.getPointAt(m.u).x, crawlCurve.getPointAt(m.u).y+0.4, crawlCurve.getPointAt(m.u).z));
+      } else if(u>m.u+0.09){ m.leaf.scale.setScalar(0.12); }
+      else { m.leaf.scale.setScalar(1); }
+    });
+  } else if(si===2){
+    const u=(t-44)/18;
+    if(u<0.5){
+      const cu=ease(u/0.5);
+      for(let i=0;i<CAT_N;i++){
+        const pp=climbCurve.getPointAt(clamp01(cu - i*0.016));
+        catSegs[i].position.set(pp.x, pp.y+0.42, pp.z);
+        catSegs[i].scale.setScalar(1.5);
+      }
+      catGroup.visible=true; catGroup.position.set(0,0,0);
+    } else if(u<0.72){
+      const ju=ease((u-0.5)/0.22);
+      catGroup.visible=true;
+      for(let i=0;i<CAT_N;i++){
+        const a=(i/(CAT_N-1))*Math.PI*0.85*ju;
+        catSegs[i].position.set(hangPoint.x + Math.sin(a)*0.55*(1-ju*0.3), hangPoint.y - 0.1 - (1-Math.cos(a))*1.5, hangPoint.z + i*0.02);
+        catSegs[i].scale.setScalar(1.5*(1-ju*0.15));
+      }
+    } else {
+      chrysGroup.visible=true;
+      chrysGroup.scale.setScalar(Math.max(0.001,ease(clamp01((u-0.72)/0.16))));
+      chrysGroup.rotation.z=Math.sin(t*1.7)*0.06;
+      chrysGroup.rotation.x=Math.sin(t*1.3)*0.04;
+    }
+  } else {
+    const u=(t-62)/34;
+    chrysGroup.visible=true;
+    chrysGroup.rotation.z=Math.sin(t*1.7)*0.03;
+    if(u<0.24){
+      const c=ease(u/0.24);
+      chrys.scale.set(1+c*0.12, 1-c*0.06, 1+c*0.12);
+      chrys.position.y=c*0.25; chrys.rotation.z=c*0.35;
+    } else {
+      chrys.visible=false; silk.visible=false;
+      bfGroup.visible=true;
+      const eu=ease(clamp01((u-0.24)/0.18));
+      const wu=ease(clamp01((u-0.42)/0.22));
+      const fx=ease(clamp01((u-0.70)/0.30));
+      const perch=V1.copy(hangPoint).add(V2.set(0,-0.7,0.3));
+      const fp=flightCurve.getPointAt((fx*0.999)%1);
+      bfGroup.position.lerpVectors(perch, fp, fx);
+      bfGroup.position.y+=Math.sin(t*2)*0.15*(1-fx)+eu*0.4;
+      if(fx>0.001){
+        flightCurve.getTangentAt((fx*0.999)%1, V2);
+        V3.copy(bfGroup.position).add(V2);
+        bfGroup.lookAt(V3);
+        bfGroup.rotateZ(Math.sin(t*0.9)*0.35);
+      } else { bfGroup.rotation.set(0,0.6,0); }
+      const fold=(1-wu)*1.25 + 0.12;
+      const flap=Math.sin(t*(6+10*fx))*(0.15+0.75*fx)*wu;
+      wingL.rotation.z=fold+flap; wingR.rotation.z=-(fold+flap);
+      const wscale=0.55+0.45*wu;
+      wingL.scale.setScalar(wscale); wingR.scale.setScalar(wscale);
+      bfGroup.scale.setScalar(0.8+0.2*eu);
+    }
+  }
+  if(t<0.5){ mealLeaf1.scale.setScalar(1); mealLeaf2.scale.setScalar(1);
+    chrys.visible=true; silk.visible=true; chrys.scale.set(1,1,1); chrys.position.y=0; chrys.rotation.z=0; }
+  { const pos=crumbGeo.attributes.position;
+    for(let i=0;i<CR_N;i++){
+      if(crumbPos[i*3+1]<-40) continue;
+      crumbVel[i].y-=4*rawDt;
+      crumbPos[i*3]+=crumbVel[i].x*rawDt; crumbPos[i*3+1]+=crumbVel[i].y*rawDt; crumbPos[i*3+2]+=crumbVel[i].z*rawDt;
+      if(crumbPos[i*3+1]<0) crumbPos[i*3+1]=-50;
+    }
+    pos.needsUpdate=true; }
+  const camMode=camBtn;
+  if(camMode==='orbit'){
+    const subj = si===0 ? eggPos : si===1 ? catSegs[0].position : (bfGroup.visible ? bfGroup.position : V1.copy(hangPoint).add(V3.set(0,-1.2,0)));
+    const a=t*0.12, rad= si===3 && bfGroup.visible ? 9.5 : 7.5;
+    V3.copy(subj); V2.set(V3.x+Math.cos(a)*rad, V3.y+3.2+Math.sin(t*0.2)*0.6, V3.z+Math.sin(a)*rad); }
+  else if(camMode==='egg'){ V2.set(eggPos.x+3.4, eggPos.y+1.8, eggPos.z+4.2); V3.copy(eggPos); }
+  else if(camMode==='larva'){ const lp=(si===1?crawlCurve.getPointAt(clamp01((t-14)/30)):climbCurve.getPointAt(0.5)); const la=t*0.22; V2.set(lp.x+Math.cos(la)*5.2, lp.y+2.8, lp.z+Math.sin(la)*5.2); V3.copy(lp); }
+  else if(camMode==='pupa'){ V2.set(hangPoint.x+3.6, hangPoint.y+1.2, hangPoint.z+4.4); V3.copy(hangPoint).add(new THREE.Vector3(0,-1,0)); }
+  else { if(bfGroup.visible){ V2.copy(bfGroup.position).add(new THREE.Vector3(-4,-1.5,-5.5)); V3.copy(bfGroup.position); } else { V2.set(10,10,14); V3.copy(hangPoint); } }
+  const k=camSnapped ? 1-Math.pow(0.002, rawDt) : 1; camSnapped=true;
+  if(dYaw||dPitch){ const off=V2.clone().sub(V3); const sph=new THREE.Spherical().setFromVector3(off); sph.theta+=dYaw; sph.phi=Math.max(0.15,Math.min(Math.PI-0.15,sph.phi+dPitch)); V2.copy(V3).add(new THREE.Vector3().setFromSpherical(sph)); }
+  camera.position.lerp(V2, k);
+  camTarget.lerp(V3, k);
+  camera.lookAt(camTarget);
+  renderer.render(scene,camera);
+}
+const $=id=>document.getElementById(id);
+const scrub=$('scrub'), stageName=$('stageName'), dots=$('dots');
+const camTarget=new THREE.Vector3(0,4.5,0);
+let camBtn='orbit';
+let dYaw=0,dPitch=0;
+camera.position.set(20,10,18);
+$('bPlay').addEventListener('click',()=>{ playing=!playing; $('bPlay').textContent=playing?'Pause':'Play'; $('bPlay').classList.toggle('on',!playing); });
+$('speed').addEventListener('input',e=>{ speed=e.target.value/100; $('speedVal').textContent=speed.toFixed(speed<1?2:1)+'×'; });
+scrub.addEventListener('input',()=>{ simT=scrub.value/10; });
+document.querySelectorAll('#cams button').forEach(b=>{ b.addEventListener('click',()=>{ camBtn=b.dataset.cam; document.querySelectorAll('#cams button').forEach(x=>x.classList.toggle('on',x===b)); hideHint(); }); });
+addEventListener('keydown',e=>{ if(e.code==='Space'){ e.preventDefault(); $('bPlay').click(); } });
+let dragging=false, px=0, py=0;
+canvas.addEventListener('pointerdown',e=>{dragging=true;px=e.clientX;py=e.clientY;});
+addEventListener('pointerup',()=>dragging=false);
+addEventListener('pointermove',e=>{ if(!dragging) return; dYaw-=(e.clientX-px)*0.005; dPitch=Math.max(-1.2,Math.min(1.2,dPitch-(e.clientY-py)*0.005)); px=e.clientX; py=e.clientY; hideHint(); });
+canvas.addEventListener('wheel',e=>{ const d=camera.position.clone().sub(camTarget).multiplyScalar(1+e.deltaY*0.001); const l=Math.min(60,Math.max(4,d.length())); camera.position.copy(camTarget).add(d.setLength(l)); },{passive:true});
+let hintHidden=false;
+function hideHint(){ if(!hintHidden){hint.classList.add('hidden');hintHidden=true;} }
+setTimeout(hideHint, 9000);
+const startEl=$('start');
+startEl.addEventListener('click',()=>startEl.classList.add('hidden'));
+if(AUTOTEST) startEl.classList.add('hidden');
+// ?t=<seconds> jumps to a moment of the cycle (handy for screenshots)
+{ const tq=new URLSearchParams(location.search).get('t'); if(tq!==null && !isNaN(parseFloat(tq))) simT=parseFloat(tq); }
+window.__bf={ setStage:i=>{ simT=STAGES[i].t0+(STAGES[i].t1-STAGES[i].t0)*0.45; }, setTime:s=>{ simT=s; }, get stage(){ return stageOf(simT); } };
+animate();
+addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+</script>
+</body>
+</html>

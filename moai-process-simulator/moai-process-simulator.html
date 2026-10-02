@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Moai Process Simulator</title>
+<style>
+  :root{
+    --panel-bg: rgba(20,16,12,0.72);
+    --accent: #d99a3f;
+    --accent2: #e3572b;
+    --text: #f2e6d0;
+  }
+  html,body{margin:0;padding:0;overflow:hidden;background:#0b1420;font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:var(--text);height:100%;}
+  canvas{display:block;}
+  #app{position:fixed;inset:0;}
+
+  /* ---- Start overlay ---- */
+  #startOverlay{
+    position:fixed;inset:0;z-index:50;
+    display:flex;align-items:center;justify-content:center;flex-direction:column;
+    background:radial-gradient(ellipse at center, #1c3a52 0%, #060b12 100%);
+    text-align:center;
+  }
+  #startOverlay h1{
+    font-size:clamp(28px,4vw,52px);margin:0 0 6px;letter-spacing:2px;
+    color:var(--accent);text-shadow:0 2px 12px rgba(0,0,0,0.6);
+  }
+  #startOverlay h2{
+    font-size:clamp(14px,1.6vw,20px);margin:0 0 28px;color:#cfd8de;font-weight:400;letter-spacing:3px;
+  }
+  #startOverlay p{max-width:560px;line-height:1.6;color:#c9c2b4;font-size:14px;margin:0 0 30px;padding:0 20px;}
+  #beginBtn{
+    padding:14px 42px;font-size:16px;letter-spacing:2px;cursor:pointer;
+    background:linear-gradient(180deg,var(--accent),#a9701f);border:none;border-radius:30px;
+    color:#20140a;font-weight:700;box-shadow:0 6px 22px rgba(217,154,63,0.45);
+    transition:transform .15s ease;
+  }
+  #beginBtn:hover{transform:translateY(-2px) scale(1.03);}
+  #startOverlay .hint{margin-top:22px;font-size:12px;color:#8a95a0;letter-spacing:1px;}
+
+  /* ---- HUD top ---- */
+  #topHud{
+    position:fixed;top:16px;left:16px;z-index:20;
+    background:var(--panel-bg);backdrop-filter:blur(4px);
+    padding:10px 16px;border-radius:10px;border:1px solid rgba(217,154,63,0.35);
+    max-width:min(420px,60vw);
+  }
+  #topHud .title{font-size:13px;letter-spacing:1px;color:var(--accent);font-weight:700;margin-bottom:2px;}
+  #topHud .stageName{font-size:16px;font-weight:700;}
+  #topHud .stageDesc{font-size:11.5px;color:#cdbfa4;margin-top:3px;line-height:1.4;}
+
+  #helpHud{
+    position:fixed;top:16px;right:16px;z-index:20;
+    background:var(--panel-bg);padding:8px 12px;border-radius:10px;border:1px solid rgba(217,154,63,0.25);
+    font-size:11px;color:#c9c2b4;line-height:1.6;text-align:right;
+  }
+
+  /* ---- Bottom control bar ---- */
+  #bottomBar{
+    position:fixed;left:0;right:0;bottom:0;z-index:20;
+    background:linear-gradient(180deg,rgba(20,16,12,0) 0%, rgba(14,11,8,0.88) 30%, rgba(10,8,6,0.94) 100%);
+    padding:10px 18px 14px;box-sizing:border-box;
+  }
+  #progressRow{display:flex;align-items:center;gap:12px;max-width:1100px;margin:0 auto 10px;}
+  #progressRow input[type=range]{flex:1;height:6px;-webkit-appearance:none;background:transparent;cursor:pointer;}
+  #progressRow input[type=range]::-webkit-slider-runnable-track{
+    height:6px;border-radius:4px;background:linear-gradient(90deg,#3a3126,#5a4a34);
+  }
+  #progressRow input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:var(--accent2);border:2px solid #fff2d8;margin-top:-5px;cursor:pointer;
+    box-shadow:0 0 6px rgba(227,87,43,0.7);
+  }
+  #playBtn,#resetBtn{
+    background:rgba(217,154,63,0.16);border:1px solid rgba(217,154,63,0.5);color:var(--text);
+    border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;min-width:38px;
+  }
+  #playBtn:hover,#resetBtn:hover{background:rgba(217,154,63,0.3);}
+  #pctLabel{font-size:12px;color:#cdbfa4;min-width:48px;text-align:right;}
+
+  #stageBtns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;max-width:1100px;margin:0 auto;}
+  .stageBtn{
+    flex:1 1 0;min-width:110px;max-width:220px;
+    background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.14);
+    color:#e6dcc6;border-radius:9px;padding:8px 6px;cursor:pointer;text-align:center;
+    font-size:12px;line-height:1.35;transition:all .15s ease;
+  }
+  .stageBtn b{display:block;font-size:13px;color:var(--accent);}
+  .stageBtn:hover{background:rgba(255,255,255,0.12);}
+  .stageBtn.active{
+    background:linear-gradient(180deg,rgba(227,87,43,0.35),rgba(217,154,63,0.2));
+    border-color:var(--accent2);box-shadow:0 0 10px rgba(227,87,43,0.35);
+  }
+  .stageBtn.active b{color:#fff1d6;}
+
+  #loading{
+    position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;
+    background:#060b12;color:#c9c2b4;font-size:14px;letter-spacing:2px;
+  }
+</style>
+</head>
+<body>
+<div id="loading">加载中 LOADING…</div>
+<div id="app"></div>
+
+<div id="startOverlay">
+  <h1>摩 艾 全 流 程 模 拟</h1>
+  <h2>MOAI PROCESS SIMULATOR &middot; RAPA NUI / EASTER ISLAND</h2>
+  <p>依据考古学与实验物理学复原：从 Rano Raraku 火山凝灰岩采石场的开采、雕刻，到“行走式”直立运输、祭坛竖立，最终戴上红色普卡奥（Pukao）石帽的完整五阶段流程。<br><br>
+  Reconstructed from archaeology &amp; experimental physics: quarrying &amp; carving at Rano Raraku, the upright "walking" transport method, erection onto the Ahu platform, and pukao placement.</p>
+  <button id="beginBtn">开始模拟 &nbsp;BEGIN</button>
+  <div class="hint">拖拽旋转视角 · 滚轮缩放 · 底部可拖动进度条逐帧查看每个阶段</div>
+</div>
+
+<div id="topHud" style="display:none;">
+  <div class="title">MOAI PROCESS SIMULATOR</div>
+  <div class="stageName" id="stageNameLbl">阶段 1 / 5 &middot; 开采 Quarrying</div>
+  <div class="stageDesc" id="stageDescLbl">岛民在 Rano Raraku 火山凝灰岩体上切割、剥离出巨石雏形。</div>
+</div>
+<div id="helpHud" style="display:none;">
+  左键拖拽：旋转视角<br>右键拖拽：平移&nbsp; 滚轮：缩放<br>360&deg; 自由观察每个阶段
+</div>
+
+<div id="bottomBar" style="display:none;">
+  <div id="progressRow">
+    <button id="resetBtn" title="重置 Reset">⟲</button>
+    <button id="playBtn" title="播放/暂停">▶</button>
+    <input type="range" id="progressSlider" min="0" max="5" step="0.001" value="0">
+    <span id="pctLabel">0%</span>
+  </div>
+  <div id="stageBtns">
+    <div class="stageBtn" data-stage="0"><b>① 开采</b>Quarrying</div>
+    <div class="stageBtn" data-stage="1"><b>② 雕刻</b>Carving</div>
+    <div class="stageBtn" data-stage="2"><b>③ 运输</b>Walking Transport</div>
+    <div class="stageBtn" data-stage="3"><b>④ 竖立</b>Erecting</div>
+    <div class="stageBtn" data-stage="4"><b>⑤ 戴帽</b>Pukao Placement</div>
+  </div>
+</div>
+
+<script>
+window.addEventListener('error',e=>{document.title='ERROR: '+e.message+' @'+e.lineno});
+document.title='Moai Process Simulator';
+</script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const AUTOTEST = /autotest/.test(location.search);
+
+// ----------------------------------------------------------------------------
+// Utility helpers
+// ----------------------------------------------------------------------------
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp  = (a,b,t)=>a+(b-a)*t;
+function smoothstep(a,b,x){ const t=clamp((x-a)/(b-a),0,1); return t*t*(3-2*t); }
+function lerpVec(out,a,b,t){ out.x=lerp(a.x,b.x,t); out.y=lerp(a.y,b.y,t); out.z=lerp(a.z,b.z,t); return out; }
+
+function terrainHeight(x,z){
+  const d = Math.sqrt(x*x+z*z);
+  const islandFalloff = 1 - smoothstep(78,112,d);
+  const hdx = x-(-46), hdz = z-(-32);
+  const hill = 13*Math.exp(-(hdx*hdx+hdz*hdz)/260);
+  const pdx = x-46, pdz = z-24;
+  const plateau = 2.4*Math.exp(-(pdx*pdx+pdz*pdz)/900);
+  const rolling = Math.sin(x*0.05)*0.4+Math.cos(z*0.045)*0.4;
+  const base = 1.1;
+  return (base+hill+plateau+rolling)*islandFalloff;
+}
+
+// ----------------------------------------------------------------------------
+// Renderer / Scene / Camera
+// ----------------------------------------------------------------------------
+const app = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,1.75));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0xaecbdd, 90, 420);
+
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 2000);
+camera.position.set(-35,12,-1);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 6;
+controls.maxDistance = 220;
+controls.minPolarAngle = 0.12;
+controls.maxPolarAngle = 1.52;
+controls.target.set(-46,10,-18);
+camera.lookAt(controls.target);
+
+window.addEventListener('resize', ()=>{
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ----------------------------------------------------------------------------
+// Lighting
+// ----------------------------------------------------------------------------
+const hemi = new THREE.HemisphereLight(0xbfe0ff, 0x3d3320, 0.75);
+scene.add(hemi);
+
+const sun = new THREE.DirectionalLight(0xfff2d8, 1.55);
+sun.position.set(120,140,60);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1536,1536);
+sun.shadow.camera.left = -140; sun.shadow.camera.right = 140;
+sun.shadow.camera.top = 140; sun.shadow.camera.bottom = -140;
+sun.shadow.camera.near = 10; sun.shadow.camera.far = 420;
+sun.shadow.bias = -0.0015;
+scene.add(sun);
+scene.add(sun.target);
+// soft sky bounce from the inland side, so the statue faces (which look inland) read clearly
+const fill = new THREE.DirectionalLight(0xdfe8ff, 0.7);
+fill.position.set(-60,50,-120);
+scene.add(fill);
+
+const sunDisc = new THREE.Mesh(new THREE.SphereGeometry(14,10,10), new THREE.MeshBasicMaterial({color:0xfff2c0}));
+sunDisc.position.copy(sun.position).multiplyScalar(2.4);
+scene.add(sunDisc);
+
+// ----------------------------------------------------------------------------
+// Sky dome (vertical gradient via vertex colors)
+// ----------------------------------------------------------------------------
+{
+  const skyGeo = new THREE.SphereGeometry(900,20,14);
+  const top = new THREE.Color(0x1e5f9e);
+  const horizon = new THREE.Color(0xcfe9f2);
+  const pos = skyGeo.attributes.position;
+  const colors = new Float32Array(pos.count*3);
+  for(let i=0;i<pos.count;i++){
+    const y = pos.getY(i);
+    const t = Math.pow(clamp((y/900+0.05)/1.05,0,1), 0.55);
+    const c = horizon.clone().lerp(top, t);
+    colors[i*3]=c.r; colors[i*3+1]=c.g; colors[i*3+2]=c.b;
+  }
+  skyGeo.setAttribute('color', new THREE.BufferAttribute(colors,3));
+  const skyMat = new THREE.MeshBasicMaterial({vertexColors:true, side:THREE.BackSide, fog:false, depthWrite:false});
+  const sky = new THREE.Mesh(skyGeo, skyMat);
+  scene.add(sky);
+}
+
+// ----------------------------------------------------------------------------
+// Ocean
+// ----------------------------------------------------------------------------
+const oceanGeo = new THREE.PlaneGeometry(2400,2400,64,64);
+oceanGeo.rotateX(-Math.PI/2);
+const oceanMat = new THREE.MeshStandardMaterial({color:0x1a5c78, roughness:0.32, metalness:0.15, transparent:true, opacity:0.92});
+const ocean = new THREE.Mesh(oceanGeo, oceanMat);
+ocean.position.y = -0.4;
+scene.add(ocean);
+const oceanBasePos = oceanGeo.attributes.position.array.slice();
+
+// ----------------------------------------------------------------------------
+// Island terrain
+// ----------------------------------------------------------------------------
+const terrainGeo = new THREE.PlaneGeometry(240,240,90,90);
+terrainGeo.rotateX(-Math.PI/2);
+{
+  const pos = terrainGeo.attributes.position;
+  for(let i=0;i<pos.count;i++){
+    const x = pos.getX(i), z = pos.getZ(i);
+    pos.setY(i, terrainHeight(x,z));
+  }
+  terrainGeo.computeVertexNormals();
+}
+const terrainMat = new THREE.MeshStandardMaterial({color:0x5c7a3d, roughness:1});
+const terrain = new THREE.Mesh(terrainGeo, terrainMat);
+terrain.receiveShadow = true;
+scene.add(terrain);
+
+// coastal reeds (wind indicator)
+const reeds = [];
+for(let i=0;i<46;i++){
+  const ang = Math.random()*Math.PI*2;
+  const rad = i<16 ? 82+Math.random()*16 : 12+Math.random()*68;
+  const x = Math.cos(ang)*rad, z = Math.sin(ang)*rad;
+  const y = terrainHeight(x,z);
+  const g = new THREE.Group();
+  for(let k=0;k<4;k++){
+    const blade = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.03,0.07,1.2+Math.random()*0.6,5),
+      new THREE.MeshStandardMaterial({color:0x5a7a3a, roughness:1})
+    );
+    blade.position.set((Math.random()-0.5)*0.5, 0.6, (Math.random()-0.5)*0.5);
+    blade.rotation.z = (Math.random()-0.5)*0.3;
+    g.add(blade);
+  }
+  g.position.set(x,y,z);
+  g.userData.phase = Math.random()*10;
+  scene.add(g);
+  reeds.push(g);
+}
+
+// drifting clouds
+const clouds = [];
+for(let i=0;i<9;i++){
+  const g = new THREE.Group();
+  const n = 3+Math.floor(Math.random()*3);
+  const mat = new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:0.75, fog:true});
+  for(let k=0;k<n;k++){
+    const s = new THREE.Mesh(new THREE.SphereGeometry(3+Math.random()*3,6,6), mat);
+    s.position.set((Math.random()-0.5)*10,(Math.random()-0.5)*2,(Math.random()-0.5)*6);
+    s.scale.y = 0.5;
+    g.add(s);
+  }
+  g.position.set((Math.random()-0.5)*500, 55+Math.random()*25, (Math.random()-0.5)*350);
+  g.userData.speed = 1.2+Math.random()*1.6;
+  scene.add(g);
+  clouds.push(g);
+}
+// ----------------------------------------------------------------------------
+// Stone textures
+// ----------------------------------------------------------------------------
+function stoneTexture(base, light, dark, n){
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = base; ctx.fillRect(0,0,256,256);
+  for(let i=0;i<n;i++){
+    ctx.fillStyle = Math.random()<0.5 ? light : dark;
+    ctx.globalAlpha = 0.25+Math.random()*0.4;
+    const r = 0.6+Math.random()*2.2;
+    ctx.beginPath(); ctx.arc(Math.random()*256, Math.random()*256, r, 0, 7); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+// lapilli tuff of Rano Raraku: yellow-brown with dark basalt inclusions
+const tuffTex = stoneTexture('#9c8869', '#b8a27f', '#4e4234', 1800);
+// red scoria of Puna Pau, used for the pukao
+const scoriaTex = stoneTexture('#8a3a26', '#a85a3c', '#4a1c12', 2200);
+
+function perturb(geo, amt){
+  const pos = geo.attributes.position;
+  for(let i=0;i<pos.count;i++){
+    pos.setXYZ(i, pos.getX(i)+(Math.random()-0.5)*amt, pos.getY(i)+(Math.random()-0.5)*amt, pos.getZ(i)+(Math.random()-0.5)*amt);
+  }
+  geo.computeVertexNormals();
+}
+// box whose width/depth taper linearly from bottom (y=0) to top (y=h)
+function taperBox(wb, wt, db, dt, h, seg){
+  const s = seg||1;
+  const geo = new THREE.BoxGeometry(1,1,1, s, s*2, s);
+  const pos = geo.attributes.position;
+  for(let i=0;i<pos.count;i++){
+    const k = pos.getY(i)+0.5;
+    pos.setXYZ(i, pos.getX(i)*lerp(wb,wt,k), k*h, pos.getZ(i)*lerp(db,dt,k));
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+// unit-height cylinder stretched between two world points
+const _stA = new THREE.Vector3(), _stB = new THREE.Vector3(), _stD = new THREE.Vector3(), _stUp = new THREE.Vector3(0,1,0);
+function placeStick(mesh, a, b){
+  mesh.visible = true;
+  _stA.copy(a); _stB.copy(b);
+  mesh.position.copy(_stA).add(_stB).multiplyScalar(0.5);
+  _stD.subVectors(_stB,_stA);
+  const len = _stD.length();
+  mesh.scale.set(1, Math.max(len,0.001), 1);
+  mesh.quaternion.setFromUnitVectors(_stUp, _stD.normalize());
+}
+function lerpAngle(a,b,t){
+  let d = b-a;
+  while(d>Math.PI) d-=Math.PI*2; while(d<-Math.PI) d+=Math.PI*2;
+  return a+d*t;
+}
+
+// ----------------------------------------------------------------------------
+// Site anchors
+// ----------------------------------------------------------------------------
+const QUARRY_XZ = {x:-46, z:-18};
+const QUARRY_POS = new THREE.Vector3(QUARRY_XZ.x, terrainHeight(QUARRY_XZ.x,QUARRY_XZ.z), QUARRY_XZ.z);
+const AHU_PLATFORM_XZ = {x:46, z:26};
+const AHU_BASE_XZ = {x:44, z:10};           // where the walk ends, inland of the ahu
+
+// ----------------------------------------------------------------------------
+// Rano Raraku quarry face
+// ----------------------------------------------------------------------------
+const WALL_FRONT_Z = QUARRY_XZ.z - 1.2;
+{
+  const wallMat = new THREE.MeshStandardMaterial({map:tuffTex, color:0xf2e2c4, roughness:1, flatShading:true});
+  const geo = new THREE.BoxGeometry(20, 12, 6, 8, 5, 2);
+  perturb(geo, 0.6);
+  const wall = new THREE.Mesh(geo, wallMat);
+  wall.position.set(QUARRY_XZ.x, QUARRY_POS.y+3.5, WALL_FRONT_Z-3);
+  wall.castShadow = wall.receiveShadow = true;
+  scene.add(wall);
+  // loose rubble / debitage at the foot of the face
+  const rubbleMat = new THREE.MeshStandardMaterial({map:tuffTex, color:0xd8c6a5, roughness:1, flatShading:true});
+  for(let i=0;i<26;i++){
+    const r = 0.2+Math.random()*0.45;
+    const x = QUARRY_XZ.x+(Math.random()-0.5)*18, z = WALL_FRONT_Z+0.4+Math.random()*3.5;
+    if(Math.abs(x-QUARRY_XZ.x)<2.2 && z<WALL_FRONT_Z+2.5) continue;
+    const m = new THREE.Mesh(new THREE.DodecahedronGeometry(r,0), rubbleMat);
+    m.position.set(x, terrainHeight(x,z)+r*0.4, z);
+    m.rotation.set(Math.random()*3,Math.random()*3,Math.random()*3);
+    m.castShadow = true;
+    scene.add(m);
+  }
+}
+// dark recess left in the face once the block is freed
+const niche = new THREE.Mesh(new THREE.BoxGeometry(3.0,6.4,0.12), new THREE.MeshStandardMaterial({color:0x2a2219, roughness:1}));
+niche.position.set(QUARRY_XZ.x, QUARRY_POS.y+3.0, WALL_FRONT_Z+0.02);
+scene.add(niche);
+
+// ----------------------------------------------------------------------------
+// Moai builder (local origin = centre of the base, face looks down +z)
+// ----------------------------------------------------------------------------
+const MOAI_TOP_Y = 5.2;
+const HALF_DEPTH = 0.68;
+const sharedMoaiMat = new THREE.MeshStandardMaterial({map:tuffTex, roughness:0.95, flatShading:true});
+const sharedDarkMat = new THREE.MeshStandardMaterial({color:0x2c2318, roughness:1});
+function buildMoai(animated){
+  const g = new THREE.Group();
+  const groups = {head:[], face:[], torso:[], arms:[]};
+  const mat = (grp, dark)=>{
+    if(!animated) return dark ? sharedDarkMat : sharedMoaiMat;
+    const m = (dark ? sharedDarkMat : sharedMoaiMat).clone();
+    groups[grp].push(m);
+    return m;
+  };
+  const add = (geo, grp, x,y,z, dark)=>{
+    const m = new THREE.Mesh(geo, mat(grp, dark));
+    m.position.set(x,y,z); m.castShadow = true; m.receiveShadow = true;
+    g.add(m); return m;
+  };
+  add(taperBox(2.0,2.2,1.25,1.32,2.7,2), 'torso', 0,0,0);
+  add(taperBox(1.62,1.85,1.32,1.45,2.5,2), 'head', 0,2.7,0.08);
+  add(new THREE.BoxGeometry(1.95,0.38,0.42), 'face', 0,4.5,0.86);                 // heavy brow ridge
+  [-0.44,0.44].forEach(x=> add(new THREE.BoxGeometry(0.52,0.26,0.1), 'face', x,4.18,0.78, true)); // deep eye sockets
+  add(taperBox(0.62,0.3,0.5,0.24,1.2), 'face', 0,3.28,0.86);                       // long nose
+  add(new THREE.BoxGeometry(0.86,0.16,0.24), 'face', 0,3.1,0.84);                  // pursed lips
+  add(new THREE.BoxGeometry(1.3,0.45,0.34), 'face', 0,2.8,0.78);                   // jutting jaw
+  [-0.9,0.9].forEach(x=> add(new THREE.BoxGeometry(0.16,1.5,0.42), 'face', x,3.85,0.06)); // elongated ears
+  [-1,1].forEach(s=>{
+    const up = add(new THREE.BoxGeometry(0.26,1.6,0.42), 'arms', s*1.08,1.55,0.12);
+    up.rotation.z = -s*0.05;
+    add(new THREE.BoxGeometry(0.95,0.22,0.22), 'arms', s*0.62,0.78,0.64);           // forearms meeting at the belly
+    add(new THREE.BoxGeometry(0.3,0.08,0.2), 'arms', s*0.18,0.78,0.72);             // long fingers
+  });
+  g.userData.groups = groups;
+  g.userData.neckPoint = new THREE.Vector3(0,4.6,0.2);
+  g.userData.chestPoint = new THREE.Vector3(0,2.4,0.6);
+  return g;
+}
+const REVEAL = {head:[0.05,0.35], face:[0.3,0.6], torso:[0.45,0.75], arms:[0.65,0.9]};
+function setMoaiReveal(k){
+  const groups = moaiGroup.userData.groups;
+  for(const key in groups){
+    const o = smoothstep(REVEAL[key][0], REVEAL[key][1], k);
+    groups[key].forEach(m=>{ m.opacity = o; m.transparent = o<0.999; m.visible = o>0.01; });
+  }
+}
+
+function buildPukao(){
+  const outer = new THREE.Group();
+  const inner = new THREE.Group();
+  outer.add(inner);
+  const mat = new THREE.MeshStandardMaterial({map:scoriaTex, roughness:0.95, flatShading:true});
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(1.0,1.1,1.3,14), mat);
+  body.castShadow = true; inner.add(body);
+  const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.7,0.3,14), mat);
+  knob.position.y = 0.8; knob.castShadow = true; inner.add(knob);
+  outer.userData.inner = inner;
+  return outer;
+}
+const PUKAO_R = 1.1;
+
+// ----------------------------------------------------------------------------
+// Scene props: the moving statue, rough block, pukao, extra statues
+// ----------------------------------------------------------------------------
+const roughBlock = new THREE.Mesh(taperBox(2.7,2.45,1.95,1.9,5.9,3), new THREE.MeshStandardMaterial({map:tuffTex, color:0xa8977a, roughness:1, flatShading:true, transparent:true}));
+perturb(roughBlock.geometry, 0.22);
+roughBlock.castShadow = roughBlock.receiveShadow = true;
+scene.add(roughBlock);
+function setRockOpacity(v){ roughBlock.material.opacity = v; roughBlock.material.transparent = v<0.999; roughBlock.visible = v>0.01; }
+
+const moaiRig = new THREE.Group();          // position + heading
+const moaiGroup = buildMoai(true);          // tilt (x) + walking rock (z), pivoting on the base
+moaiRig.add(moaiGroup);
+scene.add(moaiRig);
+function setRig(pos, yaw, tilt, rock){
+  moaiRig.position.copy(pos);
+  moaiRig.rotation.set(0, yaw, 0);
+  moaiGroup.rotation.set(tilt, 0, rock);
+  moaiRig.updateMatrixWorld(true);
+}
+function moaiPoint(local){ return moaiGroup.localToWorld(local.clone()); }
+
+const pukao = buildPukao();
+scene.add(pukao);
+
+// Rano Raraku's famous buried heads, standing on the slope below the quarry
+[[-59,-20,0.2],[-33,-20,-0.3],[-63,-27,0.5],[-29,-27,-0.6],[-53,-12.5,0.1]].forEach(([x,z,yaw])=>{
+  const m = buildMoai(false);
+  m.position.set(x, terrainHeight(x,z)-2.55, z);
+  m.rotation.set((Math.random()-0.5)*0.12, yaw, (Math.random()-0.5)*0.1);
+  scene.add(m);
+});
+
+// ----------------------------------------------------------------------------
+// Ahu platform with two statues already in place (backs to the sea)
+// ----------------------------------------------------------------------------
+const AHU_PLATFORM_BASE_Y = terrainHeight(AHU_PLATFORM_XZ.x, AHU_PLATFORM_XZ.z);
+const AHU_PLATFORM_HEIGHT = 3.0;
+const T_TOP = AHU_PLATFORM_BASE_Y + AHU_PLATFORM_HEIGHT;
+const AHU_PLATFORM_TOP_Y = T_TOP;
+{
+  const stoneMat = new THREE.MeshStandardMaterial({color:0x8c8779, roughness:0.95});
+  const top = new THREE.Mesh(new THREE.BoxGeometry(20,AHU_PLATFORM_HEIGHT+1.5,7), stoneMat);
+  top.position.set(AHU_PLATFORM_XZ.x, AHU_PLATFORM_BASE_Y+AHU_PLATFORM_HEIGHT/2-0.75, AHU_PLATFORM_XZ.z);
+  top.castShadow = true; top.receiveShadow = true;
+  scene.add(top);
+  // dressed basalt facing slabs on the seaward wall
+  for(let i=0;i<6;i++){
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(3.1,AHU_PLATFORM_HEIGHT+1.9,1.1), stoneMat);
+    slab.position.set(AHU_PLATFORM_XZ.x-8+i*3.2, AHU_PLATFORM_BASE_Y+AHU_PLATFORM_HEIGHT/2-0.75, AHU_PLATFORM_XZ.z+4.0);
+    slab.castShadow = true; slab.receiveShadow = true;
+    scene.add(slab);
+  }
+  [40,52].forEach((x,i)=>{
+    const m = buildMoai(false);
+    m.position.set(x, T_TOP, 24.3); m.rotation.y = Math.PI;
+    scene.add(m);
+    if(i===1){
+      const p = buildPukao();
+      p.position.set(x, T_TOP+MOAI_TOP_Y+0.65, 24.3-0.05);
+      scene.add(p);
+    }
+  });
+}
+const FINAL_POS = new THREE.Vector3(46, T_TOP, 24.3);
+
+// earthen ramp on the inland side, used to haul the statue onto the ahu
+const RAMP_Z0 = 14, RAMP_Z1 = AHU_PLATFORM_XZ.z-3.5;
+const RAMP_G0 = terrainHeight(46, RAMP_Z0);
+const RAMP_SLOPE = Math.atan2(T_TOP-RAMP_G0, RAMP_Z1-RAMP_Z0);
+function surfaceY(z){
+  if(z <= RAMP_Z0) return terrainHeight(46,z);
+  if(z < RAMP_Z1) return lerp(RAMP_G0, T_TOP, (z-RAMP_Z0)/(RAMP_Z1-RAMP_Z0));
+  return T_TOP;
+}
+const earthRamp = (()=>{
+  const L = RAMP_Z1-RAMP_Z0, h = T_TOP-RAMP_G0, w = 5;
+  const shape = new THREE.Shape();
+  shape.moveTo(0,-1.5); shape.lineTo(L+0.3,-1.5); shape.lineTo(L+0.3,h); shape.lineTo(L,h); shape.lineTo(0,0); shape.closePath();
+  const geo = new THREE.ExtrudeGeometry(shape, {depth:w, bevelEnabled:false});
+  geo.rotateY(-Math.PI/2);
+  geo.translate(w/2, 0, 0);
+  const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({color:0x7a6447, roughness:1, flatShading:true}));
+  m.position.set(46, RAMP_G0, RAMP_Z0);
+  m.receiveShadow = true; m.castShadow = true;
+  m.visible = false;
+  scene.add(m);
+  return m;
+})();
+
+// ----------------------------------------------------------------------------
+// NPCs (islander pool)
+// ----------------------------------------------------------------------------
+const NPC_POOL_SIZE = 18;
+const npcs = [];
+const skinTones = [0xa5673a,0x8f5730,0xb87843,0x9c6238];
+const clothTones = [0xd8c49a,0xc9a86b,0xbfa06a];
+
+function buildNPC(){
+  const group = new THREE.Group();
+  const skin = new THREE.MeshStandardMaterial({color:skinTones[Math.floor(Math.random()*skinTones.length)], roughness:0.85});
+  const cloth = new THREE.MeshStandardMaterial({color:clothTones[Math.floor(Math.random()*clothTones.length)], roughness:0.95});
+
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.48,0.68,0.28), cloth);
+  torso.position.y = 1.12;
+  torso.castShadow = true;
+  group.add(torso);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.21,8,8), skin);
+  head.position.y = 1.62;
+  head.castShadow = true;
+  group.add(head);
+
+  function limb(len, mat, shoulder){
+    const pivot = new THREE.Group();
+    pivot.position.copy(shoulder);
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.085,0.075,len,6), mat);
+    mesh.position.y = -len/2;
+    mesh.castShadow = true;
+    pivot.add(mesh);
+    return pivot;
+  }
+  const leftArm = limb(0.62, skin, new THREE.Vector3(-0.30,1.42,0));
+  const rightArm = limb(0.62, skin, new THREE.Vector3(0.30,1.42,0));
+  const leftLeg = limb(0.82, cloth, new THREE.Vector3(-0.14,0.80,0));
+  const rightLeg = limb(0.82, cloth, new THREE.Vector3(0.14,0.80,0));
+  group.add(leftArm, rightArm, leftLeg, rightLeg);
+
+  // basalt hand-axe (toki)
+  const tool = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.7,5), new THREE.MeshStandardMaterial({color:0x3a3530}));
+  tool.position.y = -0.55;
+  tool.visible = false;
+  rightArm.add(tool);
+
+  const scaleV = 0.92+Math.random()*0.22;
+  group.scale.setScalar(scaleV);
+
+  return {group, torso, head, leftArm, rightArm, leftLeg, rightLeg, tool, phase: Math.random()*Math.PI*2};
+}
+
+for(let i=0;i<NPC_POOL_SIZE;i++){
+  const npc = buildNPC();
+  scene.add(npc.group);
+  npcs.push(npc);
+}
+
+function resetPose(npc){
+  npc.tool.visible = false;
+  npc.group.rotation.x = 0;
+  npc.leftLeg.rotation.x = 0; npc.rightLeg.rotation.x = 0;
+}
+function poseIdle(npc,t){
+  resetPose(npc);
+  npc.leftArm.rotation.x = Math.sin(t*1.4+npc.phase)*0.08;
+  npc.rightArm.rotation.x = Math.sin(t*1.4+npc.phase+1)*0.08;
+}
+function poseChisel(npc,t){
+  resetPose(npc);
+  npc.tool.visible = true;
+  npc.rightArm.rotation.x = -1.5 + Math.sin(t*7+npc.phase)*0.55;
+  npc.leftArm.rotation.x = -1.15;
+  npc.group.rotation.x = 0.18;
+}
+// leaning back on a rope; intensity 0..1
+function posePull(npc,t,intensity){
+  resetPose(npc);
+  const sway = Math.sin(t*3.2+npc.phase)*0.08*intensity;
+  npc.group.rotation.x = -0.18 - 0.42*intensity + sway;
+  npc.leftArm.rotation.x = -1.15 - 0.35*intensity + Math.sin(t*3.2+npc.phase)*0.12;
+  npc.rightArm.rotation.x = -1.15 - 0.35*intensity + Math.sin(t*3.2+npc.phase+0.4)*0.12;
+  npc.leftLeg.rotation.x = 0.25*intensity;
+  npc.rightLeg.rotation.x = -0.15*intensity;
+}
+// bearing down on a lever / pushing forward
+function posePush(npc,t,amount){
+  resetPose(npc);
+  npc.group.rotation.x = 0.25+0.2*amount;
+  npc.leftArm.rotation.x = -1.3+0.3*amount;
+  npc.rightArm.rotation.x = -1.3+0.3*amount;
+  npc.leftLeg.rotation.x = -0.3; npc.rightLeg.rotation.x = 0.25;
+}
+function poseCelebrate(npc,t){
+  resetPose(npc);
+  npc.leftArm.rotation.x = -2.6+Math.sin(t*3+npc.phase)*0.15;
+  npc.rightArm.rotation.x = -2.6+Math.sin(t*3+npc.phase+0.6)*0.15;
+}
+function placeNPC(npc, x,y,z, rotY){
+  npc.group.position.set(x,y,z);
+  npc.group.rotation.y = rotY||0;
+  npc.group.visible = true;
+}
+function hideNPCsFrom(i){ for(;i<npcs.length;i++) npcs[i].group.visible=false; }
+function handOf(npc){
+  const p = npc.group.position;
+  const f = new THREE.Vector3(Math.sin(npc.group.rotation.y),0,Math.cos(npc.group.rotation.y));
+  return new THREE.Vector3(p.x+f.x*0.45, p.y+1.25, p.z+f.z*0.45);
+}
+
+// ----------------------------------------------------------------------------
+// Ropes
+// ----------------------------------------------------------------------------
+const ropeMat = new THREE.MeshStandardMaterial({color:0x5c3f26, roughness:1});
+const ROPE_POOL_SIZE = 8;
+const ropePool = [];
+for(let i=0;i<ROPE_POOL_SIZE;i++){
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(0.045,0.045,1,4), ropeMat);
+  m.visible = false; scene.add(m); ropePool.push(m);
+}
+function placeRope(mesh, a, b){ placeStick(mesh, a, b); }
+function hideAllRopes(){ ropePool.forEach(r=>r.visible=false); }
+
+// ----------------------------------------------------------------------------
+// Dust particles (quarrying / carving)
+// ----------------------------------------------------------------------------
+const DUST_N = 160;
+const dustGeo = new THREE.BufferGeometry();
+const dustPos = new Float32Array(DUST_N*3);
+const dustVel = new Float32Array(DUST_N);
+for(let i=0;i<DUST_N;i++){
+  dustPos[i*3]=(Math.random()-0.5)*3; dustPos[i*3+1]=Math.random()*3; dustPos[i*3+2]=(Math.random()-0.5)*3;
+  dustVel[i]=0.3+Math.random()*0.6;
+}
+dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos,3));
+const dustMat = new THREE.PointsMaterial({color:0xcbbfa5, size:0.11, transparent:true, opacity:0.65});
+const dust = new THREE.Points(dustGeo, dustMat);
+dust.visible = false;
+scene.add(dust);
+function updateDust(dt, center){
+  const arr = dustGeo.attributes.position.array;
+  for(let i=0;i<DUST_N;i++){
+    arr[i*3+1] -= dustVel[i]*dt;
+    arr[i*3] += Math.sin(i+arr[i*3+1]*3)*0.004 + windX*0.012;   // trade wind drift
+    if(arr[i*3+1] < -0.2){
+      arr[i*3]=(Math.random()-0.5)*3.2; arr[i*3+1]=2.2+Math.random()*3; arr[i*3+2]=(Math.random()-0.5)*3.2;
+    }
+  }
+  dustGeo.attributes.position.needsUpdate = true;
+  dust.position.copy(center);
+}
+let windX = 0.6;
+
+// ----------------------------------------------------------------------------
+// Stage props
+// ----------------------------------------------------------------------------
+// carving scaffold (posts + plank) in front of the statue
+const scaffold = new THREE.Group();
+{
+  const wood = new THREE.MeshStandardMaterial({color:0x5b4429, roughness:1});
+  const plank = new THREE.Mesh(new THREE.BoxGeometry(3.4,0.12,0.9), wood);
+  plank.position.y = 2.45; plank.castShadow = true; scaffold.add(plank);
+  [-1.5,1.5].forEach(x=>[-0.35,0.35].forEach(z=>{
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.08,2.9,5), wood);
+    post.position.set(x,1.25,z); post.castShadow = true; scaffold.add(post);
+  }));
+  scaffold.visible = false;
+  scene.add(scaffold);
+}
+const SCAFFOLD_POS = new THREE.Vector3(QUARRY_XZ.x, terrainHeight(QUARRY_XZ.x, QUARRY_XZ.z+1.7)-0.2, QUARRY_XZ.z+1.7);
+scaffold.position.copy(SCAFFOLD_POS);
+
+// packing stones and levers for raising the statue
+const stoneGeo = new THREE.BoxGeometry(1.5,0.45,1.1);
+const rampStoneMat = new THREE.MeshStandardMaterial({color:0x8a8070, roughness:1, flatShading:true});
+const RAMP_STONES_MAX = 10;
+const rampStones = [];
+for(let i=0;i<RAMP_STONES_MAX;i++){
+  const s = new THREE.Mesh(stoneGeo, rampStoneMat);
+  s.visible = false; s.castShadow = true; s.receiveShadow = true;
+  s.userData.jx = (Math.random()-0.5)*0.25; s.userData.ry = (Math.random()-0.5)*0.3;
+  scene.add(s);
+  rampStones.push(s);
+}
+const leverMat = new THREE.MeshStandardMaterial({color:0x4a3a26, roughness:1});
+const levers = [0,1].map(()=>{
+  const lv = new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.14,1,6), leverMat);
+  lv.visible = false; lv.castShadow = true; scene.add(lv); return lv;
+});
+
+// sloping timber ramp for the pukao, built from the inland side up to the brow
+const PR_A = new THREE.Vector3(46, terrainHeight(46,11.5)+0.15, 11.5);
+const PR_B = new THREE.Vector3(46, T_TOP+MOAI_TOP_Y-0.05, FINAL_POS.z-1.0);
+const PR_DIR = PR_B.clone().sub(PR_A).normalize();
+const PR_LEN = PR_B.distanceTo(PR_A);
+const PR_NORMAL = new THREE.Vector3(0, PR_DIR.z, -PR_DIR.y);   // perpendicular, pointing up
+const pukaoRampGroup = new THREE.Group();
+{
+  const wood = new THREE.MeshStandardMaterial({color:0x5b4429, roughness:1});
+  const stick = (r, a, b)=>{ const m = new THREE.Mesh(new THREE.CylinderGeometry(r,r,1,6), wood); m.castShadow = true; placeStick(m,a,b); pukaoRampGroup.add(m); };
+  [-1.25,1.25].forEach(x=>{
+    stick(0.13, PR_A.clone().setX(46+x), PR_B.clone().setX(46+x));
+    for(let d=1.5; d<PR_LEN-0.5; d+=2.4){
+      const p = PR_A.clone().addScaledVector(PR_DIR, d);
+      stick(0.1, new THREE.Vector3(46+x, terrainHeight(46+x,p.z)-0.2, p.z), new THREE.Vector3(46+x, p.y, p.z));
+    }
+  });
+  for(let d=0.3; d<PR_LEN; d+=0.45){
+    const p = PR_A.clone().addScaledVector(PR_DIR, d).addScaledVector(PR_NORMAL, 0.05);
+    stick(0.08, new THREE.Vector3(46-1.35,p.y,p.z), new THREE.Vector3(46+1.35,p.y,p.z));
+  }
+}
+pukaoRampGroup.visible = false;
+scene.add(pukaoRampGroup);
+
+// ----------------------------------------------------------------------------
+// Transport path (quarry -> ahu)
+// ----------------------------------------------------------------------------
+const transportCurve = new THREE.QuadraticBezierCurve3(
+  new THREE.Vector3(QUARRY_XZ.x, 0, QUARRY_XZ.z),
+  new THREE.Vector3(-1, 0, -24),
+  new THREE.Vector3(AHU_BASE_XZ.x, 0, AHU_BASE_XZ.z)
+);
+function transportPoint(t, out){
+  const p = transportCurve.getPoint(clamp(t,0,1));
+  out.set(p.x, terrainHeight(p.x,p.z), p.z);
+  return out;
+}
+function transportHeading(t){
+  const a = transportCurve.getPoint(clamp(t+0.01,0,1)), b = transportCurve.getPoint(clamp(t-0.01,0,1));
+  return Math.atan2(a.x-b.x, a.z-b.z);
+}
+{
+  const N=60;
+  const pts = [];
+  for(let i=0;i<=N;i++){
+    const p = transportCurve.getPoint(i/N);
+    pts.push(new THREE.Vector3(p.x, terrainHeight(p.x,p.z)+0.04, p.z));
+  }
+  const verts = [];
+  for(let i=0;i<pts.length-1;i++){
+    const a=pts[i], b=pts[i+1];
+    const dir = new THREE.Vector3().subVectors(b,a).normalize();
+    const side = new THREE.Vector3(-dir.z,0,dir.x).multiplyScalar(1.6);
+    verts.push(a.x-side.x,a.y,a.z-side.z, a.x+side.x,a.y,a.z+side.z, b.x-side.x,b.y,b.z-side.z);
+    verts.push(a.x+side.x,a.y,a.z+side.z, b.x+side.x,b.y,b.z+side.z, b.x-side.x,b.y,b.z-side.z);
+  }
+  const pathGeo = new THREE.BufferGeometry();
+  pathGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts),3));
+  pathGeo.computeVertexNormals();
+  const pathMesh = new THREE.Mesh(pathGeo, new THREE.MeshStandardMaterial({color:0x8a7a55, roughness:1, side:THREE.DoubleSide}));
+  pathMesh.receiveShadow = true;
+  scene.add(pathMesh);
+}
+
+const STAGE_NAMES = [
+  ['阶段 1 / 5 · 开采 Quarrying','岛民手持玄武岩石斧（toki）在 Rano Raraku 火山凝灰岩壁上凿出沟槽，把整块巨石从山体中剥离出来。'],
+  ['阶段 2 / 5 · 雕刻 Carving','工匠搭起木架，先粗凿头部，再细刻眉骨、长鼻、薄唇与长耳，最后雕出躯干与贴身的双臂。'],
+  ['阶段 3 / 5 · 运输 Walking Transport','三组绳索：左右两队交替拉动让直立的石像摇摆“行走”，后方一队稳住防止前倾（考古实验验证的“行走摩艾”方案）。'],
+  ['阶段 4 / 5 · 竖立 Erecting','石像仰面放倒、沿土坡拖上祭坛 (Ahu)，再以木杠杆一次次撬起，在背后逐层垫入石块，配合绳索牵引直至竖立。'],
+  ['阶段 5 / 5 · 戴帽 Pukao Placement','搭建木质斜坡，岛民用绳索把圆柱形的红色火山渣普卡奥沿坡滚上石像头顶，再翻转安放。'],
+];
+
+// ----------------------------------------------------------------------------
+// Master timeline state
+// ----------------------------------------------------------------------------
+let masterProgress = 0;
+let targetProgress = 0;
+let isPlaying = false;
+const PLAY_SPEED = AUTOTEST ? 0.26 : 0.09; // stages per second
+
+const clock = new THREE.Clock();
+let frameDt = 0.016; // per-frame dt for the dust sim
+
+function resetProps(){
+  scaffold.visible = false;
+  earthRamp.visible = false;
+  pukaoRampGroup.visible = false;
+  rampStones.forEach(s=>s.visible=false);
+  levers.forEach(l=>l.visible=false);
+  dust.visible = false;
+  niche.visible = true;
+  hideAllRopes();
+}
+const UP = new THREE.Vector3(0,1,0);
+
+// ----------------------------------------------------------------------------
+// Stage 0: Quarrying – the block is cut free and eased out of the rock face
+// ----------------------------------------------------------------------------
+function stageQuarrying(localT, t){
+  resetProps();
+  moaiRig.visible = false;
+  pukao.visible = false;
+  setRockOpacity(1);
+  roughBlock.scale.set(1,1,1);
+
+  const k = smoothstep(0.1,1,localT);
+  const p = QUARRY_POS.clone().add(new THREE.Vector3(0, 0, -2.15*(1-k)));
+  niche.visible = k > 0.3;
+  p.y = QUARRY_POS.y - 0.25;
+  roughBlock.position.copy(p);
+
+  dust.visible = true;
+  updateDust(frameDt, new THREE.Vector3(p.x, p.y, WALL_FRONT_Z+1.2));
+
+  // two cutters work each side trench, two undercut the base, two trim the top from the face
+  const spots = [[-1.9,0.4],[1.9,0.4],[-1.2,1.9],[1.2,1.9],[-2.6,-0.3],[2.6,-0.3]];
+  spots.forEach(([dx,dz],i)=>{
+    const npc = npcs[i];
+    const x = QUARRY_XZ.x+dx, z = WALL_FRONT_Z+dz+0.8;
+    placeNPC(npc, x, terrainHeight(x,z)-0.05, z, Math.atan2(QUARRY_XZ.x-x, (p.z+0.5)-z));
+    poseChisel(npc, t+i*0.37);
+  });
+  hideNPCsFrom(6);
+  return new THREE.Vector3(QUARRY_XZ.x, QUARRY_POS.y+3, QUARRY_XZ.z);
+}
+
+// ----------------------------------------------------------------------------
+// Stage 1: Carving – head first, then the face, torso and arms in relief
+// ----------------------------------------------------------------------------
+function stageCarving(localT, t){
+  resetProps();
+  pukao.visible = false;
+  const base = QUARRY_POS.clone(); base.y -= 0.25;
+  roughBlock.position.copy(base);
+  const shrink = smoothstep(0.05,0.95,localT);
+  roughBlock.scale.set(1-0.18*shrink, 1-0.06*shrink, 1-0.2*shrink);
+  setRockOpacity(1-smoothstep(0.1,0.92,localT));
+
+  moaiRig.visible = true;
+  setRig(base, 0, 0, 0);
+  setMoaiReveal(localT);
+
+  scaffold.visible = localT < 0.97;
+  dust.visible = localT < 0.93;
+  updateDust(frameDt, base.clone().add(new THREE.Vector3(0,1.5,1.2)));
+
+  // two on the scaffold work the head/face, four on the ground work the body
+  const spots = [[-0.7,SCAFFOLD_POS.y+2.5,SCAFFOLD_POS.z],[0.7,SCAFFOLD_POS.y+2.5,SCAFFOLD_POS.z],
+                 [-1.9,null,base.z+0.4],[1.9,null,base.z+0.4],[-1.4,null,base.z+2.6],[1.4,null,base.z+2.6]];
+  spots.forEach(([dx,y,z],i)=>{
+    const npc = npcs[i];
+    const x = base.x+dx;
+    placeNPC(npc, x, y===null ? terrainHeight(x,z)-0.05 : y, z, Math.atan2(base.x-x, base.z-z));
+    poseChisel(npc, t+i*0.3);
+  });
+  hideNPCsFrom(6);
+  return new THREE.Vector3(base.x, base.y+3.2, base.z);
+}
+
+// ----------------------------------------------------------------------------
+// Stage 2: Transport – the "walking moai"
+// ----------------------------------------------------------------------------
+const _tp = new THREE.Vector3();
+function stageTransport(localT, t){
+  resetProps();
+  niche.visible = true;
+  roughBlock.visible = false;
+  pukao.visible = false;
+  moaiRig.visible = true;
+  setMoaiReveal(1);
+
+  const pos = transportPoint(localT, new THREE.Vector3());
+  // turn from facing out of the quarry to the direction of travel, then keep heading
+  const heading = lerpAngle(0, transportHeading(localT), smoothstep(0,0.05,localT));
+
+  const phase = localT*52.0;
+  const swing = Math.sin(phase);
+  const rock = swing*0.16;                            // rocking on the base edge
+  const yawWaddle = Math.cos(phase)*0.12;             // each rock pivots the statue forward
+  const bounce = Math.abs(swing)*0.1;
+  pos.y += bounce;
+  setRig(pos, heading+yawWaddle, -0.05, rock);
+
+  const neckW = moaiPoint(moaiGroup.userData.neckPoint);
+  const chestW = moaiPoint(new THREE.Vector3(0,2.4,-0.7));
+
+  const rightDir = new THREE.Vector3(1,0,0).applyAxisAngle(UP, heading);
+  const leftDir = rightDir.clone().negate();
+  const backDir = new THREE.Vector3(0,0,-1).applyAxisAngle(UP, heading);
+  const fwdDir = backDir.clone().negate();
+
+  const leftPull = Math.max(0, swing);
+  const rightPull = Math.max(0, -swing);
+  const backTension = 0.4+0.2*Math.sin(phase*0.5);
+
+  // side teams stand out to the side and a little ahead; the back team trails behind
+  function placeTeam(startIdx, count, anchor, dir, pull, ropeIdx){
+    let lead = null;
+    for(let i=0;i<count;i++){
+      const npc = npcs[startIdx+i];
+      const d = 3.2+i*1.5;
+      const p = pos.clone().addScaledVector(dir, d).addScaledVector(dir===backDir ? UP : fwdDir, dir===backDir ? 0 : 1.2);
+      p.y = terrainHeight(p.x,p.z);
+      placeNPC(npc, p.x,p.y,p.z, Math.atan2(-dir.x, -dir.z));   // face the statue, lean away
+      posePull(npc, t+i*0.15, pull);
+      if(i===0) lead = npc;
+    }
+    placeRope(ropePool[ropeIdx], anchor, handOf(lead));
+  }
+  placeTeam(0,4, neckW, leftDir, leftPull, 0);
+  placeTeam(4,4, neckW, rightDir, rightPull, 1);
+  placeTeam(8,3, chestW, backDir, backTension, 2);
+  hideNPCsFrom(11);
+
+  return pos.clone().add(new THREE.Vector3(0,3,0));
+}
+
+// ----------------------------------------------------------------------------
+// Stage 3: Erecting onto the ahu
+// ----------------------------------------------------------------------------
+const LIE_A = THREE.MathUtils.degToRad(84);
+const LIFT_START = 0.5;
+function stageErecting(localT, t){
+  resetProps();
+  roughBlock.visible = false;
+  pukao.visible = false;
+  moaiRig.visible = true;
+  setMoaiReveal(1);
+  earthRamp.visible = true;
+
+  const S0 = new THREE.Vector3(AHU_BASE_XZ.x, terrainHeight(AHU_BASE_XZ.x,AHU_BASE_XZ.z), AHU_BASE_XZ.z);
+  const R0z = 12.6;
+  const pos = new THREE.Vector3();
+  let yaw = Math.PI, a = 0, rock = 0, leverF = 0, phaseName;
+
+  if(localT < 0.12){
+    // final steps: turn to face inland (moai stand with their backs to the sea)
+    const k = localT/0.12;
+    yaw = lerpAngle(transportHeading(1), Math.PI, smoothstep(0,1,k));
+    rock = Math.sin(k*Math.PI*6)*0.12*(1-k);
+    pos.copy(S0);
+    phaseName = 'turn';
+  } else if(localT < 0.26){
+    // walk to the foot of the ramp and lower it onto its back
+    const k = (localT-0.12)/0.14;
+    const m = smoothstep(0,0.6,k);
+    const x = lerp(S0.x, 46, m), z = lerp(S0.z, R0z, m);
+    a = (Math.PI/2 - RAMP_SLOPE) * smoothstep(0.6,1,k);
+    rock = Math.sin(k*40)*0.1*(1-smoothstep(0.45,0.6,k));
+    pos.set(x, terrainHeight(x,z) + HALF_DEPTH*Math.sin(a), z);
+    phaseName = 'lower';
+  } else if(localT < LIFT_START){
+    // haul it head-first up the earthen ramp onto the platform
+    const k = smoothstep(0,1,(localT-0.26)/(LIFT_START-0.26));
+    const z = lerp(R0z, FINAL_POS.z, k);
+    a = lerp(Math.PI/2 - RAMP_SLOPE, LIE_A, smoothstep(RAMP_Z1-1, RAMP_Z1+1.5, z));
+    pos.set(46, surfaceY(z) + HALF_DEPTH*Math.sin(a), z);
+    phaseName = 'haul';
+  } else {
+    // lever stroke by stroke, packing stones under the back each time
+    const strokes = 7;
+    const k = clamp((localT-LIFT_START)/0.44, 0, 1);
+    const s = k*strokes, i = Math.min(strokes-1, Math.floor(s));
+    leverF = k>=1 ? 0 : s-i;
+    const prog = k>=1 ? 1 : (i + smoothstep(0.15,0.75,leverF))/strokes;
+    a = LIE_A*(1-prog);
+    pos.set(46, T_TOP + HALF_DEPTH*Math.sin(a), FINAL_POS.z);
+    phaseName = 'lift';
+  }
+  setRig(pos, yaw, -a, rock);
+  const neckW = moaiPoint(moaiGroup.userData.neckPoint);
+
+  // packing stones under the back (head end points to +z while lying)
+  const showStack = localT > 0.44 && localT < 0.985;
+  let stackTop = T_TOP, stackZ = FINAL_POS.z;
+  if(showStack){
+    const P = pos.clone().add(new THREE.Vector3(0, Math.cos(a), Math.sin(a)).multiplyScalar(3.0));
+    stackTop = P.y - Math.sin(a)*HALF_DEPTH;
+    stackZ = P.z + Math.cos(a)*HALF_DEPTH + 0.4;
+    const h = Math.max(0, stackTop - T_TOP);
+    const n = Math.min(RAMP_STONES_MAX, Math.ceil(h/0.45));
+    const vanish = 1 - smoothstep(0.95,0.985,localT);
+    rampStones.forEach((s,i)=>{
+      if(i >= n){ s.visible = false; return; }
+      const layerH = Math.min(0.45, h - i*0.45);
+      s.visible = vanish > 0.02;
+      s.position.set(46+s.userData.jx, T_TOP + i*0.45 + layerH/2, stackZ);
+      s.rotation.y = s.userData.ry;
+      s.scale.set(vanish, (layerH/0.45)*vanish, vanish);
+    });
+  }
+
+  if(phaseName === 'turn' || phaseName === 'lower'){
+    // walking crew still on the ropes either side
+    for(let i=0;i<8;i++){
+      const npc = npcs[i];
+      const side = i<4 ? -1 : 1, j = i%4;
+      const x = pos.x+side*(3.2+j*1.4), z = pos.z+1.2;
+      placeNPC(npc, x, terrainHeight(x,z), z, side>0 ? -Math.PI/2 : Math.PI/2);
+      posePull(npc, t+j*0.2, 0.35+0.3*Math.abs(Math.sin(t*2)));
+      if(j===0) placeRope(ropePool[side<0?0:1], neckW, handOf(npc));
+    }
+    hideNPCsFrom(8);
+  } else if(phaseName === 'haul'){
+    // haulers below the seaward wall pull it up over the platform edge
+    for(let i=0;i<6;i++){
+      const npc = npcs[i];
+      const side = i<3 ? -1 : 1, j = i%3;
+      const x = 46+side*1.6, z = 31.5+j*1.5;
+      placeNPC(npc, x, terrainHeight(x,z), z, Math.PI);
+      posePull(npc, t+j*0.2, 0.9);
+      if(j===0) placeRope(ropePool[side<0?0:1], neckW, handOf(npc));
+    }
+    // two pushers behind the base on the ramp
+    for(let i=0;i<2;i++){
+      const npc = npcs[6+i];
+      const z = pos.z-1.1, x = 46+(i?0.5:-0.5);
+      placeNPC(npc, x, surfaceY(z), z, 0);
+      posePush(npc, t, 0.8);
+    }
+    hideNPCsFrom(8);
+  } else {
+    // pullers on the ramp draw the head up toward vertical
+    for(let i=0;i<4;i++){
+      const npc = npcs[i];
+      const z = 20.5-i*1.5;
+      placeNPC(npc, 46+(i%2?0.35:-0.35), surfaceY(z), z, 0);
+      if(localT > 0.96) poseCelebrate(npc, t+i*0.3);
+      else posePull(npc, t+i*0.2, 0.5+0.4*Math.sin(leverF*Math.PI));
+      if(i===0 && localT <= 0.96) placeRope(ropePool[0], neckW, handOf(npc));
+    }
+    // lever crews bear down on the handles; packers wait to slip in the next stone
+    const leverOn = localT < 0.95;
+    levers.forEach((lv,i)=>{
+      const side = i?1:-1;
+      const tip = new THREE.Vector3(46+side*0.45, stackTop-0.05, stackZ-0.35);
+      const handle = new THREE.Vector3(46+side*2.8, T_TOP+1.5-1.0*Math.sin(leverF*Math.PI), stackZ+0.6);
+      if(leverOn) placeStick(lv, handle, tip); else lv.visible = false;
+      const op = npcs[4+i];
+      placeNPC(op, handle.x+side*0.45, T_TOP, handle.z, side>0 ? -Math.PI/2 : Math.PI/2);
+      if(leverOn) posePush(op, t, Math.sin(leverF*Math.PI)); else poseCelebrate(op, t);
+      const packer = npcs[6+i];
+      placeNPC(packer, 46+side*1.3, T_TOP, stackZ+1.3, side>0 ? -2.4 : 2.4);
+      if(leverOn) poseChisel(packer, t*0.5+i); else poseIdle(packer, t);
+      packer.tool.visible = false;
+    });
+    hideNPCsFrom(8);
+  }
+
+  return new THREE.Vector3(pos.x, (phaseName==='lift' ? T_TOP : pos.y)+3, pos.z+ (phaseName==='lift' ? 1.5 : 0));
+}
+
+// ----------------------------------------------------------------------------
+// Stage 4: Pukao placement – rolled up a timber ramp, then tipped onto the head
+// ----------------------------------------------------------------------------
+function stagePukao(localT, t){
+  resetProps();
+  roughBlock.visible = false;
+  moaiRig.visible = true;
+  setMoaiReveal(1);
+  setRig(FINAL_POS, Math.PI, 0, 0);
+
+  pukaoRampGroup.visible = localT < 0.95;
+  pukao.visible = true;
+  const inner = pukao.userData.inner;
+
+  const ROLL_END = 0.74, SETTLE_END = 0.9;
+  const e = smoothstep(0, 1, clamp(localT/ROLL_END, 0, 1));
+  const rollAngle = e*PR_LEN/PUKAO_R;
+  const rollPos = PR_A.clone().addScaledVector(PR_DIR, 1.2 + e*(PR_LEN-1.2)).addScaledVector(PR_NORMAL, PUKAO_R);
+  const seat = new THREE.Vector3(46, T_TOP+MOAI_TOP_Y+0.65, FINAL_POS.z-0.05);
+  if(localT < ROLL_END){
+    pukao.position.copy(rollPos);
+    pukao.rotation.set(rollAngle, 0, 0);
+    inner.rotation.set(0, 0, Math.PI/2);          // cylinder axis sideways, so it rolls
+  } else {
+    const k = smoothstep(0, 1, (localT-ROLL_END)/(SETTLE_END-ROLL_END));
+    const lift = Math.sin(k*Math.PI)*0.7;
+    pukao.position.lerpVectors(rollPos, seat, k); pukao.position.y += lift;
+    const restAngle = Math.round(rollAngle/(Math.PI*2))*Math.PI*2;
+    pukao.rotation.set(lerp(rollAngle, restAngle, k), 0, 0);
+    inner.rotation.set(0, 0, (Math.PI/2)*(1-k));  // tip upright onto the head
+  }
+
+  // haulers on the platform behind the statue pull the rope over the head
+  const over = new THREE.Vector3(46, T_TOP+MOAI_TOP_Y+0.1, FINAL_POS.z+0.3);
+  const hauling = localT < SETTLE_END;
+  for(let i=0;i<4;i++){
+    const npc = npcs[i];
+    const side = i<2 ? -1 : 1, j = i%2;
+    const x = 46+side*0.9, z = 26.6+j*1.3;
+    placeNPC(npc, x, T_TOP, z, Math.PI);
+    if(hauling) posePull(npc, t+i*0.2, 0.85); else poseCelebrate(npc, t+i*0.2);
+    if(j===0 && hauling) placeRope(ropePool[side<0?1:2], over, handOf(npc));
+  }
+  if(hauling) placeRope(ropePool[0], pukao.position.clone(), over);
+
+  // guiders push from behind on the ramp while it rolls
+  for(let i=0;i<2;i++){
+    const npc = npcs[4+i];
+    const side = i?1:-1;
+    if(localT < ROLL_END){
+      const d = Math.max(0.3, 1.2 + e*(PR_LEN-1.2) - 1.9);
+      const p = PR_A.clone().addScaledVector(PR_DIR, d);
+      placeNPC(npc, 46+side*0.6, p.y, p.z, 0);
+      npc.group.rotation.x = 0;
+      posePush(npc, t, 0.9);
+    } else {
+      placeNPC(npc, 46+side*3.2, terrainHeight(46+side*3.2, 9), 9, 0);
+      poseCelebrate(npc, t+i);
+    }
+  }
+
+  // onlookers at the foot of the ahu
+  for(let i=0;i<6;i++){
+    const npc = npcs[6+i];
+    const x = 38+i*3.2, z = 7+(i%2)*1.5;
+    placeNPC(npc, x, terrainHeight(x,z), z, Math.atan2(46-x, 24-z));
+    if(localT > SETTLE_END) poseCelebrate(npc, t+i*0.3); else poseIdle(npc, t+i);
+  }
+  hideNPCsFrom(12);
+
+  return new THREE.Vector3(46, T_TOP+3.5, 20 + 3*smoothstep(0.6,1,localT));
+}
+
+
+const STAGE_FUNCS = [stageQuarrying, stageCarving, stageTransport, stageErecting, stagePukao];
+
+// ----------------------------------------------------------------------------
+// Camera rig pan (preserve user orbit offset while recentring pivot)
+// ----------------------------------------------------------------------------
+// Preferred camera offset (camera - pivot) per stage. The camera eases toward it
+// unless the user has orbited/zoomed in the last few seconds, so manual 360° viewing
+// is never fought, but each stage still opens on a readable angle. The ahu views look
+// from inland, where the statues face.
+const STAGE_VIEW = [
+  new THREE.Vector3(10, 4, 16),
+  new THREE.Vector3(-6, 2.5, 12),
+  new THREE.Vector3(8, 9, 17),
+  new THREE.Vector3(-17, 7, -9),
+  new THREE.Vector3(-9, 4, -17),
+];
+let lastUserInput = -100;
+controls.addEventListener('start', ()=>{ lastUserInput = clock.elapsedTime; });
+const _off = new THREE.Vector3();
+function panRigTowards(focus, dt, stageIndex){
+  const delta = focus.clone().sub(controls.target).multiplyScalar(Math.min(1, dt*1.6));
+  controls.target.add(delta);
+  camera.position.add(delta);
+  if(clock.elapsedTime - lastUserInput > 4){
+    _off.subVectors(camera.position, controls.target).lerp(STAGE_VIEW[stageIndex], Math.min(1, dt*0.9));
+    camera.position.copy(controls.target).add(_off);
+  }
+}
+
+// ----------------------------------------------------------------------------
+// UI wiring
+// ----------------------------------------------------------------------------
+const slider = document.getElementById('progressSlider');
+const pctLabel = document.getElementById('pctLabel');
+const playBtn = document.getElementById('playBtn');
+const resetBtn = document.getElementById('resetBtn');
+const stageBtns = Array.from(document.querySelectorAll('.stageBtn'));
+const stageNameLbl = document.getElementById('stageNameLbl');
+const stageDescLbl = document.getElementById('stageDescLbl');
+
+function updateUI(){
+  slider.value = masterProgress;
+  const pct = Math.round((masterProgress/5)*100);
+  pctLabel.textContent = pct+'%';
+  const stageIndex = clamp(Math.floor(masterProgress+1e-6),0,4);
+  stageBtns.forEach((b,i)=> b.classList.toggle('active', i===stageIndex));
+  const [name,desc] = STAGE_NAMES[stageIndex];
+  stageNameLbl.textContent = name;
+  stageDescLbl.textContent = desc;
+  playBtn.textContent = isPlaying ? '❚❚' : '▶';
+}
+
+slider.addEventListener('input', ()=>{
+  masterProgress = parseFloat(slider.value);
+  targetProgress = masterProgress;
+  isPlaying = false;
+  updateUI();
+});
+playBtn.addEventListener('click', ()=>{
+  isPlaying = !isPlaying;
+  if(isPlaying && masterProgress>=5) masterProgress=0;
+  updateUI();
+});
+resetBtn.addEventListener('click', ()=>{
+  masterProgress = 0; targetProgress = 0; isPlaying=false; updateUI();
+});
+stageBtns.forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const idx = parseInt(btn.dataset.stage,10);
+    targetProgress = idx + 0.001;
+    isPlaying = false;
+  });
+});
+
+// ----------------------------------------------------------------------------
+// Main animation loop
+// ----------------------------------------------------------------------------
+
+function updateScene(dt, t){
+  if(isPlaying){
+    masterProgress += dt*PLAY_SPEED;
+    if(masterProgress >= 5){
+      if(AUTOTEST){ masterProgress = masterProgress % 5; }
+      else { masterProgress = 5; isPlaying = false; }
+    }
+    targetProgress = masterProgress;
+  } else if(Math.abs(targetProgress-masterProgress) > 0.0005){
+    masterProgress = lerp(masterProgress, targetProgress, Math.min(1, dt*4));
+  }
+
+  const stageIndex = clamp(Math.floor(masterProgress+1e-6),0,4);
+  const localT = clamp(masterProgress-stageIndex,0,1);
+
+  const focus = STAGE_FUNCS[stageIndex](localT, t);
+
+  // each stage returns the point the camera pivot should follow
+  panRigTowards(focus, dt, stageIndex);
+  windX = 0.6 + 0.4*Math.sin(t*0.31) + 0.2*Math.sin(t*1.7);
+
+  // ocean waves
+  const arr = oceanGeo.attributes.position.array;
+  for(let i=0;i<arr.length;i+=3){
+    arr[i+1] = oceanBasePos[i+1] + Math.sin(arr[i]*0.05+t*1.1)*0.35 + Math.cos(arr[i+2]*0.06+t*0.8)*0.28;
+  }
+  oceanGeo.attributes.position.needsUpdate = true;
+
+  // reeds wind sway
+  reeds.forEach(g=>{
+    g.children.forEach((blade,i)=>{
+      blade.rotation.z = -0.12*windX + Math.sin(t*1.6+g.userData.phase+i)*0.12*windX;
+    });
+  });
+
+  // clouds drift
+  clouds.forEach(c=>{
+    c.position.x += c.userData.speed*dt;
+    if(c.position.x > 300) c.position.x = -300;
+  });
+
+  updateUI();
+}
+
+function animate(){
+  requestAnimationFrame(animate);
+  // No upper clamp on dt: under slow software rendering only a handful of real
+  // frames may fire, and progress/camera-follow lerps must still fully converge
+  // within those frames rather than crawling at an assumed 60fps rate.
+  const dt = clock.getDelta();
+  const t = clock.elapsedTime;
+  frameDt = Math.min(dt, 0.1); // dust sim only: keep per-frame fall speed sane even on sparse frames
+  updateScene(dt, t);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// ----------------------------------------------------------------------------
+// Start / autotest handling
+// ----------------------------------------------------------------------------
+document.getElementById('loading').style.display = 'none';
+
+function beginExperience(){
+  document.getElementById('startOverlay').style.display = 'none';
+  document.getElementById('topHud').style.display = 'block';
+  document.getElementById('helpHud').style.display = 'block';
+  document.getElementById('bottomBar').style.display = 'block';
+  isPlaying = true;
+  updateUI();
+}
+
+document.getElementById('beginBtn').addEventListener('click', beginExperience);
+
+if(AUTOTEST){
+  beginExperience();
+  const qs = new URLSearchParams(location.search);
+  const qsT = qs.get('t');
+  const qsStage = qs.get('stage');
+  if(qsT !== null && qsT !== ''){
+    // debug helper: ?autotest&t=<0..5> freezes at an exact master-progress value for QA
+    masterProgress = clamp(parseFloat(qsT), 0, 5);
+    targetProgress = masterProgress;
+    isPlaying = false;
+  } else if(qsStage !== null && qsStage !== ''){
+    // debug helper: ?autotest&stage=N freezes mid-way through stage N (0-4) for QA screenshots
+    const sIdx = clamp(parseFloat(qsStage), 0, 4);
+    masterProgress = sIdx + 0.5;
+    targetProgress = masterProgress;
+    isPlaying = false;
+  } else {
+    isPlaying = true;
+    masterProgress = 0;
+    targetProgress = 0;
+  }
+}
+
+updateUI();
+animate();
+</script>
+</body>
+</html>
