@@ -9,7 +9,7 @@ Twenty-nine builds: single-file web pieces plus two native macOS apps. Most were
 
 | Tasks completed | Active agent time | Output tokens | Total tokens |
 |:-:|:-:|:-:|:-:|
-| **29** | **15h 9m** | **1.1M** | **133.9M** |
+| **29** | **14h 39m** | **1.1M** | **131.5M** |
 
 > **Active time** leaves out waiting for the usage limit to reset (about 4.3 h, twice) and any idle gap over 20 minutes.
 > **Total tokens** = fresh input + cache writes + cache reads + output; cache reads are most of it.
