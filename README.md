@@ -1,6 +1,6 @@
 # AI Creation · Completed Deliverables
 
-Twenty-nine builds: single-file web pieces plus two native macOS apps. Most were made by Claude Code (the main session or parallel subagents); eight were first built by Codex or Muse and finished by Claude. Each section below shows the original task brief, the time spent actively working on it, the tokens it used, a screenshot, and a link to the output.
+Thirty builds: single-file web pieces plus two native macOS apps. Most were made by Claude Code (the main session or parallel subagents); eight were first built by Codex or Muse and finished by Claude. Each section below shows the original task brief, the time spent actively working on it, the tokens it used, a screenshot, and a link to the output.
 
 **▶ Live site: [aray4702.github.io/ai_creation](https://aray4702.github.io/ai_creation/)**, where every game, simulation and animation runs in your browser.
 
@@ -9,7 +9,7 @@ Twenty-nine builds: single-file web pieces plus two native macOS apps. Most were
 
 | Tasks completed | Active agent time | Output tokens | Total tokens |
 |:-:|:-:|:-:|:-:|
-| **29** | **13h 10m** | **1.1M** | **121.8M** |
+| **30** | **13h 21m** | **1.1M** | **123.2M** |
 
 > **Active time** leaves out waiting for the usage limit to reset (about 4.3 h, twice) and any idle gap over 20 minutes. For each task it counts only the session work that finished it, not planning for other tasks or earlier attempts.
 > **Total tokens** = fresh input + cache writes + cache reads + output; cache reads are most of it.
@@ -47,6 +47,7 @@ Twenty-nine builds: single-file web pieces plus two native macOS apps. Most were
 27. [Neutron Star: Magnetic Field and Polar Jets](#27-neutron-star)
 28. [Butterfly Life Cycle](#28-butterfly-life-cycle)
 29. [Void Wing: Space Dogfight & Asteroid Battle](#29-void-wing)
+30. [Quantum Collapse: Two Observers vs Three (CN)](#30-quantum-collapse)
 
 ---
 
@@ -608,6 +609,26 @@ A continuous 3D metamorphosis in a meadow: the egg hatches, the caterpillar eats
 
 ---
 
+<a id="30-quantum-collapse"></a>
+## 30. Quantum Collapse: Two Observers vs Three (CN)
+
+**Explainer** · Main session
+
+<p><a href="quantum-collapse/quantum-collapse.html"><img src="quantum-collapse/quantum-collapse.png" alt="Screenshot of Open the explainer" width="640"></a></p>
+
+A Chinese explainer on wavefunction collapse when A measures B, and when an outside observer C watches the sealed lab (Wigner's friend). It comes as an interactive page with two hands-on experiments, a narrated 2-minute 20-second video and two diagrams.
+
+> Built in a session in the my-articles project; the figures cover that session from the Chinese explanation request to the finished outputs.
+
+| Active time | Output tokens | Total tokens |
+|:-:|:-:|:-:|
+| 11.8 min | 44,124 | 1.4M (1,400,877) |
+
+**Output:** [Open the explainer](quantum-collapse/quantum-collapse.html) · [Video (2:20)](quantum-collapse/quantum-collapse-explainer.mp4) · [Diagram: A and B](quantum-collapse/fig1-ab-collapse.png) · [Diagram: A, B and C](quantum-collapse/fig2-abc-wigners-friend.png)<br>
+**Task brief:** [quantum-collapse.md](quantum-collapse/quantum-collapse.md)
+
+---
+
 ## Full token breakdown
 
 | Task | Active | Input | Cache write | Cache read | Output | Total |
@@ -641,11 +662,12 @@ A continuous 3D metamorphosis in a meadow: the egg hatches, the caterpillar eats
 | Neutron Star: Magnetic Field and Polar Jets † | 42.8 min | 104 | 135,232 | 29,141,357 | 47,758 | 29,324,451 |
 | Butterfly Life Cycle † | 42.8 min | 104 | 135,232 | 29,141,357 | 47,758 | 29,324,451 |
 | Void Wing: Space Dogfight & Asteroid Battle † | 42.8 min | 104 | 135,232 | 29,141,357 | 47,758 | 29,324,451 |
+| Quantum Collapse: Two Observers vs Three (CN) | 11.8 min | 32 | 67,270 | 1,289,451 | 44,124 | 1,400,877 |
 
 \* One agent run covered both tasks in the pair; each pair is counted once in the totals.  
 † First built by Codex or Muse and finished by Claude. The figures are Claude’s finishing work for all eight in one run (counted once in the totals; filing and publishing excluded); Codex’s and Muse’s own usage isn’t recorded.
 
-Source: Claude Code session transcripts, 28 Sep – 1 Oct 2026. Screenshots were taken with headless Chrome at 1280×720.
+Source: Claude Code session transcripts, 28 Sep – 5 Oct 2026. Screenshots were taken with headless Chrome at 1280×720.
 
 ## License
 
