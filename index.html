@@ -74,7 +74,7 @@
 <div class="wrap">
   <header>
     <h1>AI Creation · Completed Deliverables</h1>
-    <p>Twenty-nine builds: single-file web pieces plus two native macOS apps. Most were made by Claude Code (the main session or parallel subagents); eight were first built by Codex or Muse and finished by Claude. Each card shows the original task brief, the time spent actively working on it, the tokens it used, and a link to the working output.</p>
+    <p>Thirty builds: single-file web pieces plus two native macOS apps. Most were made by Claude Code (the main session or parallel subagents); eight were first built by Codex or Muse and finished by Claude. Each card shows the original task brief, the time spent actively working on it, the tokens it used, and a link to the working output.</p>
   </header>
 
   <section class="totals" id="totals"></section>
@@ -92,7 +92,7 @@
     <div class="tablewrap"><table id="table"></table></div>
   </details>
 
-  <footer>Source: Claude Code session transcripts, 28 Sep – 1 Oct 2026. Screenshots were taken with headless Chrome at 1280×720.<br>Generated code is released under the <a href="https://github.com/aray4702/ai_creation/blob/main/LICENSE">MIT License</a>; the task briefs and screenshots are not covered by it.</footer>
+  <footer>Source: Claude Code session transcripts, 28 Sep – 5 Oct 2026. Screenshots were taken with headless Chrome at 1280×720.<br>Generated code is released under the <a href="https://github.com/aray4702/ai_creation/blob/main/LICENSE">MIT License</a>; the task briefs and screenshots are not covered by it.</footer>
 </div>
 
 <script>
@@ -217,6 +217,10 @@ const TASKS = [
     desc: "3D space combat with throttle, roll and heat-managed blasters, AI fighters firing plasma, asteroids that fracture, engine trails, radar and a synthesized score across three waves.",
     md: "void wing 3d space dogfight &asteroid battle.md", outputs: [["void-wing.html", "Play Void Wing"]],
     group: "cm8", note: "First built by Codex or Muse; Claude then checked all eight and filled the gaps in one run. The figures cover Claude's finishing work for all eight (filing and publishing excluded) and leave out Codex's and Muse's own usage, which isn't recorded.", min: 42.8, in: 104, cw: 135232, cr: 29141357, out: 47758, by: "Muse · finished by Claude" },
+  { dir: "quantum-collapse", cat: "Explainer", title: "Quantum Collapse: Two Observers vs Three (CN)",
+    desc: "A Chinese explainer on wavefunction collapse when A measures B, and when an outside observer C watches the sealed lab (Wigner's friend). It comes as an interactive page with two hands-on experiments, a narrated 2-minute 20-second video and two diagrams.",
+    md: "quantum-collapse.md", outputs: [["quantum-collapse.html", "Open the explainer"]],
+    note: "Built in a session in the my-articles project; the figures cover that session from the Chinese explanation request to the finished outputs.", min: 11.8, in: 32, cw: 67270, cr: 1289451, out: 44124, by: "Main session" },
 ];
 
 const enc = (dir, f) => /^https?:/.test(f) ? f : dir + "/" + encodeURIComponent(f);

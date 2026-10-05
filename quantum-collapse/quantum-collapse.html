@@ -1,0 +1,356 @@
+<title>两个人看，三个人看</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;900&family=Noto+Sans+SC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column (~44em) with two wider "bench" panels for the experiments. */
+:root {
+  --bg: #f2f4f6; --surface: #ffffff; --sunk: #e8ecf0; --fg: #15191e; --muted: #5a6470; --line: #cfd6dd;
+  --up: #1689ab; --down: #c46f12; --a: #3b8f34; --c: #8447c4; --hl: #a87a00;
+  --display: "Noto Serif SC", "Songti SC", "STSong", serif;
+  --body: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e1116; --surface: #161b22; --sunk: #0a0d11; --fg: #e8e6e3; --muted: #8d96a1; --line: #2a313b;
+  --up: #58c4dd; --down: #f0a04b; --a: #83c167; --c: #c792ea; --hl: #ffd75e; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0e1116; --surface: #161b22; --sunk: #0a0d11; --fg: #e8e6e3; --muted: #8d96a1; --line: #2a313b;
+  --up: #58c4dd; --down: #f0a04b; --a: #83c167; --c: #c792ea; --hl: #ffd75e; color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--fg); font: 16px/1.8 var(--body); padding-inline: 16px; padding-block: 0 64px }
+main { max-width: 980px; margin: 0 auto; display: grid; gap: 56px }
+.col { max-width: 44em; margin: 0 auto; width: 100%; min-width: 0 }
+h1, h2 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.25 }
+h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); font-weight: 900; letter-spacing: .02em }
+h2 { font-size: clamp(1.4rem, 3.4vw, 1.9rem); font-weight: 600 }
+p { margin: 0 }
+.eyebrow { font: 600 .78rem/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted) }
+.stack { display: grid; gap: 14px }
+.up { color: var(--up) } .down { color: var(--down) } .ca { color: var(--a) } .cc { color: var(--c) } .hl { color: var(--hl) }
+.ket { font-family: var(--mono); white-space: nowrap }
+
+header.hero { padding-block: 48px 0; display: grid; gap: 18px }
+.lede { font-size: 1.12rem; color: var(--muted); max-width: 36em }
+.video { width: 100%; aspect-ratio: 16 / 9; max-width: 100%; border-radius: 10px; background: #0e1116; display: block; border: 1px solid var(--line) }
+.cap { font-size: .86rem; color: var(--muted) }
+
+.bench { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: clamp(16px, 3vw, 28px); display: grid; gap: 18px; min-width: 0 }
+.bench svg { width: 100%; height: auto; display: block; overflow: visible }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center }
+button, .seg label { font: 500 .95rem/1 var(--body); border-radius: 8px; padding: 10px 14px; cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--fg) }
+button.primary { background: var(--fg); color: var(--bg); border-color: var(--fg) }
+button:hover { border-color: var(--muted) }
+button:focus-visible, input:focus-visible + span, .seg input:focus-visible + span { outline: 2px solid var(--hl); outline-offset: 2px }
+button:disabled { opacity: .45; cursor: default }
+.slider { display: flex; align-items: center; gap: 10px; font-size: .92rem; color: var(--muted); flex-wrap: wrap }
+.slider input { width: 180px; max-width: 100%; accent-color: var(--up) }
+.readout { font: 600 1rem var(--mono); color: var(--fg); font-variant-numeric: tabular-nums }
+.note { font-size: .95rem; padding: 12px 14px; border-radius: 8px; background: var(--sunk); min-height: 3.2em }
+
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden }
+.seg label { border: 0; border-radius: 0; padding: 0; position: relative }
+.seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer }
+.seg span { display: block; padding: 10px 16px }
+.seg input:checked + span { background: var(--fg); color: var(--bg) }
+.steps { display: flex; gap: 8px; flex-wrap: wrap }
+.steps button[aria-current="step"] { background: var(--fg); color: var(--bg); border-color: var(--fg) }
+
+svg text { font-family: var(--body); fill: var(--fg) }
+svg .mono { font-family: var(--mono) }
+.ring { fill: none; stroke: var(--line); stroke-width: 2 }
+.flash { fill: none; stroke: var(--hl); stroke-width: 3; opacity: 0 }
+.flash.go { animation: flash .7s ease-out }
+@keyframes flash { from { opacity: 1; transform: scale(.4) } to { opacity: 0; transform: scale(1.5) } }
+.pulse-a { animation: pa 1.6s ease-in-out infinite alternate }
+.pulse-b { animation: pa 1.6s ease-in-out infinite alternate-reverse }
+@keyframes pa { from { opacity: .35 } to { opacity: 1 } }
+@media (prefers-reduced-motion: reduce) { .flash.go, .pulse-a, .pulse-b { animation: none } .pulse-a, .pulse-b { opacity: .8 } }
+
+table { border-collapse: collapse; width: 100%; font-size: .95rem; min-width: 560px }
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface) }
+th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: top }
+tr:last-child td { border-bottom: 0 }
+th { font-weight: 700; color: var(--muted); font-size: .85rem }
+td:first-child { font-weight: 500; white-space: nowrap }
+
+.interp { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px }
+.interp div { border-top: 3px solid var(--line); padding-top: 10px; display: grid; gap: 4px; min-width: 0 }
+.interp b { font-family: var(--display); font-size: 1.1rem }
+.interp small { color: var(--muted); font-size: .9rem }
+.verdict { font: 600 .74rem/1 var(--mono); letter-spacing: .06em; color: var(--muted) }
+.callout { border-left: 3px solid var(--hl); padding: 4px 0 4px 16px; display: grid; gap: 8px }
+footer { color: var(--muted); font-size: .86rem }
+</style>
+
+<main>
+  <header class="hero col">
+    <span class="eyebrow">量子测量 · 维格纳的朋友</span>
+    <h1>两个人看，三个人看</h1>
+    <p class="lede">只有 A 测量 B 时，B 坍缩为一个结果。如果实验室外还有观测者 C，C 对同一个事件会给出另一种描述。这一页用两个可以操作的实验，解释这两种情况。</p>
+  </header>
+
+  <section class="col stack" aria-labelledby="v-h">
+    <h2 id="v-h">先看视频</h2>
+    <video class="video" controls preload="metadata" playsinline poster="poster.jpg">
+      <source src="quantum-collapse-explainer.mp4" type="video/mp4">
+    </video>
+    <p class="cap">约 2 分 20 秒。中文配音，带字幕。配音使用 macOS 自带的语音合成。</p>
+  </section>
+
+  <section class="stack" aria-labelledby="e1-h">
+    <div class="col stack">
+      <span class="eyebrow">实验一 · 只有 A 和 B</span>
+      <h2 id="e1-h">A 测量 B</h2>
+      <p>B 是一个电子。测量前，B 处于叠加态：<span class="ket" id="ket">|B⟩ = 0.80|<span class="up">上</span>⟩ + 0.60|<span class="down">下</span>⟩</span>。每个振幅的平方是对应结果的概率。A 测量 B 时，只得到一个结果。测量后，B 留在这个结果对应的状态。这个变化叫做坍缩。</p>
+    </div>
+    <div class="bench">
+      <div class="controls">
+        <div class="slider"><label for="p">得到「上」的概率</label><input id="p" type="range" min="5" max="95" step="1" value="64"><span class="readout" id="pval">64%</span></div>
+      </div>
+      <svg id="e1" viewBox="0 0 640 300" role="img" aria-label="电子的自旋状态和测量结果统计"></svg>
+      <div class="controls">
+        <button class="primary" id="measure" type="button">A 测量一次</button>
+        <button id="prepare" type="button">重新制备 B</button>
+        <button id="many" type="button">制备并测量 100 次</button>
+        <button id="clear" type="button">清空统计</button>
+      </div>
+      <p class="note" id="e1note" aria-live="polite">B 在叠加态。按「A 测量一次」。</p>
+    </div>
+  </section>
+
+  <section class="stack" aria-labelledby="e2-h">
+    <div class="col stack">
+      <span class="eyebrow">实验二 · A、B 和 C</span>
+      <h2 id="e2-h">实验室外的观测者</h2>
+      <p>A 和 B 在一个封闭的实验室里。C 在实验室外面，不能看到里面。C 把整个实验室当作一个量子系统。按步骤操作，并切换视角。B 的概率与实验一的滑块相同。</p>
+    </div>
+    <div class="bench">
+      <div class="controls" style="justify-content: space-between">
+        <div class="steps" role="group" aria-label="步骤">
+          <button type="button" data-step="1">① 制备 B</button>
+          <button type="button" data-step="2">② A 测量</button>
+          <button type="button" data-step="3">③ C 打开实验室</button>
+        </div>
+        <div class="seg" role="radiogroup" aria-label="视角">
+          <label><input type="radio" name="view" id="view-a" value="A" checked><span>A 的视角</span></label>
+          <label><input type="radio" name="view" id="view-c" value="C"><span>C 的视角</span></label>
+        </div>
+      </div>
+      <svg id="e2" viewBox="0 0 640 320" role="img" aria-label="维格纳的朋友实验示意"></svg>
+      <p class="note" id="e2note" aria-live="polite"></p>
+      <div class="controls"><button id="restart" type="button">重新开始（新的随机结果）</button></div>
+    </div>
+    <div class="col callout">
+      <b>矛盾在哪里</b>
+      <p>在第 ② 步，A 说 B 已经坍缩。C 说 A 和 B 纠缠在一起，没有坍缩。在第 ③ 步，C 的结果一定和 A 的记录相同。所以平时看不到矛盾。</p>
+      <p>理论上，C 可以对整个实验室做一种干涉测量。如果 B 真的坍缩了，C 得到一种统计结果。如果实验室仍是叠加态，C 得到另一种统计结果。所以两种描述的预测不同。对于人和宏观仪器，这种测量实际上无法做到。</p>
+    </div>
+  </section>
+
+  <section class="stack" aria-labelledby="cmp-h">
+    <div class="col"><h2 id="cmp-h">两种情况对比</h2></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th></th><th>只有 A 和 B</th><th>A、B 和 C</th></tr></thead>
+        <tbody>
+          <tr><td>A 的角色</td><td>经典的外部观测者</td><td>A 也是一个量子系统</td></tr>
+          <tr><td>A 测量之后</td><td>B 坍缩为一个确定的状态</td><td>对 A：B 坍缩了。<br>对 C：A 和 B 纠缠，整个实验室是叠加态</td></tr>
+          <tr><td>有没有矛盾</td><td>没有明显矛盾</td><td>两个观测者对同一事件的描述不同</td></tr>
+          <tr><td>核心问题</td><td>为什么结果是随机的</td><td>坍缩是客观事件，还是相对于观测者</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="col stack" aria-labelledby="int-h">
+    <h2 id="int-h">不同的诠释怎么回答</h2>
+    <div class="interp">
+      <div style="border-color: var(--up)"><span class="verdict">坍缩：真实</span><b>哥本哈根</b><small>坍缩在某处发生。维格纳曾认为是意识导致坍缩，后来放弃了这个观点。</small></div>
+      <div style="border-color: var(--a)"><span class="verdict">坍缩：不存在</span><b>多世界</b><small>A 分成「看到上」和「看到下」两个版本。C 观察时也分支。</small></div>
+      <div style="border-color: var(--c)"><span class="verdict">坍缩：相对</span><b>关系量子力学 / QBism</b><small>状态相对于观测者。对 A 是坍缩，对 C 是叠加态，两者都对。</small></div>
+      <div style="border-color: var(--down)"><span class="verdict">坍缩：物理过程</span><b>客观坍缩（GRW、彭罗斯）</b><small>A 是宏观物体，会使状态自动坍缩。C 的叠加态描述是错误的。</small></div>
+      <div style="border-color: var(--hl)"><span class="verdict">坍缩：表观</span><b>玻姆力学</b><small>粒子的位置一直确定。波函数引导粒子，结果一直是确定的。</small></div>
+    </div>
+  </section>
+
+  <section class="col stack" aria-labelledby="now-h">
+    <h2 id="now-h">现代研究</h2>
+    <p><b>Frauchiger–Renner 定理（2018）</b>：三个假设不能同时成立。①量子力学适用于观测者。②每次测量只有一个结果。③观测者可以一致地推理彼此知道的事。</p>
+    <p><b>Local Friendliness 实验（Proietti 等 2019；Bong 等 2020）</b>：研究者用光子充当「朋友」。结果符合量子力学的预测，违反了「观测事实对所有人客观」的不等式。实验中的「朋友」只是光子，所以结论仍有争议。</p>
+  </section>
+
+  <footer class="col">一句话总结：只有 A 和 B 时，B 坍缩为一个结果。加入 C 以后，对 A 是坍缩，对 C 是纠缠的叠加态。坍缩可能依赖于观测者的视角。</footer>
+</main>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let p = 0.64;
+
+  function arrow(cx, cy, len, dir, cls, op, w = 5) {
+    const y2 = cy - dir * len, hy = y2 + dir * 16;
+    return `<g style="color:var(--${cls})" opacity="${op.toFixed(2)}">
+      <line x1="${cx}" y1="${cy}" x2="${cx}" y2="${hy}" stroke="currentColor" stroke-width="${w}" stroke-linecap="round"/>
+      <polygon points="${cx},${y2} ${cx - 10},${hy} ${cx + 10},${hy}" fill="currentColor"/></g>`;
+  }
+  function spin(cx, cy, r, wu, wd, labels = true, cls = "") {
+    let s = `<g class="${cls}"><circle class="ring" cx="${cx}" cy="${cy}" r="${r}"/>`;
+    if (wu > 0.01) s += arrow(cx, cy, r * 0.86, 1, "up", wu, Math.max(3, r / 18));
+    if (wd > 0.01) s += arrow(cx, cy, r * 0.86, -1, "down", wd, Math.max(3, r / 18));
+    s += `<circle cx="${cx}" cy="${cy}" r="${Math.max(3, r / 16)}" style="fill:var(--fg)"/>`;
+    if (labels) {
+      if (wu > 0.01) s += `<text x="${cx + r * 0.38}" y="${cy - r * 0.62}" style="fill:var(--up)" opacity="${wu}" font-size="${10 + r / 6}">上</text>`;
+      if (wd > 0.01) s += `<text x="${cx + r * 0.38}" y="${cy + r * 0.78}" style="fill:var(--down)" opacity="${wd}" font-size="${10 + r / 6}">下</text>`;
+    }
+    return s + "</g>";
+  }
+  function person(x, y, s, who) {
+    const c = who === "A" ? "a" : "c";
+    return `<g style="color:var(--${c})" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" fill="none">
+      <circle cx="${x}" cy="${y - 46 * s}" r="${11 * s}" fill="currentColor" stroke="none"/>
+      <path d="M${x} ${y - 34 * s}V${y - 6 * s}M${x - 16 * s} ${y - 16 * s}L${x} ${y - 26 * s}L${x + 16 * s} ${y - 16 * s}M${x - 12 * s} ${y + 16 * s}L${x} ${y - 6 * s}L${x + 12 * s} ${y + 16 * s}"/>
+      <text x="${x}" y="${y + 38 * s}" text-anchor="middle" font-weight="700" font-size="${16 * Math.max(s, .8)}" stroke="none" style="fill:var(--${c})">${who}</text></g>`;
+  }
+  function bubble(x, y, text, cls, w) {
+    w = w || text.length * 15 + 26;
+    return `<g><rect x="${x - w / 2}" y="${y - 17}" width="${w}" height="34" rx="9" style="fill:var(--surface);stroke:var(--${cls})" stroke-width="1.5"/>
+      <text x="${x}" y="${y + 5}" text-anchor="middle" font-size="15" style="fill:var(--${cls})">${text}</text></g>`;
+  }
+  const amp = q => Math.sqrt(q).toFixed(2);
+  function setKet() {
+    $("#ket").innerHTML = `|B⟩ = ${amp(p)}|<span class="up">上</span>⟩ + ${amp(1 - p)}|<span class="down">下</span>⟩`;
+  }
+
+  /* ---------- Experiment 1 ---------- */
+  const e1 = { outcome: null, up: 0, down: 0, busy: false };
+  function drawE1(flash) {
+    const n = e1.up + e1.down, fu = n ? e1.up / n : 0, fd = n ? e1.down / n : 0;
+    const wu = e1.outcome ? (e1.outcome === "up" ? 1 : 0) : Math.sqrt(p);
+    const wd = e1.outcome ? (e1.outcome === "down" ? 1 : 0) : Math.sqrt(1 - p);
+    const base = 250, H = 180, bw = 64, xs = [400, 520];
+    let s = `<text x="150" y="22" text-anchor="middle" font-size="15" style="fill:var(--muted)">${e1.outcome ? "测量后：已经坍缩" : "测量前：叠加态"}</text>`;
+    s += spin(150, 150, 100, wu, wd, true, e1.outcome ? "" : "");
+    s += `<circle class="flash${flash ? " go" : ""}" cx="150" cy="150" r="100" style="transform-origin:150px 150px"/>`;
+    s += `<text x="150" y="285" text-anchor="middle" font-size="14" style="fill:var(--muted)">B（电子）</text>`;
+    s += `<text x="490" y="22" text-anchor="middle" font-size="15" style="fill:var(--muted)">测量次数：<tspan class="mono" style="fill:var(--fg)">${n}</tspan></text>`;
+    s += `<line x1="372" y1="${base}" x2="612" y2="${base}" style="stroke:var(--line)" stroke-width="1.5"/>`;
+    [[fu, p, "up", "上"], [fd, 1 - p, "down", "下"]].forEach(([f, th, c, lab], i) => {
+      const x = xs[i], h = H * f, ty = base - H * th;
+      s += `<rect x="${x - bw / 2}" y="${base - h}" width="${bw}" height="${h}" rx="3" style="fill:var(--${c})"/>`;
+      s += `<line x1="${x - bw / 2 - 8}" x2="${x + bw / 2 + 8}" y1="${ty}" y2="${ty}" style="stroke:var(--muted)" stroke-dasharray="5 4" stroke-width="1.5"/>`;
+      s += `<text x="${x + bw / 2 + 12}" y="${ty + 4}" font-size="11" class="mono" style="fill:var(--muted)">${Math.round(th * 100)}%</text>`;
+      if (n) s += `<text x="${x}" y="${Math.min(base - h, ty) - 8}" text-anchor="middle" font-size="14" class="mono">${Math.round(f * 100)}%</text>`;
+      s += `<text x="${x}" y="${base + 22}" text-anchor="middle" font-size="15" style="fill:var(--${c})">${lab}</text>`;
+    });
+    s += `<text x="490" y="292" text-anchor="middle" font-size="11" style="fill:var(--muted)">虚线 = 理论概率（振幅²）</text>`;
+    $("#e1").innerHTML = s;
+  }
+  const sample = () => (Math.random() < p ? "up" : "down");
+  const zh = o => (o === "up" ? "上" : "下");
+  $("#measure").onclick = () => {
+    if (e1.busy) return;
+    if (e1.outcome) {
+      $("#e1note").textContent = `B 已经坍缩。再测一次，结果还是「${zh(e1.outcome)}」。按「重新制备 B」回到叠加态。`;
+      drawE1(true);
+      return;
+    }
+    e1.outcome = sample();
+    e1[e1.outcome]++;
+    $("#e1note").textContent = `A 得到「${zh(e1.outcome)}」。B 的状态变成 |${zh(e1.outcome)}⟩。另一种可能消失了。这就是坍缩。`;
+    drawE1(true);
+  };
+  $("#prepare").onclick = () => {
+    if (e1.busy) return;
+    e1.outcome = null;
+    $("#e1note").textContent = "B 回到叠加态。下一次测量的结果仍是随机的。";
+    drawE1(false);
+  };
+  $("#clear").onclick = () => {
+    if (e1.busy) return;
+    e1.up = e1.down = 0; e1.outcome = null;
+    $("#e1note").textContent = "统计已清空。B 在叠加态。";
+    drawE1(false);
+  };
+  $("#many").onclick = () => {
+    if (e1.busy) return;
+    e1.busy = true;
+    document.querySelectorAll("#e1 ~ .controls button").forEach(b => (b.disabled = true));
+    let k = 0;
+    const step = () => {
+      const batch = reduce ? 100 : 2;
+      for (let j = 0; j < batch && k < 100; j++, k++) { e1.outcome = sample(); e1[e1.outcome]++; }
+      drawE1(false);
+      if (k < 100) return setTimeout(step, 16);
+      e1.busy = false;
+      document.querySelectorAll("#e1 ~ .controls button").forEach(b => (b.disabled = false));
+      const n = e1.up + e1.down;
+      $("#e1note").textContent = `共 ${n} 次。「上」占 ${Math.round(100 * e1.up / n)}%，理论值是 ${Math.round(100 * p)}%。每次的结果随机，但比例接近振幅的平方。这叫做玻恩规则。`;
+    };
+    step();
+  };
+  $("#p").oninput = e => {
+    p = +e.target.value / 100;
+    $("#pval").textContent = `${e.target.value}%`;
+    setKet();
+    e1.up = e1.down = 0; e1.outcome = null;
+    $("#e1note").textContent = "概率已改变，统计已清空。B 在叠加态。";
+    drawE1(false);
+    e2.outcome = null; e2.step = 1; drawE2();
+  };
+
+  /* ---------- Experiment 2 ---------- */
+  const e2 = { step: 1, view: "A", outcome: null };
+  function branch(y, up, amplitude, cls) {
+    return `<g class="${cls}">
+      <rect x="70" y="${y}" width="330" height="118" rx="12" style="fill:var(--sunk);stroke:var(--line)"/>
+      ${person(130, y + 70, 0.75, "A")}
+      ${spin(235, y + 59, 42, up ? 1 : 0, up ? 0 : 1, false)}
+      ${bubble(340, y + 59, up ? "看到上" : "看到下", up ? "up" : "down", 82)}
+      <text x="50" y="${y + 64}" text-anchor="middle" class="mono" font-size="15">${amplitude}</text></g>`;
+  }
+  function drawE2() {
+    const { step, view } = e2;
+    if (step >= 2 && !e2.outcome) e2.outcome = sample();
+    const o = e2.outcome, isUp = o === "up";
+    let s = `<rect x="20" y="20" width="400" height="280" rx="16" style="fill:none;stroke:var(--fg)" stroke-width="2" ${view === "C" && step < 3 ? 'stroke-dasharray="8 6"' : ""}/>`;
+    s += `<text x="36" y="44" font-size="13" style="fill:var(--muted)">封闭实验室</text>`;
+    const superLab = view === "C" && step === 2;
+    if (superLab) {
+      s += branch(54, true, amp(p), "pulse-a") + branch(178, false, "+" + amp(1 - p), "pulse-b");
+    } else {
+      s += person(110, 220, 1.2, "A");
+      if (step === 1) s += spin(285, 160, 82, Math.sqrt(p), Math.sqrt(1 - p));
+      else s += spin(285, 160, 82, isUp ? 1 : 0, isUp ? 0 : 1);
+      if (step >= 2) s += bubble(110, 100, `看到${zh(o)}`, isUp ? "up" : "down", 88);
+    }
+    s += person(545, 230, 1.2, "C");
+    if (step === 3) {
+      s += `<line x1="520" y1="180" x2="428" y2="180" style="stroke:var(--hl)" stroke-width="3" stroke-dasharray="6 5"/>`;
+      s += bubble(545, 95, `A 看到「${zh(o)}」✓`, "c", 150);
+    } else if (step === 2) {
+      s += bubble(545, 110, view === "C" ? "我还没看" : "？", "c", view === "C" ? 96 : 44);
+    }
+    $("#e2").innerHTML = s;
+    document.querySelectorAll(".steps button").forEach(b =>
+      b.setAttribute("aria-current", +b.dataset.step === step ? "step" : "false"));
+    const P = Math.round(p * 100);
+    const notes = {
+      "1A": `B 在叠加态：「上」的概率 ${P}%，「下」的概率 ${100 - P}%。A 还没有测量。`,
+      "1C": `C 在实验室外。C 知道 B 在叠加态。C 看不到里面。`,
+      "2A": `A 测量 B，看到「${zh(o)}」。对 A 来说，B 已经坍缩。实验室外的 C 不知道结果。`,
+      "2C": `C 没有看到结果。C 认为 A 也是量子系统。测量让 A 和 B 纠缠。整个实验室处于叠加态：两个分支同时存在。没有坍缩。`,
+      "3A": `C 打开实验室，问 A 看到了什么。A 回答「${zh(o)}」。`,
+      "3C": `C 只得到一个结果：A 记录的是「${zh(o)}」。C 的结果和 A 的记录一致。对 C 来说，坍缩现在才发生。`,
+    };
+    $("#e2note").textContent = notes[step + view];
+  }
+  document.querySelectorAll(".steps button").forEach(b => (b.onclick = () => { e2.step = +b.dataset.step; drawE2(); }));
+  document.querySelectorAll('input[name="view"]').forEach(r => (r.onchange = () => { e2.view = r.value; drawE2(); }));
+  $("#restart").onclick = () => { e2.outcome = null; e2.step = 1; drawE2(); };
+
+  setKet(); drawE1(false); drawE2();
+})();
+</script>
