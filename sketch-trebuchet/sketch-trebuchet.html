@@ -1,0 +1,691 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch Trebuchet</title>
+<style>
+:root{
+  --paper:#f5f0e3; --grid:rgba(70,110,170,.13); --grid2:rgba(70,110,170,.25);
+  --ink:#2e2f3a; --muted:#6d6a60; --panel:rgba(255,252,244,.94); --line:#d8cfba;
+  --frame:#8a5a2b; --beam:#b8432a; --pivot:#1d6fa5; --cw:#5b4a8b; --sling:#2f8a57; --proj:#d0861a;
+  --accent:#c2412b;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--paper);color:var(--ink);
+  font:14px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+canvas{position:fixed;inset:0;touch-action:none;cursor:crosshair}
+.hand{font-family:"Marker Felt","Chalkboard SE","Comic Sans MS","Bradley Hand",cursive}
+header{position:fixed;left:16px;top:12px;display:flex;align-items:baseline;gap:12px;pointer-events:none}
+header h1{margin:0;font-size:24px;font-weight:600;letter-spacing:.3px}
+header span{color:var(--muted);font-size:13px}
+#tools{position:fixed;left:12px;top:64px;display:flex;flex-direction:column;gap:4px;background:var(--panel);
+  border:1px solid var(--line);border-radius:12px;padding:6px;box-shadow:0 4px 18px rgba(60,40,10,.08);z-index:2}
+#tools button{width:56px;padding:6px 2px;border:0;border-radius:8px;background:transparent;color:var(--ink);
+  font-size:10.5px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+#tools button i{font-style:normal;font-size:17px;line-height:1}
+#tools button:hover{background:rgba(0,0,0,.05)}
+#tools button.on{background:var(--ink);color:#fff}
+#tools hr{border:0;border-top:1px solid var(--line);margin:3px 4px}
+#panel{position:fixed;right:12px;top:12px;bottom:12px;width:294px;background:var(--panel);border:1px solid var(--line);
+  border-radius:14px;padding:14px 16px;overflow:auto;box-shadow:0 4px 18px rgba(60,40,10,.08);z-index:2}
+#panel h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:14px 0 8px}
+#panel h2:first-child{margin-top:0}
+.prm{margin:0 0 11px}
+.prm label{display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px}
+.prm label b{font-weight:600;font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.row{display:flex;align-items:center;gap:8px;font-size:13px;margin:6px 0}
+select{font:inherit;padding:3px 6px;border-radius:6px;border:1px solid var(--line);background:#fff}
+#parts{list-style:none;margin:0;padding:0;font-size:13px}
+#parts li{display:flex;align-items:center;gap:8px;padding:2px 0}
+#parts li .sw{width:10px;height:10px;border-radius:3px;flex:none}
+#parts li.miss{color:var(--muted)}
+#parts li em{margin-left:auto;font-style:normal;color:var(--muted);font-size:12px}
+#stats{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.st{background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+.st small{display:block;color:var(--muted);font-size:11px}
+.st b{font-size:16px;font-variant-numeric:tabular-nums}
+#log{font-size:12px;margin:0;padding-left:18px;color:var(--muted)}
+#log li{margin:2px 0}
+#bar{position:fixed;left:50%;bottom:16px;transform:translateX(calc(-50% - 150px));display:flex;gap:8px;z-index:2}
+#bar button{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:10px 16px;border-radius:999px;
+  font:600 14px/1 inherit;font-family:inherit;cursor:pointer;box-shadow:0 3px 12px rgba(60,40,10,.1)}
+#bar button.main{background:var(--accent);border-color:var(--accent);color:#fff;min-width:150px}
+#bar button:disabled{opacity:.45;cursor:default}
+#hint{position:fixed;left:50%;top:14px;transform:translateX(calc(-50% - 110px));background:var(--ink);color:#fff;
+  padding:7px 14px;border-radius:999px;font-size:13px;z-index:2;max-width:min(560px,70vw);text-align:center;
+  transition:opacity .3s}
+#result{position:fixed;left:96px;top:96px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:12px 16px;box-shadow:0 6px 24px rgba(60,40,10,.15);z-index:2;display:none;min-width:220px}
+#result h3{margin:0 0 6px;font-size:22px}
+#result div{font-size:13px;color:var(--muted)}
+#ptoggle{display:none}
+@media (max-width:820px){
+  #panel{top:auto;left:12px;right:12px;bottom:70px;width:auto;max-height:46vh;display:none}
+  #panel.open{display:block}
+  #ptoggle{display:block}
+  #bar{transform:translateX(-50%);bottom:12px}
+  #hint{transform:translateX(-50%);top:52px}
+  #result{left:70px;top:70px}
+  #tools button{width:46px;font-size:9px}
+  header h1{font-size:19px} header span{display:none}
+}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<header><h1 class="hand">Sketch&nbsp;Trebuchet</h1><span id="modeLbl">sketch mode · draw your siege engine</span></header>
+<div id="tools"></div>
+<div id="hint">Draw a trebuchet, or press “Example”</div>
+<aside id="panel">
+  <h2>Recognised parts</h2>
+  <ul id="parts"></ul>
+  <h2>Parameters</h2>
+  <div id="params"></div>
+  <div class="row"><input type="checkbox" id="hinged" checked><label for="hinged">Hinged counterweight</label></div>
+  <div class="row">Playback <select id="slowmo"><option value="1">1× real time</option><option value="0.5">0.5×</option><option value="0.25">0.25×</option><option value="0.1">0.1× slow motion</option></select></div>
+  <h2>Live readout</h2>
+  <div id="stats"></div>
+  <h2>Shot log</h2>
+  <ol id="log"><li>No shots yet</li></ol>
+</aside>
+<div id="result"></div>
+<div id="bar">
+  <button id="ptoggle">⚙</button>
+  <button id="editBtn">✎ Edit sketch</button>
+  <button id="mainBtn" class="main">▶ Trigger</button>
+  <button id="resetBtn">↺ Re-arm</button>
+</div>
+<script>
+window.addEventListener('error',e=>{document.title='ERROR: '+e.message+' @'+e.lineno});
+document.title='Sketch Trebuchet';
+const $=id=>document.getElementById(id);
+const cv=$('cv'),ctx=cv.getContext('2d');
+const SW=1200,SH=750,U=40;            // sketch space (units) and units per metre
+const G=9.81;
+const ROLES={
+  frame:{label:'Frame',c:'#8a5a2b'}, beam:{label:'Beam',c:'#b8432a'}, pivot:{label:'Pivot axle',c:'#1d6fa5'},
+  cw:{label:'Counterweight',c:'#5b4a8b'}, sling:{label:'Sling',c:'#2f8a57'}, proj:{label:'Projectile',c:'#d0861a'}
+};
+const TOOLS=[['auto','✎','Smart pen'],['frame','⊓','Frame'],['beam','╱','Beam'],['pivot','◉','Pivot'],
+  ['cw','⬤','Weight'],['sling','〰','Sling'],['proj','●','Stone'],['erase','⌫','Eraser']];
+const PARAMS=[
+  {k:'cwMass',label:'Counterweight mass',min:100,max:10000,step:50,v:2000,fmt:v=>v.toFixed(0)+' kg'},
+  {k:'projMass',label:'Projectile mass',min:2,max:200,step:1,v:25,fmt:v=>v.toFixed(0)+' kg'},
+  {k:'slingLen',label:'Sling length',min:0.5,max:12,step:0.1,v:5,fmt:v=>v.toFixed(1)+' m'},
+  {k:'armRatio',label:'Beam arm ratio (long : short)',min:1.2,max:8,step:0.1,v:3.5,fmt:v=>v.toFixed(1)+' : 1'},
+  {k:'beamMass',label:'Beam mass',min:20,max:2000,step:10,v:300,fmt:v=>v.toFixed(0)+' kg'},
+  {k:'releaseAngle',label:'Release angle',min:10,max:80,step:1,v:45,fmt:v=>v.toFixed(0)+'°'},
+];
+const prm={hinged:true,slowmo:1};
+PARAMS.forEach(p=>prm[p.k]=p.v);
+
+let W=0,H=0,DPR=1;
+let strokes=[],tool='auto',mode='sketch',drawing=null,model=null,sim=null,shots=[];
+let cam={x:0,y:0,s:1},camT=null,snapCam=false;
+
+/* ---------------- UI construction ---------------- */
+TOOLS.forEach(([k,ic,lb])=>{
+  const b=document.createElement('button');b.dataset.t=k;b.innerHTML=`<i>${ic}</i>${lb}`;
+  if(k!=='auto'&&ROLES[k])b.querySelector('i').style.color=ROLES[k].c;
+  b.onclick=()=>{tool=k;syncTools();if(mode!=='sketch')toSketch()};$('tools').appendChild(b);
+});
+$('tools').appendChild(document.createElement('hr'));
+[['undo','↶','Undo',()=>{strokes.pop();sketchChanged()}],['clear','✕','Clear',()=>{strokes=[];sketchChanged()}],
+ ['ex','★','Example',()=>{loadExample();}]].forEach(([k,ic,lb,fn])=>{
+  const b=document.createElement('button');b.innerHTML=`<i>${ic}</i>${lb}`;b.onclick=()=>{if(mode!=='sketch')toSketch();fn()};
+  $('tools').appendChild(b);
+});
+function syncTools(){document.querySelectorAll('#tools button[data-t]').forEach(b=>b.classList.toggle('on',b.dataset.t===tool));
+  cv.style.cursor=tool==='erase'?'cell':'crosshair'}
+syncTools();
+PARAMS.forEach(p=>{
+  const d=document.createElement('div');d.className='prm';
+  d.innerHTML=`<label>${p.label}<b id="v_${p.k}"></b></label><input type="range" id="r_${p.k}" min="${p.min}" max="${p.max}" step="${p.step}">`;
+  $('params').appendChild(d);
+  const r=d.querySelector('input');r.value=p.v;
+  r.oninput=()=>{prm[p.k]=+r.value;showParam(p);paramsChanged()};
+});
+function showParam(p){$('v_'+p.k).textContent=p.fmt(prm[p.k])}
+function setParam(k,v){const p=PARAMS.find(q=>q.k===k);v=Math.min(p.max,Math.max(p.min,Math.round(v/p.step)*p.step));
+  prm[k]=v;$('r_'+k).value=v;showParam(p)}
+PARAMS.forEach(showParam);
+$('hinged').onchange=e=>{prm.hinged=e.target.checked;paramsChanged()};
+$('slowmo').onchange=e=>{prm.slowmo=+e.target.value};
+$('ptoggle').onclick=()=>$('panel').classList.toggle('open');
+$('mainBtn').onclick=mainAction;
+$('resetBtn').onclick=()=>{if(mode==='sim')resetSim();else mainAction()};
+$('editBtn').onclick=()=>toSketch();
+addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'&&e.target.type!=='range')return;
+  if(e.code==='Space'){e.preventDefault();mainAction()}
+  else if((e.metaKey||e.ctrlKey)&&e.key==='z'){strokes.pop();sketchChanged()}
+  else if(e.key==='Escape')toSketch();
+  else if(e.key==='r'&&mode==='sim')resetSim();
+});
+
+/* ---------------- geometry helpers ---------------- */
+const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
+function segT(p,a,b){const dx=b[0]-a[0],dy=b[1]-a[1],l=dx*dx+dy*dy||1;return((p[0]-a[0])*dx+(p[1]-a[1])*dy)/l}
+function distSeg(p,a,b){const t=Math.max(0,Math.min(1,segT(p,a,b)));return dist(p,[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t])}
+const lerp2=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];
+function pathLen(pts){let l=0;for(let i=1;i<pts.length;i++)l+=dist(pts[i-1],pts[i]);return l}
+
+/* Classify a freehand stroke as a line or a circle. */
+function analyze(pts){
+  const len=pathLen(pts),a=pts[0],b=pts[pts.length-1],chord=dist(a,b);
+  if(len<8){return{type:'circle',cx:a[0],cy:a[1],r:8,dot:true,len}}
+  if(len>30&&chord<Math.max(22,len*0.22)){
+    // resample by arc length so slow parts of the stroke don't bias the centre
+    const N=48,res=[];let acc=0,j=1;
+    for(let i=0;i<N;i++){const target=len*i/N;
+      while(j<pts.length-1&&acc+dist(pts[j-1],pts[j])<target){acc+=dist(pts[j-1],pts[j]);j++}
+      const seg=dist(pts[j-1],pts[j])||1;res.push(lerp2(pts[j-1],pts[j],Math.min(1,(target-acc)/seg)))}
+    let cx=0,cy=0;res.forEach(p=>{cx+=p[0];cy+=p[1]});cx/=N;cy/=N;
+    let r=0;res.forEach(p=>r+=Math.hypot(p[0]-cx,p[1]-cy));r/=N;
+    return{type:'circle',cx,cy,r:Math.max(5,r),len};
+  }
+  return{type:'line',x1:a[0],y1:a[1],x2:b[0],y2:b[1],len:chord,path:len,straight:chord/len};
+}
+function circleOf(s){const sh=s.shape;if(sh.type==='circle')return{c:[sh.cx,sh.cy],r:sh.r};
+  let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;s.pts.forEach(p=>{x0=Math.min(x0,p[0]);x1=Math.max(x1,p[0]);y0=Math.min(y0,p[1]);y1=Math.max(y1,p[1])});
+  return{c:[(x0+x1)/2,(y0+y1)/2],r:Math.max(6,Math.hypot(x1-x0,y1-y0)/2)}}
+const ends=s=>[s.pts[0],s.pts[s.pts.length-1]];
+const roleOf=s=>s.role==='auto'?s.autoRole:s.role;
+
+/* Work out what each "smart pen" stroke is meant to be. */
+function inferRoles(){
+  strokes.forEach(s=>s.autoRole=null);
+  const has=r=>strokes.some(s=>s.role===r);
+  const free=strokes.filter(s=>s.role==='auto');
+  const fc=free.filter(s=>s.shape.type==='circle'),fl=free.filter(s=>s.shape.type==='line');
+  const yMax=Math.max(...strokes.flatMap(s=>s.pts.map(p=>p[1])));
+  const isBase=s=>s.shape.type==='line'&&Math.abs(s.shape.y2-s.shape.y1)<0.3*s.shape.len&&Math.min(s.shape.y1,s.shape.y2)>yMax-35;
+  let cw=strokes.find(s=>s.role==='cw');
+  if(!cw&&fc.length){const big=fc.reduce((a,b)=>b.shape.r>a.shape.r?b:a);if(big.shape.r>=14&&!big.shape.dot){cw=big;cw.autoRole='cw'}}
+  const cwc=cw?circleOf(cw):null;
+  let beam=strokes.find(s=>s.role==='beam');
+  if(!beam){
+    let best=null,bs=-1e9;
+    fl.forEach(s=>{const sh=s.shape;if(sh.len<70||sh.straight<0.75)return;
+      let sc=sh.len;if(isBase(s))sc-=1000;
+      if(Math.abs(sh.y2-sh.y1)>0.94*sh.len)sc-=300;
+      if(cwc&&Math.min(...ends(s).map(e=>dist(e,cwc.c)))<cwc.r+70)sc+=400;
+      if(sc>bs){bs=sc;best=s}});
+    if(best&&bs>0){beam=best;beam.autoRole='beam'}
+  }
+  if(beam){
+    const [A,B]=ends(beam);
+    if(!has('pivot')){let best=null,bd=1e9;
+      fc.forEach(s=>{if(s.autoRole)return;const c=circleOf(s),t=segT(c.c,A,B),d=distSeg(c.c,A,B);
+        if(c.r<40&&t>0.05&&t<0.95&&d<c.r+28&&d<bd){bd=d;best=s}});
+      if(best)best.autoRole='pivot'}
+    if(!has('sling')){
+      const tip=cwc?(dist(A,cwc.c)>dist(B,cwc.c)?A:B):null;
+      let best=null,bd=45;
+      fl.forEach(s=>{if(s.autoRole)return;const e=ends(s);
+        const targets=tip?[tip]:[A,B];
+        const d=Math.min(...e.flatMap(p=>targets.map(t=>dist(p,t))));if(d<bd){bd=d;best=s}});
+      if(best)best.autoRole='sling'}
+  }
+  if(!has('proj')){
+    const left=fc.filter(s=>!s.autoRole);
+    if(left.length){const sl=strokes.find(s=>roleOf(s)==='sling');let pick;
+      if(sl&&beam){const [A,B]=ends(beam),e=ends(sl);
+        const far=Math.min(dist(e[0],A),dist(e[0],B))>Math.min(dist(e[1],A),dist(e[1],B))?e[0]:e[1];
+        pick=left.reduce((a,b)=>dist(circleOf(b).c,far)<dist(circleOf(a).c,far)?b:a)}
+      else pick=left.reduce((a,b)=>b.shape.r<a.shape.r?b:a);
+      pick.autoRole='proj'}
+  }
+  free.forEach(s=>{if(!s.autoRole)s.autoRole='frame'});
+}
+
+/* Turn the recognised sketch + parameters into a mechanical model (metres, y up). */
+function buildModel(){
+  if(!strokes.length)return{ok:false,msg:'Draw a trebuchet: frame, beam, pivot, counterweight, sling and stone, or press “Example”.'};
+  inferRoles();
+  const by=r=>strokes.filter(s=>roleOf(s)===r);
+  const frames=by('frame'),beamS=by('beam')[0],pivS=by('pivot')[0],cwS=by('cw')[0],slS=by('sling')[0],prS=by('proj')[0];
+  if(!beamS)return{ok:false,msg:'Draw the beam: one long straight line for the throwing arm.'};
+  let [A,B]=ends(beamS);
+  if(dist(A,B)<40)return{ok:false,msg:'The beam is too short; draw a longer line.'};
+  const cwC=cwS?circleOf(cwS):null;
+  let P=null;
+  const proj=(p)=>lerp2(A,B,Math.max(0.04,Math.min(0.96,segT(p,A,B))));
+  if(pivS)P=proj(circleOf(pivS).c);
+  else{let best=null,bd=70;frames.forEach(s=>ends(s).forEach(p=>{const d=distSeg(p,A,B);if(d<bd){bd=d;best=p}}));if(best)P=proj(best)}
+  let T,S;
+  if(cwC){[T,S]=dist(A,cwC.c)>dist(B,cwC.c)?[A,B]:[B,A]}
+  else if(P){[T,S]=dist(A,P)>dist(B,P)?[A,B]:[B,A]}
+  else{[T,S]=A[0]<B[0]?[A,B]:[B,A]}
+  if(!P)P=lerp2(T,S,0.78);
+  const L=dist(T,S),drawnRatio=dist(T,P)/Math.max(1,dist(S,P));
+  let gy=-1e9;frames.forEach(s=>s.pts.forEach(p=>gy=Math.max(gy,p[1])));
+  if(gy<-1e8){gy=Math.max(T[1],S[1])+60;if(cwC)gy=Math.max(gy,cwC.c[1]+cwC.r+30);gy=Math.min(gy,SH-20)}
+  if(P[1]>gy-20)return{ok:false,msg:'The pivot must sit above the ground line (bottom of the frame).'};
+  // apply arm ratio: pivot stays put, the beam slides along its own axis
+  const u=[(T[0]-P[0])/dist(T,P),(T[1]-P[1])/dist(T,P)];
+  const r=prm.armRatio,La=L*r/(1+r),Lb=L/(1+r);
+  const T2=[P[0]+u[0]*La,P[1]+u[1]*La],S2=[P[0]-u[0]*Lb,P[1]-u[1]*Lb];
+  let off,rcw;
+  if(cwC){off=[cwC.c[0]-S[0],cwC.c[1]-S[1]];rcw=cwC.r}else{rcw=28;off=[0,48]}
+  if(Math.hypot(...off)<12){const l=Math.hypot(...off)||1;off=off[0]||off[1]?[off[0]/l*12,off[1]/l*12]:[0,12]}
+  const C2=[S2[0]+off[0],S2[1]+off[1]];
+  let pc,rp;
+  if(prS){const c=circleOf(prS);pc=c.c;rp=Math.min(30,c.r)}else{rp=10;pc=[T[0]+(cwC?Math.sign(cwC.c[0]-P[0]):1)*100,gy-rp]}
+  const drawnSling=slS?pathLen(slS.pts):Math.max(dist(T,pc),La*0.6);
+  const Ls=prm.slingLen*U;
+  let dv=[pc[0]-T2[0],pc[1]-T2[1]];const dl=Math.hypot(...dv);dv=dl>1e-6?[dv[0]/dl,dv[1]/dl]:[0,1];
+  let p2=[T2[0]+dv[0]*Ls,T2[1]+dv[1]*Ls];
+  if(p2[1]>gy-rp){const yP=gy-rp,dy=yP-T2[1];
+    if(Ls>Math.abs(dy)&&dy>0){const sx=Math.sign(pc[0]-T2[0])||1;p2=[T2[0]+sx*Math.sqrt(Ls*Ls-dy*dy),yP]}
+    else p2=[T2[0],Math.min(T2[1]+Ls,yP)]}
+  const fd=Math.sign(C2[0]-P[0])||Math.sign(P[0]-T2[0])||1;
+  const w=p=>[(p[0]-P[0])/U,(gy-p[1])/U];
+  const wP=w(P),wT=w(T2),wS=w(S2),wC=w(C2),wp=w(p2);
+  const ang=(a,b)=>Math.atan2(b[1]-a[1],b[0]-a[0]);
+  return{ok:true,gy,P,T:T2,S:S2,C:C2,pc:p2,rcwU:rcw,rpU:rp,drawnRatio,drawnSling,fd,
+    w:{P:wP,La:La/U,Lb:Lb/U,Lc:Math.hypot(...off)/U,Ls:prm.slingLen,rcw:rcw/U,rp:rp/U,
+       th0:ang(wP,wT),ph0:ang(wS,wC),ps0:ang(wT,wp),fd,
+       frames:frames.map(s=>s.pts.map(w))}};
+}
+
+/* ---------------- multibody physics (generalised coordinates, RK4) ---------------- */
+const NB=9;
+function makeSys(m,withProj){
+  const hinged=prm.hinged,masses=[],radii=[];
+  for(let k=0;k<NB;k++){masses.push(prm.beamMass/NB);radii.push(0.15)}
+  masses.push(prm.cwMass);radii.push(m.rcw);
+  if(withProj){masses.push(prm.projMass);radii.push(m.rp)}
+  const n=(hinged?2:1)+(withProj?1:0),K=masses.length;
+  const delta=m.ph0-(m.th0+Math.PI);
+  const P=m.P,La=m.La,Lb=m.Lb,Lc=m.Lc,Ls=m.Ls;
+  function pos(q,o){
+    const th=q[0],c=Math.cos(th),s=Math.sin(th);
+    for(let k=0;k<NB;k++){const d=-Lb+(La+Lb)*k/(NB-1);o[2*k]=P[0]+d*c;o[2*k+1]=P[1]+d*s}
+    const sx=P[0]-Lb*c,sy=P[1]-Lb*s,ph=hinged?q[1]:th+Math.PI+delta;
+    o[2*NB]=sx+Lc*Math.cos(ph);o[2*NB+1]=sy+Lc*Math.sin(ph);
+    if(withProj){const ps=q[n-1];o[2*NB+2]=P[0]+La*c+Ls*Math.cos(ps);o[2*NB+3]=P[1]+La*s+Ls*Math.sin(ps)}
+    return o}
+  return{n,K,masses,radii,pos,hinged,withProj,
+    p0:new Float64Array(2*K),pa:new Float64Array(2*K),pb:new Float64Array(2*K),
+    J:new Float64Array(2*K*n),bias:new Float64Array(2*K),v:new Float64Array(2*K),qt:new Float64Array(n),damp:0.004}
+}
+function accel(sys,q,qd,out){
+  const{n,K,masses,radii,pos,p0,pa,pb,J,bias,v,qt}=sys,h=1e-6,hb=1e-4;
+  pos(q,p0);
+  for(let j=0;j<n;j++){qt.set(q);qt[j]+=h;pos(qt,pa);qt[j]-=2*h;pos(qt,pb);
+    for(let i=0;i<2*K;i++)J[i*n+j]=(pa[i]-pb[i])/(2*h)}
+  for(let j=0;j<n;j++)qt[j]=q[j]+qd[j]*hb;pos(qt,pa);
+  for(let j=0;j<n;j++)qt[j]=q[j]-qd[j]*hb;pos(qt,pb);
+  for(let i=0;i<2*K;i++){bias[i]=(pa[i]-2*p0[i]+pb[i])/(hb*hb);let s=0;for(let j=0;j<n;j++)s+=J[i*n+j]*qd[j];v[i]=s}
+  const M=new Float64Array(n*n),rhs=new Float64Array(n);
+  for(let k=0;k<K;k++){
+    const m=masses[k],ix=2*k,iy=2*k+1;
+    let fx=0,fy=-m*G;
+    const pen=radii[k]-p0[iy];
+    if(pen>0){const kk=m*3e4,cc=2*Math.sqrt(kk*m)*0.8;fy+=Math.max(0,kk*pen-cc*v[iy]);fx-=cc*0.6*v[ix]}
+    fx-=m*bias[ix];fy-=m*bias[iy];
+    for(let a=0;a<n;a++){const ja=J[ix*n+a],jb=J[iy*n+a];rhs[a]+=ja*fx+jb*fy;
+      for(let b=0;b<n;b++)M[a*n+b]+=m*(ja*J[ix*n+b]+jb*J[iy*n+b])}
+  }
+  for(let a=0;a<n;a++)rhs[a]-=sys.damp*M[a*n+a]*qd[a]*60;
+  solve(M,rhs,n,out);
+}
+function solve(A,b,n,x){
+  for(let c=0;c<n;c++){let p=c;for(let r=c+1;r<n;r++)if(Math.abs(A[r*n+c])>Math.abs(A[p*n+c]))p=r;
+    if(p!==c){for(let k=0;k<n;k++){const t=A[c*n+k];A[c*n+k]=A[p*n+k];A[p*n+k]=t}const t=b[c];b[c]=b[p];b[p]=t}
+    const d=A[c*n+c]||1e-12;
+    for(let r=c+1;r<n;r++){const f=A[r*n+c]/d;for(let k=c;k<n;k++)A[r*n+k]-=f*A[c*n+k];b[r]-=f*b[c]}}
+  for(let r=n-1;r>=0;r--){let s=b[r];for(let k=r+1;k<n;k++)s-=A[r*n+k]*x[k];x[r]=s/(A[r*n+r]||1e-12)}
+}
+function rk4(sys,q,qd,h){
+  const n=sys.n,a1=new Float64Array(n),a2=new Float64Array(n),a3=new Float64Array(n),a4=new Float64Array(n);
+  const q2=new Float64Array(n),v2=new Float64Array(n);
+  accel(sys,q,qd,a1);
+  for(let i=0;i<n;i++){q2[i]=q[i]+qd[i]*h/2;v2[i]=qd[i]+a1[i]*h/2}const k2q=Float64Array.from(v2);accel(sys,q2,v2,a2);
+  for(let i=0;i<n;i++){q2[i]=q[i]+k2q[i]*h/2;v2[i]=qd[i]+a2[i]*h/2}const k3q=Float64Array.from(v2);accel(sys,q2,v2,a3);
+  for(let i=0;i<n;i++){q2[i]=q[i]+k3q[i]*h;v2[i]=qd[i]+a3[i]*h}const k4q=Float64Array.from(v2);accel(sys,q2,v2,a4);
+  for(let i=0;i<n;i++){q[i]+=h/6*(qd[i]+2*k2q[i]+2*k3q[i]+k4q[i]);qd[i]+=h/6*(a1[i]+2*a2[i]+2*a3[i]+a4[i])}
+}
+function pointVel(sys,q,qd,k){const h=1e-5,n=sys.n,qa=new Float64Array(n),qb=new Float64Array(n);
+  for(let i=0;i<n;i++){qa[i]=q[i]+qd[i]*h;qb[i]=q[i]-qd[i]*h}
+  const a=sys.pos(qa,new Float64Array(2*sys.K)),b=sys.pos(qb,new Float64Array(2*sys.K));
+  return[(a[2*k]-b[2*k])/(2*h),(a[2*k+1]-b[2*k+1])/(2*h)]}
+
+function resetSim(){
+  model=buildModel();if(!model.ok){toSketch();return}
+  const m=model.w,sys=makeSys(m,true),q=new Float64Array(sys.n),qd=new Float64Array(sys.n);
+  q[0]=m.th0;if(sys.hinged)q[1]=m.ph0;q[sys.n-1]=m.ps0;
+  const p=sys.pos(q,new Float64Array(2*sys.K));
+  sim={m,sys,q,qd,t:0,phase:'armed',proj:null,traj:[],swing:[],maxH:0,prevAng:null,cwY0:p[2*NB+1],
+    rel:null,res:null,lastSample:0};
+  $('result').style.display='none';
+  camT=null;fitCamToSketch();
+  updateUI();
+}
+function mainAction(){
+  if(mode==='sketch'){model=buildModel();if(!model.ok){flashHint(model.msg);return}
+    mode='sim';hintTimer=0;resetSim();sim.phase='swing';updateUI();return}
+  if(!sim)return;hintTimer=0;
+  if(sim.phase==='armed'){sim.phase='swing';}
+  else if(sim.phase==='swing'){release('manual')}
+  else{resetSim();sim.phase='swing'}
+  updateUI();
+}
+function release(why){
+  const s=sim,sys=s.sys,k=sys.K-1,p=sys.pos(s.q,new Float64Array(2*sys.K)),v=pointVel(sys,s.q,s.qd,k);
+  s.proj={x:p[2*k],y:p[2*k+1],vx:v[0],vy:v[1]};
+  const sp=Math.hypot(v[0],v[1]),ang=Math.atan2(v[1],v[0]*s.m.fd)*180/Math.PI;
+  const dh=s.cwY0-p[2*NB+1],ke=0.5*prm.projMass*sp*sp;
+  s.rel={x:p[2*k],y:p[2*k+1],speed:sp,angle:ang,t:s.t,eff:dh>0?Math.min(1,ke/(prm.cwMass*G*dh)):0,why};
+  const nsys=makeSys(s.m,false),nq=new Float64Array(nsys.n),nqd=new Float64Array(nsys.n);
+  for(let i=0;i<nsys.n;i++){nq[i]=s.q[i];nqd[i]=s.qd[i]}
+  nsys.damp=0.03;
+  s.sys=nsys;s.q=nq;s.qd=nqd;s.phase='flight';s.traj=[[s.proj.x,s.proj.y]];s.maxH=s.proj.y;
+}
+function stepSim(dt){
+  const s=sim;if(!s||s.phase==='armed')return;
+  const n=Math.max(1,Math.min(600,Math.ceil(dt/0.0005))),h=dt/n,relA=prm.releaseAngle*Math.PI/180;
+  for(let i=0;i<n;i++){
+    rk4(s.sys,s.q,s.qd,h);s.t+=h;
+    if(s.phase==='swing'){
+      const k=s.sys.K-1,p=s.sys.pos(s.q,s.sys.pa),y=p[2*k+1],v=pointVel(s.sys,s.q,s.qd,k);
+      const ang=Math.atan2(v[1],v[0]*s.m.fd),sp=Math.hypot(v[0],v[1]);
+      if(s.t-s.lastSample>1/90){s.swing.push([p[2*k],y]);s.lastSample=s.t}
+      const air=y>s.m.rp+0.05;
+      if(air&&sp>1&&s.prevAng!==null&&s.prevAng>relA&&ang<=relA&&ang>-Math.PI/3){release('auto');continue}
+      s.prevAng=air?ang:null;
+      if(s.t>12)release('timeout');
+    }else if(s.phase==='flight'){
+      const P=s.proj;P.vy-=G*h;P.x+=P.vx*h;P.y+=P.vy*h;s.maxH=Math.max(s.maxH,P.y);
+      if(s.t-s.lastSample>1/60){s.traj.push([P.x,P.y]);s.lastSample=s.t}
+      if(P.y<=s.m.rp&&P.vy<0){
+        const lx=P.x;s.traj.push([lx,s.m.rp]);P.y=s.m.rp;
+        s.phase='landed';
+        s.res={range:lx*s.m.fd,maxH:s.maxH,speed:s.rel.speed,angle:s.rel.angle,flight:s.t-s.rel.t,eff:s.rel.eff};
+        logShot();showResult();
+      }
+    }
+  }
+}
+function logShot(){
+  const r=sim.res;shots.unshift({traj:sim.traj.slice(),range:r.range,maxH:r.maxH,
+    label:`${r.range.toFixed(1)} m · ${prm.cwMass} kg CW · ${prm.armRatio.toFixed(1)}:1 · sling ${prm.slingLen.toFixed(1)} m`});
+  shots=shots.slice(0,6);
+  $('log').innerHTML=shots.map(s=>`<li>${s.label}</li>`).join('');
+}
+function showResult(){
+  const r=sim.res,el=$('result');el.style.display='block';
+  el.innerHTML=`<div class="hand" style="color:var(--accent);font-size:15px">Landed!</div><h3>${r.range.toFixed(1)} m</h3>
+  <div>max height ${r.maxH.toFixed(1)} m · flight ${r.flight.toFixed(2)} s</div>
+  <div>release ${r.speed.toFixed(1)} m/s at ${r.angle.toFixed(0)}° · efficiency ${(r.eff*100).toFixed(0)}%</div>`;
+}
+
+/* ---------------- sketch input ---------------- */
+let sk={f:1,ox:0,oy:0};
+function viewRect(){const narrow=W<820,l=narrow?66:86,r=narrow?12:320,t=60,b=narrow?70:76;
+  return{x:l,y:t,w:Math.max(160,W-l-r),h:Math.max(160,H-t-b)}}
+function computeSk(){const v=viewRect(),f=Math.min(v.w/SW,v.h/SH);sk={f,ox:v.x+(v.w-SW*f)/2,oy:v.y+(v.h-SH*f)/2}}
+const toScr=p=>[sk.ox+p[0]*sk.f,sk.oy+p[1]*sk.f];
+const fromScr=(x,y)=>[(x-sk.ox)/sk.f,(y-sk.oy)/sk.f];
+cv.addEventListener('pointerdown',e=>{
+  if(mode!=='sketch'){return}
+  cv.setPointerCapture(e.pointerId);
+  const p=fromScr(e.clientX,e.clientY);
+  if(tool==='erase'){eraseAt(p);drawing={erase:true};return}
+  drawing={pts:[p]};
+});
+cv.addEventListener('pointermove',e=>{
+  if(!drawing)return;const p=fromScr(e.clientX,e.clientY);
+  if(drawing.erase){eraseAt(p);return}
+  const l=drawing.pts[drawing.pts.length-1];if(dist(l,p)>1.5/sk.f)drawing.pts.push(p);
+});
+cv.addEventListener('pointerup',()=>{
+  if(!drawing)return;const d=drawing;drawing=null;if(d.erase)return;
+  const sh=analyze(d.pts);
+  // a tap with a role tool on an existing stroke re-labels it
+  if(sh.dot&&tool!=='auto'&&tool!=='pivot'&&tool!=='proj'){const hit=hitStroke(d.pts[0]);if(hit){hit.role=tool;sketchChanged();return}}
+  if(sh.dot&&tool==='auto'){const hit=hitStroke(d.pts[0]);if(hit){flashHint('Pick a part tool (Frame, Beam…) and tap a stroke to re-label it.');return}}
+  strokes.push({pts:d.pts,shape:sh,role:tool==='erase'?'auto':tool});sketchChanged();
+});
+function hitStroke(p){let best=null,bd=12/sk.f;strokes.forEach(s=>{for(let i=1;i<s.pts.length;i++){const d=distSeg(p,s.pts[i-1],s.pts[i]);if(d<bd){bd=d;best=s}}
+  if(s.pts.length===1&&dist(p,s.pts[0])<bd){bd=dist(p,s.pts[0]);best=s}});return best}
+function eraseAt(p){const h=hitStroke(p);if(h){strokes.splice(strokes.indexOf(h),1);sketchChanged()}}
+function sketchChanged(){
+  model=buildModel();
+  if(model.ok){setParam('armRatio',model.drawnRatio);setParam('slingLen',model.drawnSling/U);model=buildModel()}
+  updateUI();
+}
+function paramsChanged(){model=buildModel();if(mode==='sim'){const ph=sim&&sim.phase;resetSim();}updateUI()}
+function toSketch(){mode='sketch';sim=null;$('result').style.display='none';model=buildModel();updateUI()}
+let hintTimer=0;
+function flashHint(m){$('hint').textContent=m;$('hint').style.opacity=1;hintTimer=performance.now()+4000}
+
+/* ---------------- example drawing ---------------- */
+function rng(seed){return()=>((seed=Math.imul(seed^seed>>>15,seed|1)+0x6d2b79f5>>>0)%100000)/100000}
+function handLine(a,b,R){const n=Math.max(6,dist(a,b)/9|0),pts=[],ph=R()*6,amp=1.2+R();
+  for(let i=0;i<=n;i++){const t=i/n,nx=-(b[1]-a[1])/dist(a,b),ny=(b[0]-a[0])/dist(a,b),w=Math.sin(t*Math.PI*2.3+ph)*amp*Math.sin(t*Math.PI);
+    pts.push([a[0]+(b[0]-a[0])*t+nx*w+(R()-.5),a[1]+(b[1]-a[1])*t+ny*w+(R()-.5)])}return pts}
+function handCircle(c,r,R){const pts=[],n=Math.max(14,r*0.9|0),s=R()*6,over=0.18+R()*0.1;
+  for(let i=0;i<=n*(1+over);i++){const a=s+i/n*Math.PI*2,rr=r*(1+Math.sin(a*2+s)*0.05)+(R()-.5)*1.2;pts.push([c[0]+Math.cos(a)*rr,c[1]+Math.sin(a)*rr])}return pts}
+function handCurve(pts0,R){const out=[];for(let i=0;i<pts0.length-1;i++){const seg=handLine(pts0[i],pts0[i+1],R);if(i)seg.shift();out.push(...seg)}return out}
+function exampleStrokes(){
+  const R=rng(7),list=[
+    handLine([300,652],[820,648],R),            // base
+    handLine([452,650],[560,334],R),            // upright
+    handLine([680,650],[561,333],R),            // upright
+    handLine([492,532],[636,534],R),            // brace
+    handCircle([560,331],9,R),                  // pivot
+    handLine([331,493],[627,283],R),            // beam
+    handCircle([628,340],38,R),                 // counterweight
+    handCurve([[333,496],[372,566],[420,616],[468,632]],R), // sling
+    handCircle([482,637],11,R),                 // stone
+  ];
+  return list.map(pts=>({pts,shape:analyze(pts),role:'auto'}));
+}
+function loadExample(){strokes=exampleStrokes();sketchChanged();flashHint('Example loaded. Press ▶ Trigger (or Space) to launch.')}
+
+/* ---------------- camera ---------------- */
+function fitCamToSketch(){computeSk();const m=model;if(!m||!m.ok)return;
+  cam.s=U*sk.f;cam.x=(W/2-sk.ox-sk.f*m.P[0])/cam.s;cam.y=(sk.oy+sk.f*m.gy-H/2)/cam.s}
+const w2s=(x,y)=>[W/2+(x-cam.x)*cam.s,H/2-(y-cam.y)*cam.s];
+function updateCam(dt){
+  if(!sim)return;const v=viewRect(),m=sim.m;
+  let x0=m.P[0]-m.La-m.Ls-1,x1=m.P[0]+m.La+m.Ls+1,y0=0,y1=m.P[1]+m.La+m.Ls*0.6;
+  m.frames.forEach(f=>f.forEach(p=>{x0=Math.min(x0,p[0]);x1=Math.max(x1,p[0])}));
+  const pts=sim.traj.concat(shots.length?shots[0].traj:[]);
+  pts.forEach(p=>{x0=Math.min(x0,p[0]);x1=Math.max(x1,p[0]);y1=Math.max(y1,p[1])});
+  if(sim.proj){x0=Math.min(x0,sim.proj.x);x1=Math.max(x1,sim.proj.x);y1=Math.max(y1,sim.proj.y)}
+  computeSk();const s0=U*sk.f;
+  const s=Math.min(s0,v.w/((x1-x0)*1.12),v.h/((y1-y0)*1.25+2));
+  const cx=(x0+x1)/2,cy=(H/2-(v.y+v.h-26))/s; // ground near bottom of view
+  const tx=cx-((v.x+v.w/2)-W/2)/s;
+  const k=snapCam?1:1-Math.exp(-dt*2.5);snapCam=false;
+  if(s<cam.s||sim.phase!=='armed'){cam.s+=(s-cam.s)*k;cam.x+=(tx-cam.x)*k;cam.y+=(-cy-cam.y)*k}
+}
+
+/* ---------------- rendering ---------------- */
+function resize(){DPR=Math.min(2,devicePixelRatio||1);W=innerWidth;H=innerHeight;cv.width=W*DPR;cv.height=H*DPR;
+  cv.style.width=W+'px';cv.style.height=H+'px';computeSk();if(sim&&sim.phase==='armed')fitCamToSketch()}
+addEventListener('resize',resize);
+
+function paperGrid(scale,ox,oy){ // grid in world metres; scale px/m, (ox,oy) screen pos of world origin
+  ctx.fillStyle='#f5f0e3';ctx.fillRect(0,0,W,H);
+  let step=1;while(step*scale<14)step*=step===1?5:2;
+  ctx.lineWidth=1;
+  const x0=Math.floor(-ox/scale/step)*step,x1=(W-ox)/scale,y0=Math.floor(-(H-oy)/scale/step)*step,y1=oy/scale;
+  for(let x=x0;x<=x1;x+=step){const sx=Math.round(ox+x*scale)+.5,major=Math.abs(x/step%5)<1e-6;
+    ctx.strokeStyle=major?'rgba(70,110,170,.22)':'rgba(70,110,170,.1)';ctx.beginPath();ctx.moveTo(sx,0);ctx.lineTo(sx,H);ctx.stroke()}
+  for(let y=y0;y<=y1;y+=step){const sy=Math.round(oy-y*scale)+.5,major=Math.abs(y/step%5)<1e-6;
+    ctx.strokeStyle=major?'rgba(70,110,170,.22)':'rgba(70,110,170,.1)';ctx.beginPath();ctx.moveTo(0,sy);ctx.lineTo(W,sy);ctx.stroke()}
+  return step;
+}
+function pencil(pts,map,color,w,alpha=1){
+  if(pts.length<2)return;ctx.save();ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=color;ctx.globalAlpha=alpha;
+  for(let pass=0;pass<2;pass++){ctx.lineWidth=pass?w*0.45:w;ctx.globalAlpha=alpha*(pass?0.4:0.9);
+    ctx.beginPath();pts.forEach((p,i)=>{const s=map(p);const o=pass?0.9:0;i?ctx.lineTo(s[0]+o,s[1]-o):ctx.moveTo(s[0]+o,s[1]-o)});ctx.stroke()}
+  ctx.restore();
+}
+function tag(x,y,text,color){ctx.save();ctx.font='600 11px -apple-system,Segoe UI,sans-serif';const w=ctx.measureText(text).width+10;
+  ctx.fillStyle=color;ctx.globalAlpha=.92;roundRect(x-w/2,y-9,w,18,9);ctx.fill();ctx.globalAlpha=1;ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,x,y+.5);ctx.restore()}
+function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
+function hatchCircle(sx,sy,r,color){
+  ctx.save();ctx.beginPath();ctx.arc(sx,sy,r,0,7);ctx.fillStyle=color;ctx.globalAlpha=.18;ctx.fill();ctx.globalAlpha=1;ctx.clip();
+  ctx.strokeStyle=color;ctx.globalAlpha=.55;ctx.lineWidth=1.2;for(let d=-r*2;d<r*2;d+=Math.max(4,r/5)){ctx.beginPath();ctx.moveTo(sx+d-r,sy+r);ctx.lineTo(sx+d+r,sy-r);ctx.stroke()}
+  ctx.restore();ctx.save();ctx.strokeStyle=color;ctx.lineWidth=2.4;ctx.beginPath();ctx.arc(sx,sy,r,0,7);ctx.stroke();ctx.restore()}
+
+function drawSketch(){
+  computeSk();
+  const origin=model&&model.ok?toScr([model.P[0],model.gy]):toScr([0,SH]);
+  paperGrid(U*sk.f,origin[0],origin[1]);
+  // sheet edge
+  ctx.save();ctx.strokeStyle='rgba(120,100,60,.25)';ctx.setLineDash([6,6]);ctx.strokeRect(sk.ox,sk.oy,SW*sk.f,SH*sk.f);ctx.restore();
+  const m=model&&model.ok?model:null;
+  if(m){ // ground line
+    const g0=toScr([0,m.gy]),g1=toScr([SW,m.gy]);ctx.save();ctx.strokeStyle='rgba(90,70,40,.5)';ctx.setLineDash([10,6]);ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(g0[0],g0[1]);ctx.lineTo(g1[0],g1[1]);ctx.stroke();ctx.restore();
+    ctx.fillStyle='rgba(90,70,40,.7)';ctx.font='12px -apple-system,sans-serif';ctx.fillText('ground',g0[0]+6,g0[1]+16);
+  }
+  strokes.forEach(s=>{const r=roleOf(s),col=r?ROLES[r].c:'#3a3a46';pencil(s.pts,toScr,col,2.6*Math.max(.7,sk.f))});
+  if(drawing&&drawing.pts)pencil(drawing.pts,toScr,'#3a3a46',2.6*Math.max(.7,sk.f));
+  if(m){
+    // interpreted mechanism, inked over the sketch
+    ctx.save();ctx.globalAlpha=.75;
+    const T=toScr(m.T),S=toScr(m.S),P=toScr(m.P),C=toScr(m.C),pc=toScr(m.pc);
+    ctx.strokeStyle=ROLES.beam.c;ctx.lineWidth=Math.max(3,6*sk.f);ctx.setLineDash([]);ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(T[0],T[1]);ctx.lineTo(S[0],S[1]);ctx.stroke();
+    ctx.strokeStyle=ROLES.cw.c;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(S[0],S[1]);ctx.lineTo(C[0],C[1]);ctx.stroke();
+    ctx.beginPath();ctx.arc(C[0],C[1],m.rcwU*sk.f,0,7);ctx.stroke();
+    ctx.strokeStyle=ROLES.sling.c;ctx.setLineDash([5,4]);ctx.beginPath();ctx.moveTo(T[0],T[1]);ctx.lineTo(pc[0],pc[1]);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle=ROLES.proj.c;ctx.beginPath();ctx.arc(pc[0],pc[1],m.rpU*sk.f,0,7);ctx.fill();
+    ctx.fillStyle='#fff';ctx.strokeStyle=ROLES.pivot.c;ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(P[0],P[1],6,0,7);ctx.fill();ctx.stroke();
+    ctx.restore();
+    // labels
+    const mid=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2];
+    tag(...mid(toScr(m.T),toScr(m.P)).map((v,i)=>v-(i?14:0)),`long arm ${(m.w.La).toFixed(1)} m`,ROLES.beam.c);
+    tag(P[0],P[1]-22,'pivot '+m.w.P[1].toFixed(1)+' m',ROLES.pivot.c);
+    tag(C[0],C[1]+m.rcwU*sk.f+16,prm.cwMass+' kg',ROLES.cw.c);
+    tag(pc[0],pc[1]-m.rpU*sk.f-14,prm.projMass+' kg',ROLES.proj.c);
+    const sm=mid(toScr(m.T),toScr(m.pc));tag(sm[0]-30,sm[1],'sling '+m.w.Ls.toFixed(1)+' m',ROLES.sling.c);
+    // firing direction arrow
+    const ax=P[0]+m.fd*60*sk.f*3,ay=P[1]-120*sk.f;ctx.save();ctx.strokeStyle='rgba(194,65,43,.6)';ctx.lineWidth=2;ctx.setLineDash([4,4]);
+    ctx.beginPath();ctx.moveTo(P[0],P[1]-60*sk.f);ctx.quadraticCurveTo(P[0]+m.fd*90*sk.f,ay-40*sk.f,ax,ay);ctx.stroke();ctx.setLineDash([]);
+    ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(ax-m.fd*10,ay-7);ctx.moveTo(ax,ay);ctx.lineTo(ax-m.fd*3,ay-12);ctx.stroke();ctx.restore();
+  }
+}
+function drawSim(dt){
+  updateCam(dt);
+  const o=w2s(0,0),step=paperGrid(cam.s,o[0],o[1]);
+  const s=sim,m=s.m,map=p=>w2s(p[0],p[1]);
+  // ground with distance ticks
+  ctx.fillStyle='rgba(120,95,55,.12)';ctx.fillRect(0,o[1],W,H-o[1]);
+  ctx.strokeStyle='#5c4a2c';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,o[1]);ctx.lineTo(W,o[1]);ctx.stroke();
+  let tick=step;while(tick*cam.s<70)tick*=tick%10===0?2.5:2;tick=Math.max(tick,1);
+  ctx.fillStyle='#5c4a2c';ctx.font='11px -apple-system,sans-serif';ctx.textAlign='center';
+  const xa=Math.floor((cam.x-W/2/cam.s)/tick)*tick;
+  for(let x=xa;x<cam.x+W/2/cam.s;x+=tick){const sx=w2s(x,0)[0],d=x*m.fd;ctx.fillRect(sx-.5,o[1],1,6);if(d>=0)ctx.fillText(d.toFixed(0)+' m',sx,o[1]+18)}
+  ctx.textAlign='left';
+  // previous shots
+  shots.forEach((sh,i)=>{if(i===0&&s.phase==='landed')return;ctx.save();ctx.globalAlpha=Math.max(.15,.5-i*.08);ctx.setLineDash([4,5]);
+    ctx.strokeStyle='#7a6f62';ctx.lineWidth=1.5;ctx.beginPath();sh.traj.forEach((p,j)=>{const q=map(p);j?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1])});ctx.stroke();
+    const e=map(sh.traj[sh.traj.length-1]);ctx.setLineDash([]);ctx.fillStyle='#7a6f62';ctx.fillText(sh.range.toFixed(0)+' m',e[0]-14,e[1]-8);ctx.restore()});
+  // frame
+  m.frames.forEach(f=>pencil(f,map,ROLES.frame.c,Math.max(2,3*cam.s/U*1.3)));
+  // swing path of the stone
+  if(s.swing.length>1){ctx.save();ctx.strokeStyle=ROLES.proj.c;ctx.globalAlpha=.35;ctx.setLineDash([2,4]);ctx.lineWidth=1.5;ctx.beginPath();
+    s.swing.forEach((p,i)=>{const q=map(p);i?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1])});ctx.stroke();ctx.restore()}
+  // trajectory
+  if(s.traj.length>1){ctx.save();ctx.strokeStyle=ROLES.proj.c;ctx.lineWidth=2.5;ctx.beginPath();
+    s.traj.forEach((p,i)=>{const q=map(p);i?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1])});ctx.stroke();ctx.restore();
+    // apex marker
+    let ap=s.traj[0];s.traj.forEach(p=>{if(p[1]>ap[1])ap=p});const a=map(ap),g=map([ap[0],0]);
+    ctx.save();ctx.strokeStyle='rgba(29,111,165,.6)';ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(g[0],g[1]);ctx.stroke();ctx.restore();
+    tag(a[0],a[1]-14,'max h '+ap[1].toFixed(1)+' m',ROLES.pivot.c);
+    const r=map([s.rel.x,s.rel.y]);ctx.fillStyle=ROLES.sling.c;ctx.beginPath();ctx.arc(r[0],r[1],4,0,7);ctx.fill();
+    tag(r[0]+m.fd*10+(m.fd>0?40:-40),r[1]+16,'release '+s.rel.speed.toFixed(1)+' m/s',ROLES.sling.c);
+  }
+  if(s.phase==='landed'){const e=map(s.traj[s.traj.length-1]);ctx.save();ctx.strokeStyle=ROLES.beam.c;ctx.lineWidth=3;
+    ctx.beginPath();ctx.moveTo(e[0]-8,e[1]-8);ctx.lineTo(e[0]+8,e[1]+8);ctx.moveTo(e[0]+8,e[1]-8);ctx.lineTo(e[0]-8,e[1]+8);ctx.stroke();ctx.restore();
+    tag(e[0],e[1]-26,'range '+s.res.range.toFixed(1)+' m',ROLES.beam.c);}
+  // mechanism
+  const p=s.sys.pos(s.q,new Float64Array(2*s.sys.K));
+  const T=map([p[2*(NB-1)],p[2*(NB-1)+1]]),S=map([p[0],p[1]]),P=map(m.P),C=map([p[2*NB],p[2*NB+1]]);
+  const sc=cam.s/U;
+  ctx.save();ctx.lineCap='round';
+  ctx.strokeStyle='#4b2e17';ctx.lineWidth=Math.max(4,11*sc);ctx.beginPath();ctx.moveTo(S[0],S[1]);ctx.lineTo(T[0],T[1]);ctx.stroke();
+  ctx.strokeStyle='#b8693a';ctx.lineWidth=Math.max(2,7*sc);ctx.stroke();
+  ctx.strokeStyle='#555';ctx.lineWidth=Math.max(1,2*sc);ctx.beginPath();ctx.moveTo(S[0],S[1]);ctx.lineTo(C[0],C[1]);ctx.stroke();
+  hatchCircle(C[0],C[1],Math.max(3,m.rcw*cam.s),ROLES.cw.c);
+  ctx.fillStyle='#fff';ctx.strokeStyle=ROLES.pivot.c;ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(P[0],P[1],Math.max(3,7*sc),0,7);ctx.fill();ctx.stroke();
+  let pr;
+  if(s.phase==='swing'||s.phase==='armed'){const k=s.sys.K-1;pr=map([p[2*k],p[2*k+1]]);
+    ctx.strokeStyle=ROLES.sling.c;ctx.lineWidth=Math.max(1.5,2.5*sc);ctx.beginPath();ctx.moveTo(T[0],T[1]);ctx.lineTo(pr[0],pr[1]);ctx.stroke()}
+  else{pr=map([s.proj.x,s.proj.y]);
+    // empty sling dangles from the tip
+    const ps=s.q[0]-Math.PI/2;ctx.strokeStyle=ROLES.sling.c;ctx.globalAlpha=.6;ctx.lineWidth=Math.max(1.5,2.5*sc);ctx.beginPath();ctx.moveTo(T[0],T[1]);
+    ctx.lineTo(T[0]+Math.cos(-Math.PI/2)*0,T[1]+m.Ls*cam.s*0.5);ctx.stroke();ctx.globalAlpha=1}
+  ctx.fillStyle=ROLES.proj.c;ctx.strokeStyle='#7a4c0c';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(pr[0],pr[1],Math.max(3,m.rp*cam.s),0,7);ctx.fill();ctx.stroke();
+  ctx.restore();
+  // HUD
+  const ph={armed:'Armed: press Trigger',swing:'Swinging…',flight:'In flight',landed:'Landed'}[s.phase];
+  ctx.save();ctx.font='600 13px -apple-system,sans-serif';ctx.fillStyle='rgba(46,47,58,.85)';
+  const hx=W<820?72:96;ctx.fillText(`${ph}   t = ${s.t.toFixed(2)} s`,hx,82);ctx.restore();
+}
+
+/* ---------------- side panel ---------------- */
+function updateUI(){
+  const ok=model&&model.ok;
+  const order=['frame','beam','pivot','cw','sling','proj'];
+  $('parts').innerHTML=order.map(r=>{const n=strokes.filter(s=>roleOf(s)===r).length;
+    const note=n?(n>1?n+' strokes':'drawn'):(r==='beam'?'required':'default');
+    return `<li class="${n?'':'miss'}"><span class="sw" style="background:${ROLES[r].c};opacity:${n?1:.35}"></span>${ROLES[r].label}<em>${n?'✓ ':''}${note}</em></li>`}).join('');
+  const mb=$('mainBtn');
+  if(mode==='sketch'){mb.textContent='▶ Trigger';mb.disabled=!ok;$('modeLbl').textContent='sketch mode · draw your siege engine'}
+  else{mb.disabled=false;mb.textContent=sim.phase==='armed'?'▶ Trigger':sim.phase==='swing'?'✋ Release now':'▶ Fire again';
+    $('modeLbl').textContent='simulation · '+(sim.phase==='swing'?'swinging':sim.phase)}
+  $('editBtn').style.display=mode==='sim'?'':'none';
+  $('resetBtn').style.display=mode==='sim'?'':'none';
+  if(performance.now()>hintTimer){
+    $('hint').textContent=mode==='sim'?'Space = trigger / release · R = re-arm · Esc = back to sketch':(ok?'Looks like a trebuchet! Press ▶ Trigger or Space.':(model?model.msg:''));
+  }
+}
+function updateStats(){
+  const st=[];
+  if(sim){const s=sim,sys=s.sys;let sp=0,h=0;
+    if(s.phase==='swing'||s.phase==='armed'){const k=sys.K-1,v=pointVel(sys,s.q,s.qd,k),p=sys.pos(s.q,new Float64Array(2*sys.K));sp=Math.hypot(...v);h=p[2*k+1]}
+    else{sp=Math.hypot(s.proj.vx,s.proj.vy);h=s.proj.y}
+    st.push(['Stone speed',sp.toFixed(1)+' m/s'],['Stone height',h.toFixed(1)+' m'],['Beam ω',(Math.abs(s.qd[0])).toFixed(2)+' rad/s'],
+      ['Max height',(s.maxH||0).toFixed(1)+' m'],['Range',s.res?s.res.range.toFixed(1)+' m':'–'],['Efficiency',s.rel?(s.rel.eff*100).toFixed(0)+'%':'–']);
+  }else if(model&&model.ok){const w=model.w;
+    st.push(['Long arm',w.La.toFixed(2)+' m'],['Short arm',w.Lb.toFixed(2)+' m'],['Pivot height',w.P[1].toFixed(2)+' m'],
+      ['CW drop arm',w.Lc.toFixed(2)+' m'],['Mass ratio',(prm.cwMass/prm.projMass).toFixed(0)+' : 1'],['Fires',w.fd>0?'→ right':'← left'])}
+  $('stats').innerHTML=st.map(([a,b])=>`<div class="st"><small>${a}</small><b>${b}</b></div>`).join('');
+}
+
+/* ---------------- main loop ---------------- */
+let last=performance.now(),uiT=0;
+function frame(now){
+  const dt=Math.min(0.05,(now-last)/1000);last=now;
+  if(mode==='sim'&&sim){const prev=sim.phase;stepSim(dt*prm.slowmo);if(sim.phase!==prev)updateUI();drawSim(dt)}
+  else drawSketch();
+  if(now-uiT>150){uiT=now;updateStats();if(performance.now()>hintTimer)updateUI()}
+  requestAnimationFrame(frame);
+}
+resize();
+const Q=new URLSearchParams(location.search);
+if(Q.has('autotest')){
+  loadExample();
+  const v=Q.get('autotest');
+  if(v!=='sketch'){mode='sim';resetSim();sim.phase='swing';
+    // headless renders are slow: fast-forward the physics to the requested moment
+    const until=v==='swing'?1.2:v==='flight'?3.2:99;
+    while(sim.t<until&&sim.phase!=='landed')stepSim(1/60);
+    if(v==='second'){resetSim();prm.cwMass=3500;setParam('cwMass',3500);model=buildModel();resetSim();sim.phase='swing';while(sim.phase!=='landed')stepSim(1/60)}
+    snapCam=true;hintTimer=0;updateUI()}
+}else{model=buildModel();updateUI()}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
