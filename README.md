@@ -1,6 +1,6 @@
 # AI Creation · Completed Deliverables
 
-Thirty builds: single-file web pieces plus two native macOS apps. Most were made by Claude Code (the main session or parallel subagents); eight were first built by Codex or Muse and finished by Claude. Each section below shows the original task brief, the time spent actively working on it, the tokens it used, a screenshot, and a link to the output.
+Thirty-two builds: single-file web pieces plus two native macOS apps. Most were made by Claude Code (the main session or parallel subagents); eight were first built by Codex or Muse and finished by Claude. Each section below shows the original task brief, the time spent actively working on it, the tokens it used, a screenshot, and a link to the output.
 
 **▶ Live site: [aray4702.github.io/ai_creation](https://aray4702.github.io/ai_creation/)**, where every game, simulation and animation runs in your browser.
 
@@ -9,7 +9,7 @@ Thirty builds: single-file web pieces plus two native macOS apps. Most were made
 
 | Tasks completed | Active agent time | Output tokens | Total tokens |
 |:-:|:-:|:-:|:-:|
-| **30** | **13h 21m** | **1.1M** | **123.2M** |
+| **32** | **14h 25m** | **1.2M** | **127.3M** |
 
 > **Active time** leaves out waiting for the usage limit to reset (about 4.3 h, twice) and any idle gap over 20 minutes. For each task it counts only the session work that finished it, not planning for other tasks or earlier attempts.
 > **Total tokens** = fresh input + cache writes + cache reads + output; cache reads are most of it.
@@ -48,6 +48,8 @@ Thirty builds: single-file web pieces plus two native macOS apps. Most were made
 28. [Butterfly Life Cycle](#28-butterfly-life-cycle)
 29. [Void Wing: Space Dogfight & Asteroid Battle](#29-void-wing)
 30. [Quantum Collapse: Two Observers vs Three (CN)](#30-quantum-collapse)
+31. [Sketch Trebuchet: Drawing to Physics Simulator](#31-sketch-trebuchet)
+32. [Acrylic Marker Flip Sketchbook](#32-acrylic-sketchbook)
 
 ---
 
@@ -629,6 +631,46 @@ A Chinese explainer on wavefunction collapse when A measures B, and when an outs
 
 ---
 
+<a id="31-sketch-trebuchet"></a>
+## 31. Sketch Trebuchet: Drawing to Physics Simulator
+
+**Simulation** · Main session
+
+<p><a href="sketch-trebuchet/sketch-trebuchet.html"><img src="sketch-trebuchet/sketch-trebuchet.png" alt="Screenshot of Draw and launch" width="640"></a></p>
+
+Sketch a trebuchet on graph paper and the app recognises the frame, beam, pivot, counterweight, sling and stone, then launches it with a multibody physics engine. Trace the arc, max height, release speed and range, and tune masses, sling length, arm ratio and release angle.
+
+> Built in the same agent run as *Acrylic Marker Flip Sketchbook*; the figures cover both tasks.
+
+| Active time | Output tokens | Total tokens |
+|:-:|:-:|:-:|
+| 1h 4m | 118,291 | 4.0M (4,035,099) |
+
+**Output:** [Draw and launch](sketch-trebuchet/sketch-trebuchet.html)<br>
+**Task brief:** [drawing to trebuchet sim.md](sketch-trebuchet/drawing%20to%20trebuchet%20sim.md)
+
+---
+
+<a id="32-acrylic-sketchbook"></a>
+## 32. Acrylic Marker Flip Sketchbook
+
+**Animation** · Main session
+
+<p><a href="acrylic-sketchbook/acrylic-sketchbook.html"><img src="acrylic-sketchbook/acrylic-sketchbook.png" alt="Screenshot of Open the sketchbook" width="640"></a></p>
+
+Photos are repainted by a WebGL acrylic-and-marker filter and bound into a spiral sketchbook whose pages curl, twist and cast shadows as you drag them. Six procedural sample photos make a travel journal out of the box; add your own by upload or drag-and-drop.
+
+> Built in the same agent run as *Sketch Trebuchet: Drawing to Physics Simulator*; the figures cover both tasks.
+
+| Active time | Output tokens | Total tokens |
+|:-:|:-:|:-:|
+| 1h 4m | 118,291 | 4.0M (4,035,099) |
+
+**Output:** [Open the sketchbook](acrylic-sketchbook/acrylic-sketchbook.html)<br>
+**Task brief:** [acrylic maker interactive flip sketchbook.md](acrylic-sketchbook/acrylic%20maker%20interactive%20flip%20sketchbook.md)
+
+---
+
 ## Full token breakdown
 
 | Task | Active | Input | Cache write | Cache read | Output | Total |
@@ -663,11 +705,13 @@ A Chinese explainer on wavefunction collapse when A measures B, and when an outs
 | Butterfly Life Cycle † | 42.8 min | 104 | 135,232 | 29,141,357 | 47,758 | 29,324,451 |
 | Void Wing: Space Dogfight & Asteroid Battle † | 42.8 min | 104 | 135,232 | 29,141,357 | 47,758 | 29,324,451 |
 | Quantum Collapse: Two Observers vs Three (CN) | 11.8 min | 32 | 67,270 | 1,289,451 | 44,124 | 1,400,877 |
+| Sketch Trebuchet: Drawing to Physics Simulator \* | 1h 4m | 54 | 173,714 | 3,743,040 | 118,291 | 4,035,099 |
+| Acrylic Marker Flip Sketchbook \* | 1h 4m | 54 | 173,714 | 3,743,040 | 118,291 | 4,035,099 |
 
 \* One agent run covered both tasks in the pair; each pair is counted once in the totals.  
 † First built by Codex or Muse and finished by Claude. The figures are Claude’s finishing work for all eight in one run (counted once in the totals; filing and publishing excluded); Codex’s and Muse’s own usage isn’t recorded.
 
-Source: Claude Code session transcripts, 28 Sep – 5 Oct 2026. Screenshots were taken with headless Chrome at 1280×720.
+Source: Claude Code session transcripts, 28 Sep – 6 Oct 2026. Screenshots were taken with headless Chrome at 1280×720.
 
 ## License
 
